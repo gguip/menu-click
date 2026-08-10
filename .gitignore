@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Turborepo
+.turbo/
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
