@@ -19,12 +19,14 @@ MenuClick/
 ├─ apps/
 │  └─ api/            # API HTTP (Fastify + TypeScript)
 │     ├─ .env.example        # variáveis de ambiente (copie para .env)
+│     ├─ migrations/         # migrations em SQL puro (node-pg-migrate)
 │     └─ src/
 │        ├─ server.ts        # criação do app + listen
 │        ├─ db/
 │        │  ├─ pool.ts       # pool de conexões do Postgres
-│        │  ├─ schema.sql    # DDL das tabelas (restaurants, products)
-│        │  └─ setup.ts      # aplica e confere o schema.sql (pnpm db:setup)
+│        │  ├─ migrate.ts    # runner das migrations (pnpm migrate:up/down)
+│        │  ├─ seed.sql      # dados de exemplo
+│        │  └─ seed.ts       # aplica o seed (pnpm db:seed)
 │        └─ routes/
 │           ├─ health.ts     # GET /health
 │           └─ restaurants.ts # CRUD de restaurantes e produtos
@@ -49,7 +51,10 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 
 # cria as tabelas
-pnpm --filter @menuclick/api db:setup
+pnpm --filter @menuclick/api migrate:up
+
+# (opcional) popula com 2 restaurantes e 4 produtos de exemplo
+pnpm --filter @menuclick/api db:seed
 
 # sobe a API em modo dev (com --watch / hot reload)
 pnpm dev
@@ -103,7 +108,26 @@ Resposta esperada:
 | `pnpm build`  | Type-check de todos os pacotes (`tsc --noEmit`)  |
 | `pnpm start`  | Sobe os apps em modo produção                    |
 
-Específico da API: `pnpm --filter @menuclick/api db:setup` aplica `src/db/schema.sql` no banco e confere se as tabelas estão com as colunas esperadas (pode rodar quantas vezes quiser).
+Específicos da API (rode com `pnpm --filter @menuclick/api <script>`):
+
+| Script           | O que faz                                                       |
+| ---------------- | --------------------------------------------------------------- |
+| `migrate:up`     | Aplica as migrations pendentes                                   |
+| `migrate:down`   | Desfaz a última migration                                        |
+| `migrate:create` | Cria um arquivo de migration SQL novo (com timestamp e template) |
+| `db:seed`        | Popula dados de exemplo — idempotente, não duplica               |
+
+### Migrations
+
+O schema é versionado com [node-pg-migrate](https://github.com/salsita/node-pg-migrate), em **SQL puro** (sem DSL, sem ORM). Cada arquivo em `apps/api/migrations/` tem as seções `-- Up Migration` e `-- Down Migration`; o que já rodou fica registrado na tabela `pgmigrations`.
+
+Para mudar o schema, **nunca edite uma migration que já rodou** — crie uma nova:
+
+```bash
+pnpm --filter @menuclick/api migrate:create adiciona-categorias
+```
+
+> Se você já tem um banco com as tabelas criadas antes das migrations existirem, não rode `migrate:up` nele: faça o *baseline* inserindo o nome da migration inicial na tabela `pgmigrations` (ver `.claude/rules/database.md`, D19).
 
 ## Soft delete
 

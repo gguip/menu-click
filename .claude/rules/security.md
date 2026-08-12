@@ -8,7 +8,7 @@ O projeto ainda não tem autenticação nem exposição pública — mas as deci
 
 - **S1 — Todo valor vindo do cliente vai como parâmetro (`$1`, `$2`, ...), sempre.** O driver manda valor e comando separados, então o texto nunca é lido como SQL. Verificado neste projeto: `where name = $1` com o payload `'; drop table products; --` faz uma busca literal por essa string e não apaga nada.
 
-- **S2 — Nunca concatene ou interpole valor na string SQL.** Além do óbvio, tem um agravante concreto: query **sem** parâmetro usa o protocolo simples do Postgres, que **aceita vários comandos separados por `;`** — é o que permite o `db:setup` rodar o `schema.sql` inteiro de uma vez. Ou seja, numa query concatenada, um `; drop table ...` no meio do input **executa**. Com parâmetro o Postgres recusa (`cannot insert multiple commands into a prepared statement`), e essa recusa é a sua rede de proteção. Concatenar joga a rede fora.
+- **S2 — Nunca concatene ou interpole valor na string SQL.** Além do óbvio, tem um agravante concreto: query **sem** parâmetro usa o protocolo simples do Postgres, que **aceita vários comandos separados por `;`** — é o que permite uma migration ou o `seed.sql` rodarem inteiros de uma vez. Ou seja, numa query concatenada, um `; drop table ...` no meio do input **executa**. Com parâmetro o Postgres recusa (`cannot insert multiple commands into a prepared statement`), e essa recusa é a sua rede de proteção. Concatenar joga a rede fora.
 
   ```ts
   // ❌ nunca
@@ -36,7 +36,7 @@ O projeto ainda não tem autenticação nem exposição pública — mas as deci
 
 - **S5 — Em busca com `LIKE`/`ILIKE`, escape os curingas do input.** `%` e `_` vindos do cliente não são injection, mas transformam "buscar por `%`" numa varredura da tabela inteira. Escape antes de interpolar no padrão (e mantenha o padrão como parâmetro).
 
-- **S6 — Só execute SQL multi-statement a partir de arquivo do repositório.** `pool.query(textoInteiro)` sem parâmetros é permitido apenas para o `schema.sql` (ver `db/setup.ts`). Nunca com string que passou perto de entrada do usuário.
+- **S6 — Só execute SQL multi-statement a partir de arquivo do repositório.** `pool.query(textoInteiro)` sem parâmetros é permitido apenas para arquivos versionados — as migrations e o `seed.sql` (ver `db/seed.ts`). Nunca com string que passou perto de entrada do usuário.
 
 ## 2. Entrada: valide e não confie no shape
 

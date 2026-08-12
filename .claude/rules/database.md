@@ -61,7 +61,18 @@ Regras **obrigatórias** para todo SQL da API (`apps/api`). Não há ORM nem que
 
 ## 4. Migrações
 
-- **D16 — O schema vive em `apps/api/src/db/schema.sql`** e é aplicado com `pnpm --filter @menuclick/api db:setup`. Não há ferramenta de migration.
-- **D17 — ⚠️ `create table if not exists` NÃO altera tabela existente.** Mudou uma coluna no `create table`? Acrescente também o `alter table ... add column if not exists` na seção de migrações do arquivo — é o que atualiza bancos que já tinham a tabela. Sem isso o `db:setup` passa em silêncio e o erro só aparece em runtime.
-- **D18 — Atualize a lista `expectedColumns` em `db/setup.ts`** ao mexer em colunas. É ela que faz o `db:setup` conferir o banco e falhar com exit 1 quando o schema está defasado.
-- **D19 — O `schema.sql` inteiro precisa ser idempotente** (`if not exists`, `drop constraint if exists` antes de recriar): ele roda toda vez que alguém chama `db:setup`.
+Ferramenta: **`node-pg-migrate`**, com migrations em **SQL puro** (`.sql`) em `apps/api/migrations/`. Cada arquivo tem as seções `-- Up Migration` e `-- Down Migration`, e o que já rodou fica registrado na tabela `pgmigrations`.
+
+```bash
+pnpm --filter @menuclick/api migrate:create <nome>   # cria o arquivo com timestamp + template
+pnpm --filter @menuclick/api migrate:up              # aplica as pendentes
+pnpm --filter @menuclick/api migrate:down            # desfaz a última
+pnpm --filter @menuclick/api db:seed                 # popula dados de exemplo (idempotente)
+```
+
+- **D16 — Toda mudança de schema é uma migration nova.** Nunca edite uma migration que já rodou (nem a inicial): quem já aplicou não vai aplicar de novo, e os bancos divergem em silêncio. Corrigiu algo? Migration nova por cima.
+- **D17 — Toda migration tem `Down` que realmente desfaz o `Up`.** Sem isso o `migrate:down` mente. Se for irreversível de verdade (perda de dado), diga isso num comentário em vez de deixar a seção vazia.
+- **D18 — Migration não usa `if not exists`.** Ela roda exatamente uma vez, controlada pelo `pgmigrations`; `if not exists` só mascara migration aplicada fora de ordem. (O `seed.sql` é o oposto: **precisa** ser idempotente, com ids fixos e `on conflict do nothing`.)
+- **D19 — Banco que já tem as tabelas precisa de baseline**, não de `migrate:up`: crie a tabela `pgmigrations` e insira o nome da migration inicial (o nome do arquivo sem `.sql`) marcando-a como aplicada. Rodar `up` num banco já populado tentaria recriar tudo e falharia.
+- **D20 — Migrations e código andam no mesmo commit.** Coluna nova sem a migration junto quebra o `pnpm dev` de quem der `git pull`.
+- **D21 — Crie migration sempre pelo `migrate:create`**, nunca escrevendo o arquivo à mão: é ele que gera o prefixo de timestamp correto, que define a ordem de execução.

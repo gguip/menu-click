@@ -19,7 +19,10 @@ pnpm start                         # sobe os apps em modo produção
 pnpm --filter @menuclick/api dev   # roda um script só num pacote
 curl http://localhost:3333/health  # smoke test da API
 
-pnpm --filter @menuclick/api db:setup   # aplica src/db/schema.sql no banco (idempotente)
+pnpm --filter @menuclick/api migrate:up       # aplica as migrations pendentes
+pnpm --filter @menuclick/api migrate:down     # desfaz a última migration
+pnpm --filter @menuclick/api migrate:create X # cria uma migration SQL nova
+pnpm --filter @menuclick/api db:seed          # popula dados de exemplo (idempotente)
 ```
 
 A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
@@ -48,7 +51,9 @@ Não há bundler, `tsx`, `ts-node` nem passo de emit. O Node executa `.ts` diret
 
 O `server.ts` fecha o pool no hook `onClose` e trata `SIGINT`/`SIGTERM` (F26). Requer **Postgres >= 13** (`gen_random_uuid()` nativo).
 
-🚨 **Este projeto usa soft delete: nada é apagado do banco.** Todo `DELETE` da API é um `update ... set deleted_at = now()`, e **toda** consulta filtra `deleted_at is null`. As regras completas (incluindo cascata transacional, índices parciais e como mexer no schema sem quebrar bancos existentes) estão em `.claude/rules/database.md` — **leia antes de escrever qualquer SQL**.
+O schema é versionado com **`node-pg-migrate`**, em migrations de **SQL puro** dentro de `apps/api/migrations/` (`-- Up Migration` / `-- Down Migration`, controle na tabela `pgmigrations`). Dados de exemplo ficam em `src/db/seed.sql`.
+
+🚨 **Este projeto usa soft delete: nada é apagado do banco.** Todo `DELETE` da API é um `update ... set deleted_at = now()`, e **toda** consulta filtra `deleted_at is null`. As regras completas (cascata transacional, índices parciais, como criar migration e como fazer baseline de banco existente) estão em `.claude/rules/database.md` — **leia antes de escrever qualquer SQL**.
 
 ### Monorepo
 
