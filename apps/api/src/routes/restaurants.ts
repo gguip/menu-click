@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
+import { pool, withTransaction } from "../db/pool.ts";
 
 // ajv e ajv-formats são pacotes CJS com `export default`. Sob NodeNext +
 // verbatimModuleSyntax o import default não fica construível no type-check,
@@ -84,11 +84,132 @@ type Product = CreateProductInput & {
   updatedAt: string;
 };
 
-// ===================== Stores em memória =====================
-// Temporários, até plugarmos um banco. Persistem enquanto o processo viver.
+// ===================== Acesso ao banco =====================
+//
+// Soft delete: nada é apagado de verdade. `deleted_at` NULL = registro vivo;
+// preenchido = removido. TODA consulta precisa filtrar `deleted_at is null`,
+// e o DELETE da API vira `update ... set deleted_at = now()`.
+// Ver `.claude/rules/database.md`.
 
-const restaurants: Restaurant[] = [];
-const products: Product[] = [];
+/** Linha da tabela `restaurants`, em snake_case como vem do Postgres. */
+type RestaurantRow = {
+  id: string;
+  name: string;
+  cuisine_type: string;
+  logo_url: string | null;
+  street: string;
+  number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  is_delivery: boolean;
+  is_qrcode: boolean;
+  created_at: Date;
+  updated_at: Date;
+};
+
+/** Converte a linha do banco no formato camelCase devolvido pela API. */
+function toRestaurant(row: RestaurantRow): Restaurant {
+  return {
+    id: row.id,
+    name: row.name,
+    cuisineType: row.cuisine_type,
+    // logoUrl é opcional: quando é NULL no banco, a chave nem entra na resposta.
+    ...(row.logo_url === null ? {} : { logoUrl: row.logo_url }),
+    address: {
+      street: row.street,
+      number: row.number,
+      neighborhood: row.neighborhood,
+      city: row.city,
+      state: row.state,
+      zipCode: row.zip_code,
+    },
+    isDelivery: row.is_delivery,
+    isQrcode: row.is_qrcode,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  };
+}
+
+/** Campos simples editáveis via PATCH → coluna correspondente na tabela. */
+const restaurantColumns = {
+  name: "name",
+  cuisineType: "cuisine_type",
+  logoUrl: "logo_url",
+  isDelivery: "is_delivery",
+  isQrcode: "is_qrcode",
+} as const;
+
+/** O endereço mora em colunas planas: campo do value object → coluna. */
+const addressColumns = {
+  street: "street",
+  number: "number",
+  neighborhood: "neighborhood",
+  city: "city",
+  state: "state",
+  zipCode: "zip_code",
+} as const;
+
+/** Linha da tabela `products`, em snake_case como vem do Postgres. */
+type ProductRow = {
+  id: string;
+  restaurant_id: string;
+  name: string;
+  category: string;
+  price_in_cents: number;
+  description: string | null;
+  photo_url: string | null;
+  created_at: Date;
+  updated_at: Date;
+};
+
+/** Converte a linha do banco no formato camelCase devolvido pela API. */
+function toProduct(row: ProductRow): Product {
+  return {
+    id: row.id,
+    restaurantId: row.restaurant_id,
+    name: row.name,
+    category: row.category,
+    priceInCents: row.price_in_cents,
+    // opcionais: quando são NULL no banco, a chave nem entra na resposta.
+    ...(row.description === null ? {} : { description: row.description }),
+    ...(row.photo_url === null ? {} : { photoUrl: row.photo_url }),
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+  };
+}
+
+/** Campos editáveis via PATCH → coluna correspondente na tabela. */
+const productColumns = {
+  name: "name",
+  category: "category",
+  priceInCents: "price_in_cents",
+  description: "description",
+  photoUrl: "photo_url",
+} as const;
+
+/**
+ * `id` é uma coluna `uuid`: mandar uma string fora do formato faz o Postgres
+ * estourar `invalid input syntax for type uuid`, o que viraria 500. A API
+ * sempre respondeu 404 para id inexistente, então filtramos antes de consultar.
+ */
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value: string) {
+  return UUID_PATTERN.test(value);
+}
+
+/** Existe restaurante vivo com esse id? Usado pelas rotas de produtos. */
+async function restaurantExists(id: string) {
+  if (!isUuid(id)) return false;
+  const { rowCount } = await pool.query(
+    "select 1 from restaurants where id = $1 and deleted_at is null",
+    [id],
+  );
+  return rowCount === 1;
+}
 
 // ===================== JSON Schemas =====================
 // Validação da entrada (F9) e serialização da saída (F10).
@@ -272,16 +393,34 @@ export async function restaurantRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const now = new Date().toISOString();
-      const restaurant: Restaurant = {
-        ...request.body,
-        id: randomUUID(),
-        createdAt: now,
-        updatedAt: now,
-      };
-      restaurants.push(restaurant);
+      const { name, cuisineType, logoUrl, address, isDelivery, isQrcode } =
+        request.body;
+
+      // id/createdAt/updatedAt saem dos defaults da tabela — daí o RETURNING *.
+      const { rows } = await pool.query<RestaurantRow>(
+        `insert into restaurants
+           (name, cuisine_type, logo_url,
+            street, number, neighborhood, city, state, zip_code,
+            is_delivery, is_qrcode)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         returning *`,
+        [
+          name,
+          cuisineType,
+          logoUrl ?? null,
+          address.street,
+          address.number,
+          address.neighborhood,
+          address.city,
+          address.state,
+          address.zipCode,
+          isDelivery,
+          isQrcode,
+        ],
+      );
+
       reply.code(201);
-      return restaurant;
+      return toRestaurant(rows[0]);
     },
   );
 
@@ -289,7 +428,15 @@ export async function restaurantRoutes(app: FastifyInstance) {
   app.get(
     "/restaurants",
     { schema: { response: { 200: restaurantListResponseSchema } } },
-    async () => restaurants,
+    async () => {
+      // ordem de criação, como era com o array em memória
+      const { rows } = await pool.query<RestaurantRow>(
+        `select * from restaurants
+          where deleted_at is null
+          order by created_at, id`,
+      );
+      return rows.map(toRestaurant);
+    },
   );
 
   // Buscar por id
@@ -303,9 +450,14 @@ export async function restaurantRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params;
-      const restaurant = restaurants.find((r) => r.id === id);
-      if (!restaurant) return restaurantNotFound(reply, id);
-      return restaurant;
+      if (!isUuid(id)) return restaurantNotFound(reply, id);
+
+      const { rows } = await pool.query<RestaurantRow>(
+        "select * from restaurants where id = $1 and deleted_at is null",
+        [id],
+      );
+      if (rows.length === 0) return restaurantNotFound(reply, id);
+      return toRestaurant(rows[0]);
     },
   );
 
@@ -321,19 +473,47 @@ export async function restaurantRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params;
-      const index = restaurants.findIndex((r) => r.id === id);
-      if (index === -1) return restaurantNotFound(reply, id);
+      if (!isUuid(id)) return restaurantNotFound(reply, id);
 
-      const existing = restaurants[index];
-      const updated: Restaurant = {
-        ...existing,
-        ...request.body,
-        id: existing.id,
-        createdAt: existing.createdAt,
-        updatedAt: new Date().toISOString(),
-      };
-      restaurants[index] = updated;
-      return updated;
+      // SET dinâmico com só os campos enviados. Percorremos o mapa de colunas
+      // (nunca as chaves do body) para nada vindo do cliente virar SQL, e os
+      // valores vão sempre como parâmetro $n.
+      const assignments: string[] = [];
+      const values: unknown[] = [];
+
+      function assign(column: string, value: unknown) {
+        values.push(value);
+        assignments.push(`${column} = $${values.length}`);
+      }
+
+      for (const [field, column] of Object.entries(restaurantColumns)) {
+        const value = request.body[field as keyof typeof restaurantColumns];
+        if (value === undefined) continue;
+        assign(column, value);
+      }
+
+      // Endereço é value object: quando vem no PATCH vem inteiro, então as seis
+      // colunas são atualizadas de uma vez.
+      const { address } = request.body;
+      if (address !== undefined) {
+        for (const [field, column] of Object.entries(addressColumns)) {
+          assign(column, address[field as keyof Address]);
+        }
+      }
+
+      // updatedAt renova em todo PATCH; id e createdAt ficam intocados.
+      assignments.push("updated_at = now()");
+      values.push(id);
+
+      const { rows } = await pool.query<RestaurantRow>(
+        `update restaurants
+            set ${assignments.join(", ")}
+          where id = $${values.length} and deleted_at is null
+          returning *`,
+        values,
+      );
+      if (rows.length === 0) return restaurantNotFound(reply, id);
+      return toRestaurant(rows[0]);
     },
   );
 
@@ -348,15 +528,27 @@ export async function restaurantRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params;
-      const index = restaurants.findIndex((r) => r.id === id);
-      if (index === -1) return restaurantNotFound(reply, id);
+      if (!isUuid(id)) return restaurantNotFound(reply, id);
 
-      // cascata: remove os produtos que pertencem a este restaurante
-      const kept = products.filter((p) => p.restaurantId !== id);
-      products.length = 0;
-      products.push(...kept);
+      // Soft delete: o restaurante e os produtos dele saem de cena juntos, na
+      // mesma transação — nada é apagado, só marcado com deleted_at.
+      const removed = await withTransaction(async (client) => {
+        const { rowCount } = await client.query(
+          `update restaurants set deleted_at = now()
+            where id = $1 and deleted_at is null`,
+          [id],
+        );
+        if (rowCount === 0) return false;
 
-      restaurants.splice(index, 1);
+        await client.query(
+          `update products set deleted_at = now()
+            where restaurant_id = $1 and deleted_at is null`,
+          [id],
+        );
+        return true;
+      });
+
+      if (!removed) return restaurantNotFound(reply, id);
       return reply.code(204).send();
     },
   );
@@ -382,21 +574,30 @@ async function productRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { restaurantId } = request.params;
-      if (!restaurants.some((r) => r.id === restaurantId)) {
+      if (!(await restaurantExists(restaurantId))) {
         return restaurantNotFound(reply, restaurantId);
       }
 
-      const now = new Date().toISOString();
-      const product: Product = {
-        ...request.body,
-        id: randomUUID(),
-        restaurantId,
-        createdAt: now,
-        updatedAt: now,
-      };
-      products.push(product);
+      const { name, category, priceInCents, description, photoUrl } =
+        request.body;
+
+      const { rows } = await pool.query<ProductRow>(
+        `insert into products
+           (restaurant_id, name, category, price_in_cents, description, photo_url)
+         values ($1, $2, $3, $4, $5, $6)
+         returning *`,
+        [
+          restaurantId,
+          name,
+          category,
+          priceInCents,
+          description ?? null,
+          photoUrl ?? null,
+        ],
+      );
+
       reply.code(201);
-      return product;
+      return toProduct(rows[0]);
     },
   );
 
@@ -414,10 +615,16 @@ async function productRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { restaurantId } = request.params;
-      if (!restaurants.some((r) => r.id === restaurantId)) {
+      if (!(await restaurantExists(restaurantId))) {
         return restaurantNotFound(reply, restaurantId);
       }
-      return products.filter((p) => p.restaurantId === restaurantId);
+      const { rows } = await pool.query<ProductRow>(
+        `select * from products
+          where restaurant_id = $1 and deleted_at is null
+          order by created_at, id`,
+        [restaurantId],
+      );
+      return rows.map(toProduct);
     },
   );
 
@@ -432,14 +639,18 @@ async function productRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { restaurantId, id } = request.params;
-      if (!restaurants.some((r) => r.id === restaurantId)) {
+      if (!(await restaurantExists(restaurantId))) {
         return restaurantNotFound(reply, restaurantId);
       }
-      const product = products.find(
-        (p) => p.id === id && p.restaurantId === restaurantId,
+      if (!isUuid(id)) return productNotFound(reply, id);
+
+      const { rows } = await pool.query<ProductRow>(
+        `select * from products
+          where id = $1 and restaurant_id = $2 and deleted_at is null`,
+        [id, restaurantId],
       );
-      if (!product) return productNotFound(reply, id);
-      return product;
+      if (rows.length === 0) return productNotFound(reply, id);
+      return toProduct(rows[0]);
     },
   );
 
@@ -458,25 +669,38 @@ async function productRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { restaurantId, id } = request.params;
-      if (!restaurants.some((r) => r.id === restaurantId)) {
+      if (!(await restaurantExists(restaurantId))) {
         return restaurantNotFound(reply, restaurantId);
       }
-      const index = products.findIndex(
-        (p) => p.id === id && p.restaurantId === restaurantId,
-      );
-      if (index === -1) return productNotFound(reply, id);
+      if (!isUuid(id)) return productNotFound(reply, id);
 
-      const existing = products[index];
-      const updated: Product = {
-        ...existing,
-        ...request.body,
-        id: existing.id,
-        restaurantId: existing.restaurantId,
-        createdAt: existing.createdAt,
-        updatedAt: new Date().toISOString(),
-      };
-      products[index] = updated;
-      return updated;
+      // Mesmo SET dinâmico do PATCH de restaurante: só os campos enviados,
+      // percorrendo o mapa de colunas (nunca as chaves do body).
+      const assignments: string[] = [];
+      const values: unknown[] = [];
+
+      for (const [field, column] of Object.entries(productColumns)) {
+        const value = request.body[field as keyof typeof productColumns];
+        if (value === undefined) continue;
+        values.push(value);
+        assignments.push(`${column} = $${values.length}`);
+      }
+
+      // id, restaurantId e createdAt ficam intocados; updatedAt renova.
+      assignments.push("updated_at = now()");
+      values.push(id, restaurantId);
+
+      const { rows } = await pool.query<ProductRow>(
+        `update products
+            set ${assignments.join(", ")}
+          where id = $${values.length - 1}
+            and restaurant_id = $${values.length}
+            and deleted_at is null
+          returning *`,
+        values,
+      );
+      if (rows.length === 0) return productNotFound(reply, id);
+      return toProduct(rows[0]);
     },
   );
 
@@ -491,15 +715,19 @@ async function productRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { restaurantId, id } = request.params;
-      if (!restaurants.some((r) => r.id === restaurantId)) {
+      if (!(await restaurantExists(restaurantId))) {
         return restaurantNotFound(reply, restaurantId);
       }
-      const index = products.findIndex(
-        (p) => p.id === id && p.restaurantId === restaurantId,
-      );
-      if (index === -1) return productNotFound(reply, id);
+      if (!isUuid(id)) return productNotFound(reply, id);
 
-      products.splice(index, 1);
+      // Soft delete: marca a saída em vez de apagar a linha.
+      const { rowCount } = await pool.query(
+        `update products set deleted_at = now()
+          where id = $1 and restaurant_id = $2 and deleted_at is null`,
+        [id, restaurantId],
+      );
+      if (rowCount === 0) return productNotFound(reply, id);
+
       return reply.code(204).send();
     },
   );
