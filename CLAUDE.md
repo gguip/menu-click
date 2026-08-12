@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API com um health check. O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (health check, CRUD de restaurantes no Postgres e CRUD de produtos ainda em memória). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -18,9 +18,11 @@ pnpm start                         # sobe os apps em modo produção
 
 pnpm --filter @menuclick/api dev   # roda um script só num pacote
 curl http://localhost:3333/health  # smoke test da API
+
+pnpm --filter @menuclick/api db:setup   # aplica src/db/schema.sql no banco (idempotente)
 ```
 
-A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0).
+A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
 
 **Ainda não há test runner nem linter configurados** — é intencional (só TS + Fastify). Se precisar rodar/adicionar testes, confirme antes de trazer uma lib nova.
 
@@ -40,6 +42,14 @@ Não há bundler, `tsx`, `ts-node` nem passo de emit. O Node executa `.ts` diret
 
 `apps/api/src/server.ts` é o entrypoint: cria a instância Fastify (com logger), registra os plugins de rota via `app.register(...)`, e faz o `listen`. Rotas ficam em `apps/api/src/routes/` como **plugins async** — funções `async (app: FastifyInstance) => { app.get(...) }`. **Para adicionar uma rota:** crie o arquivo em `routes/`, exporte a função de plugin, e registre-a em `server.ts` (lembrando da extensão `.ts` no import).
 
+### Banco: Postgres via `pg` (sem ORM)
+
+`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: as rotas importam `pool` direto e escrevem SQL. Restaurantes e produtos já vivem no Postgres — não há mais nada em memória.
+
+O `server.ts` fecha o pool no hook `onClose` e trata `SIGINT`/`SIGTERM` (F26). Requer **Postgres >= 13** (`gen_random_uuid()` nativo).
+
+🚨 **Este projeto usa soft delete: nada é apagado do banco.** Todo `DELETE` da API é um `update ... set deleted_at = now()`, e **toda** consulta filtra `deleted_at is null`. As regras completas (incluindo cascata transacional, índices parciais e como mexer no schema sem quebrar bancos existentes) estão em `.claude/rules/database.md` — **leia antes de escrever qualquer SQL**.
+
 ### Monorepo
 
 Turborepo (`turbo.json`) + pnpm workspaces (`pnpm-workspace.yaml`: `apps/*` + `packages/*`). `packages/` existe mas está vazio (reservado para libs compartilhadas). As tasks `dev`/`start` são `persistent` e sem cache; `build` depende de `^build` (builds das dependências primeiro).
@@ -51,7 +61,9 @@ Turborepo (`turbo.json`) + pnpm workspaces (`pnpm-workspace.yaml`: `apps/*` + `p
 
 ## Regras
 
-Regras detalhadas ficam em `.claude/rules/` e são carregadas automaticamente pelos imports abaixo. Ao trabalhar na API, **siga as regras do Fastify**; ao commitar, **siga o padrão de commits**.
+Regras detalhadas ficam em `.claude/rules/` e são carregadas automaticamente pelos imports abaixo. Ao trabalhar na API, **siga as regras do Fastify**; ao escrever SQL, **siga as regras de banco** (soft delete é obrigatório) e as de **segurança** (todo valor do cliente vai como `$1`); ao commitar, **siga o padrão de commits**.
 
 @.claude/rules/fastify.md
+@.claude/rules/database.md
+@.claude/rules/security.md
 @.claude/rules/commits.md
