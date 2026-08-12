@@ -22,16 +22,23 @@ const {
   DB_POOL_MAX = "10",
 } = process.env;
 
+/**
+ * Config de conexão, derivada do ambiente. Exportada para as ferramentas de
+ * linha de comando (migrations, seed) usarem exatamente a mesma origem que a
+ * API — uma fonte de verdade só para "em qual banco eu mexo".
+ */
+export const connectionConfig = DATABASE_URL
+  ? { connectionString: DATABASE_URL }
+  : {
+      host: DB_HOST,
+      port: Number(DB_PORT),
+      user: DB_USER,
+      password: DB_PASSWORD,
+      database: DB_NAME,
+    };
+
 export const pool = new Pool({
-  ...(DATABASE_URL
-    ? { connectionString: DATABASE_URL }
-    : {
-        host: DB_HOST,
-        port: Number(DB_PORT),
-        user: DB_USER,
-        password: DB_PASSWORD,
-        database: DB_NAME,
-      }),
+  ...connectionConfig,
   // Máximo de conexões simultâneas mantidas por processo.
   max: Number(DB_POOL_MAX),
 });
