@@ -1,8 +1,10 @@
 import Fastify from "fastify";
 import type { FastifyError } from "fastify";
 import { pool } from "./db/pool.ts";
+import { ConflictError, NotFoundError } from "./errors.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { restaurantRoutes } from "./routes/restaurants.ts";
+import { productRoutes } from "./routes/products.ts";
 import { productPurchaseRoutes } from "./routes/products-purchase.ts";
 
 /**
@@ -27,10 +29,28 @@ export async function buildApp() {
     await pool.end();
   });
 
-  // Tratamento centralizado de erro (F14/S11). Erro de cliente continua sendo
-  // respondido pelo Fastify como sempre; erro de servidor tem o detalhe
-  // (mensagem do Postgres, nome de coluna, stack) guardado só no log.
+  // Tratamento centralizado de erro (F14/S11). É aqui — e só aqui — que erro de
+  // negócio vira status HTTP: o serviço lança `NotFoundError`/`ConflictError`
+  // sem saber o que é um status code, e a tradução acontece neste ponto. Erro de
+  // cliente continua sendo respondido pelo Fastify como sempre; erro de servidor
+  // tem o detalhe (mensagem do Postgres, nome de coluna, stack) só no log.
   app.setErrorHandler(function (error: FastifyError, request, reply) {
+    if (error instanceof NotFoundError) {
+      return reply.code(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: error.message,
+      });
+    }
+
+    if (error instanceof ConflictError) {
+      return reply.code(409).send({
+        statusCode: 409,
+        error: "Conflict",
+        message: error.message,
+      });
+    }
+
     const statusCode = error.statusCode ?? 500;
 
     if (statusCode < 500) {
@@ -50,6 +70,7 @@ export async function buildApp() {
   // Registro das rotas
   await app.register(healthRoutes);
   await app.register(restaurantRoutes);
+  await app.register(productRoutes);
   await app.register(productPurchaseRoutes);
 
   return app;
