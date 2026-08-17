@@ -10,7 +10,8 @@
     "migrate:up": "node --env-file-if-exists=.env src/db/migrate.ts up",
     "migrate:down": "node --env-file-if-exists=.env src/db/migrate.ts down",
     "migrate:create": "node-pg-migrate create -j sql",
-    "db:seed": "node --env-file-if-exists=.env src/db/seed.ts"
+    "db:seed": "node --env-file-if-exists=.env src/db/seed.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "ajv": "^8.20.0",
@@ -22,6 +23,7 @@
     "@types/node": "^26.2.0",
     "@types/pg": "^8.21.0",
     "node-pg-migrate": "^9.0.0",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
   }
 }
