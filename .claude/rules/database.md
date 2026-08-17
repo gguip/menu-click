@@ -1,6 +1,6 @@
 # Regras: Banco de dados (Postgres + `pg`)
 
-Regras **obrigatórias** para todo SQL da API (`apps/api`). Não há ORM nem query builder: `apps/api/src/db/pool.ts` exporta um `Pool` singleton do driver `pg` e as rotas escrevem SQL na mão.
+Regras **obrigatórias** para todo SQL da API (`apps/api`). Não há ORM nem query builder: `apps/api/src/db/pool.ts` exporta um `Pool` singleton do driver `pg` e os **repositórios** (`apps/api/src/repositories/`) escrevem SQL na mão. SQL só existe lá — rota e serviço nunca escrevem query.
 
 ## 1. Soft delete — a regra que não pode ser quebrada
 
@@ -47,7 +47,7 @@ Regras **obrigatórias** para todo SQL da API (`apps/api`). Não há ORM nem que
 
 ## 2. Queries
 
-- **D8 — Sempre parametrizado** (`$1`, `$2`, ...). Nunca interpole valor vindo do cliente na string SQL. Em `UPDATE` com SET dinâmico, monte as atribuições percorrendo um **mapa fixo campo→coluna** (ver o PATCH em `routes/restaurants.ts`), nunca as chaves do body.
+- **D8 — Sempre parametrizado** (`$1`, `$2`, ...). Nunca interpole valor vindo do cliente na string SQL. Em `UPDATE` com SET dinâmico, monte as atribuições percorrendo um **mapa fixo campo→coluna** (ver o `update()` em `repositories/restaurants.ts`), nunca as chaves do body.
 - **D9 — `INSERT ... RETURNING *`** e devolva a linha retornada. `id`, `created_at` e `updated_at` vêm de defaults da tabela — não gere no Node.
 - **D10 — `updated_at = now()` em todo UPDATE** de conteúdo.
 - **D11 — Ordenação determinística:** `order by created_at, id` (só `created_at` empata se duas linhas nascerem no mesmo instante).
