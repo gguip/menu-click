@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    # Postgres nativo do Actions: sobe e morre com o job, só acessível de
+    # dentro dele (localhost:5432) — as credenciais abaixo não protegem nada
+    # que exista fora deste job, então não são segredo (não vão em
+    # `secrets.*`); são só a senha de um banco descartável.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # Aponta pro service container acima. `DB_NAME` de teste (`capstone_test`)
+    # é criado e migrado sozinho pelo `globalSetup` do Vitest
+    # (apps/api/test/global-setup.ts) quando a suíte roda — nenhum passo de
+    # migration manual é necessário aqui.
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm --filter @menuclick/api run build
+
+      - name: Test
+        run: pnpm --filter @menuclick/api run test

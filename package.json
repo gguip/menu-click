@@ -2,6 +2,7 @@
   "name": "menuclick",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@11.20.0",
   "engines": {
     "node": ">=23.6.0"
@@ -9,9 +10,14 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "start": "turbo run start"
+    "start": "turbo run start",
+    "lint": "eslint ."
   },
   "devDependencies": {
-    "turbo": "^2.10.9"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.8.1",
+    "turbo": "^2.10.9",
+    "typescript": "^6.0.0",
+    "typescript-eslint": "^8.67.0"
   }
 }
