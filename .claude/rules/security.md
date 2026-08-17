@@ -26,7 +26,7 @@ O projeto ainda não tem autenticação nem exposição pública — mas as deci
   const direction = request.query.order === "desc" ? "desc" : "asc"; // ternário, não input
   ```
 
-  É o mesmo padrão do `SET` dinâmico do PATCH em `routes/restaurants.ts`: **itere o mapa de colunas, nunca as chaves do body**. Se um dia precisar mesmo de identificador dinâmico de verdade, use `escapeIdentifier` do próprio `pg` — nunca aspas montadas à mão.
+  É o mesmo padrão do `SET` dinâmico do `update()` em `repositories/restaurants.ts`: **itere o mapa de colunas, nunca as chaves do body**. Se um dia precisar mesmo de identificador dinâmico de verdade, use `escapeIdentifier` do próprio `pg` — nunca aspas montadas à mão.
 
 - **S4 — Lista `IN` vira array parametrizado.** Não monte `in (${ids.join(",")})`. Use um parâmetro só:
 
@@ -47,7 +47,7 @@ O projeto ainda não tem autenticação nem exposição pública — mas as deci
 ## 3. Saída: não vaze o que não foi pedido
 
 - **S10 — `schema.response` por status code é obrigatório** (F10) e é uma regra de **segurança**, não só de performance: o `fast-json-stringify` só serializa os campos declarados. É o que impede uma coluna nova de vazar sozinha — hoje seria `deleted_at`, amanhã `password_hash`. Ao adicionar coluna, **não** a acrescente ao response schema por reflexo.
-- **S11 — Resposta 5xx nunca carrega detalhe interno.** Mensagem do Postgres (que entrega nome de tabela, de coluna e constraint), stack e caminho de arquivo vão **só para o log**. O cliente recebe uma mensagem genérica. Isso está centralizado no `setErrorHandler()` do `server.ts` — não contorne mandando `error.message` direto de dentro de uma rota.
+- **S11 — Resposta 5xx nunca carrega detalhe interno.** Mensagem do Postgres (que entrega nome de tabela, de coluna e constraint), stack e caminho de arquivo vão **só para o log**. O cliente recebe uma mensagem genérica. Isso está centralizado no `setErrorHandler()` do `app.ts` — não contorne mandando `error.message` direto de dentro de uma rota. É o mesmo handler que traduz os erros de negócio (`NotFoundError` → 404, `ConflictError` → 409): a mensagem deles é escrita pelo serviço para o cliente ler, então nunca carregue detalhe do Postgres dentro dela.
 
 ## 4. Segredos
 

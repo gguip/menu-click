@@ -20,16 +20,24 @@ MenuClick/
 │  └─ api/            # API HTTP (Fastify + TypeScript)
 │     ├─ .env.example        # variáveis de ambiente (copie para .env)
 │     ├─ migrations/         # migrations em SQL puro (node-pg-migrate)
+│     ├─ test/               # testes de integração (vitest + app.inject)
 │     └─ src/
-│        ├─ server.ts        # criação do app + listen
+│        ├─ server.ts        # listen (chama o buildApp)
+│        ├─ app.ts           # monta o app: plugins, rotas e error handler
+│        ├─ errors.ts        # erros de negócio (NotFoundError, ConflictError)
 │        ├─ db/
-│        │  ├─ pool.ts       # pool de conexões do Postgres
+│        │  ├─ pool.ts       # pool de conexões do Postgres + withTransaction
 │        │  ├─ migrate.ts    # runner das migrations (pnpm migrate:up/down)
 │        │  ├─ seed.sql      # dados de exemplo
 │        │  └─ seed.ts       # aplica o seed (pnpm db:seed)
-│        └─ routes/
+│        ├─ domain/          # tipos do domínio (sem runtime)
+│        ├─ repositories/    # só SQL: restaurants.ts, products.ts
+│        ├─ services/        # só regra de negócio: restaurants.ts, products.ts
+│        └─ routes/          # só HTTP (schema, params, status code)
 │           ├─ health.ts     # GET /health
-│           └─ restaurants.ts # CRUD de restaurantes e produtos
+│           ├─ restaurants.ts        # CRUD de restaurantes
+│           ├─ products.ts           # CRUD de produtos do restaurante
+│           └─ products-purchase.ts  # POST /products/:id/purchase
 ├─ packages/          # libs compartilhadas (em breve)
 ├─ turbo.json         # tasks do Turborepo
 └─ pnpm-workspace.yaml

@@ -44,6 +44,14 @@ export const pool = new Pool({
 });
 
 /**
+ * Quem sabe executar SQL: o `pool` (cada query pega uma conexão qualquer) ou um
+ * `client` de dentro de uma transação. Os repositórios recebem isso como último
+ * parâmetro — com o pool por padrão, e com o `client` quando o serviço precisa
+ * que várias escritas valham juntas (ver `withTransaction`).
+ */
+export type Queryable = Pool | PoolClient;
+
+/**
  * Roda `fn` dentro de uma transação, com commit no fim e rollback se der erro.
  * Use quando duas ou mais escritas precisam valer juntas — por exemplo o soft
  * delete de um restaurante e o dos produtos dele.
