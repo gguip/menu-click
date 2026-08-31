@@ -55,6 +55,12 @@ O domínio (restaurantes e produtos) é dividido em três camadas, e cada uma s�
 
 `src/domain/` guarda só os **tipos** compartilhados pelas três camadas (e o `isUuid`), sem runtime.
 
+### Estoque e a rota de compra
+
+`products.stock` é `not null default 0`. É **legível** em toda resposta de produto, **definível** no POST (estoque inicial) e **editável** no PATCH (reposição). Quem dá baixa é só `POST /products/:id/purchase`, que roda numa transação com `select ... for update` na linha — ler, decidir e gravar saem pela mesma conexão, então duas compras concorrentes se serializam em vez de venderem a mesma unidade duas vezes. `test/products-purchase.test.ts` cobre isso com 10 compras simultâneas para 5 unidades.
+
+Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-stock-to-products`): a constraint transformaria a race condition num erro do Postgres e esconderia o sintoma que o teste precisa enxergar.
+
 **Erro de negócio nunca vira status code na rota.** O serviço lança `NotFoundError`/`ConflictError` e o `setErrorHandler()` do `app.ts` traduz para **404**/**409**, com o corpo `{ statusCode, error, message }`. Nenhuma rota monta corpo de erro na mão.
 
 ### Banco: Postgres via `pg` (sem ORM)

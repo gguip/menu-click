@@ -51,6 +51,7 @@ const createProductBodySchema = {
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
     photoUrl: { type: "string", format: "uri" },
+    stock: { type: "integer", minimum: 0 },
   },
 };
 
@@ -64,6 +65,7 @@ const updateProductBodySchema = {
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
     photoUrl: { type: "string", format: "uri" },
+    stock: { type: "integer", minimum: 0 },
   },
 };
 
@@ -77,6 +79,7 @@ const productResponseSchema = {
     priceInCents: { type: "integer" },
     description: { type: "string" },
     photoUrl: { type: "string" },
+    stock: { type: "integer" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

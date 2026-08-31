@@ -61,7 +61,7 @@ cp apps/api/.env.example apps/api/.env
 # cria as tabelas
 pnpm --filter @menuclick/api migrate:up
 
-# (opcional) popula com 2 restaurantes e 4 produtos de exemplo
+# (opcional) popula com 2 restaurantes e 9 produtos de exemplo (já com estoque)
 pnpm --filter @menuclick/api db:seed
 
 # sobe a API em modo dev (com --watch / hot reload)
@@ -136,6 +136,26 @@ pnpm --filter @menuclick/api migrate:create adiciona-categorias
 ```
 
 > Se você já tem um banco com as tabelas criadas antes das migrations existirem, não rode `migrate:up` nele: faça o *baseline* inserindo o nome da migration inicial na tabela `pgmigrations` (ver `.claude/rules/database.md`, D19).
+
+## Estoque e compra
+
+Todo produto tem `stock` (inteiro, default 0). Ele é devolvido em toda resposta de produto, aceito no `POST` (estoque inicial) e no `PATCH` (reposição):
+
+```bash
+# cria já com estoque
+curl -X POST http://localhost:3333/restaurants/$RID/products \
+  -H 'content-type: application/json' \
+  -d '{"name":"Ramen Shoyu","category":"Pratos principais","priceInCents":4890,"stock":20}'
+
+# repõe
+curl -X PATCH http://localhost:3333/restaurants/$RID/products/$PID \
+  -H 'content-type: application/json' -d '{"stock":50}'
+
+# vende uma unidade (409 quando zera)
+curl -X POST http://localhost:3333/products/$PID/purchase
+```
+
+A baixa acontece só na rota de compra, dentro de uma transação com `select ... for update` na linha do produto: duas compras concorrentes se serializam em vez de venderem a mesma unidade duas vezes. O teste `test/products-purchase.test.ts` dispara 10 compras simultâneas contra 5 unidades e exige exatamente 5 vendas.
 
 ## Soft delete
 

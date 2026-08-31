@@ -26,6 +26,7 @@ type ProductRow = {
   price_in_cents: number;
   description: string | null;
   photo_url: string | null;
+  stock: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -41,6 +42,7 @@ function toProduct(row: ProductRow): Product {
     // opcionais: quando são NULL no banco, a chave nem entra na resposta.
     ...(row.description === null ? {} : { description: row.description }),
     ...(row.photo_url === null ? {} : { photoUrl: row.photo_url }),
+    stock: row.stock,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -53,6 +55,7 @@ const productColumns = {
   priceInCents: "price_in_cents",
   description: "description",
   photoUrl: "photo_url",
+  stock: "stock",
 } as const;
 
 /** Insere um produto no restaurante e devolve o que foi criado. */
@@ -63,8 +66,8 @@ export async function insert(
 ): Promise<Product> {
   const { rows } = await db.query<ProductRow>(
     `insert into products
-       (restaurant_id, name, category, price_in_cents, description, photo_url)
-     values ($1, $2, $3, $4, $5, $6)
+       (restaurant_id, name, category, price_in_cents, description, photo_url, stock)
+     values ($1, $2, $3, $4, $5, $6, $7)
      returning *`,
     [
       restaurantId,
@@ -73,6 +76,9 @@ export async function insert(
       input.priceInCents,
       input.description ?? null,
       input.photoUrl ?? null,
+      // a coluna é `not null default 0`; sem valor explícito o driver mandaria
+      // NULL (que não é "ausente") e a inserção estouraria.
+      input.stock ?? 0,
     ],
   );
 
