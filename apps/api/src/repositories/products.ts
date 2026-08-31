@@ -199,34 +199,69 @@ export async function softDeleteByRestaurant(
 }
 
 /**
- * Lê o estoque travando a linha até o fim da transação. Exige um `client` (não
- * o pool): `for update` fora de uma transação libera o lock na hora e não
- * protege nada. Devolve `null` se o produto não existe.
+ * Produtos vivos do restaurante entre os ids informados, em uma query só.
+ *
+ * Os ids vão como array parametrizado (`= any($2::uuid[])`), nunca montando um
+ * `in (...)` por concatenação (S4). Quem chama compara o tamanho do resultado
+ * com o que pediu para descobrir o que faltou — o repositório não decide que
+ * "faltou" é erro.
  */
-export async function selectStockForUpdate(
-  id: string,
-  client: PoolClient,
-): Promise<number | null> {
-  const { rows } = await client.query<{ stock: number }>(
-    `select stock from products
-      where id = $1 and deleted_at is null
-      for update`,
-    [id],
+export async function findManyByIds(
+  restaurantId: string,
+  ids: string[],
+  db: Queryable = pool,
+): Promise<Product[]> {
+  const { rows } = await db.query<ProductRow>(
+    `select * from products
+      where restaurant_id = $1 and id = any($2::uuid[]) and deleted_at is null`,
+    [restaurantId, ids],
   );
-  return rows.length === 0 ? null : rows[0].stock;
+  return rows.map(toProduct);
 }
 
-/** Grava o novo estoque e devolve o valor gravado. Roda dentro da transação. */
-export async function updateStock(
+/**
+ * Estoque dos produtos informados, com as linhas **travadas** até o fim da
+ * transação. É o `select ... for update` da confirmação de pedido.
+ *
+ * O `order by id` fixa a ordem em que as linhas são travadas. Sem ele a ordem
+ * fica por conta do plano de execução: hoje o plano é o mesmo nas duas
+ * transações e nada acontece, mas duas transações que travem os mesmos
+ * produtos em ordens diferentes esperam uma pela outra em ciclo — deadlock,
+ * que o Postgres resolve matando uma delas. É proteção contra um plano futuro
+ * (index scan virando seq scan com a tabela maior), não contra um bug
+ * observável hoje: nenhum teste falha se esta linha sair.
+ *
+ * Produto removido não volta na lista; quem chama decide o que fazer com isso.
+ */
+export async function selectStocksForUpdate(
+  ids: string[],
+  client: PoolClient,
+): Promise<{ id: string; stock: number }[]> {
+  const { rows } = await client.query<{ id: string; stock: number }>(
+    `select id, stock from products
+      where id = any($1::uuid[]) and deleted_at is null
+      order by id
+      for update`,
+    [ids],
+  );
+  return rows;
+}
+
+/**
+ * Debita `quantity` do estoque e devolve o que sobrou. Roda dentro da
+ * transação, com a linha já travada por `selectStocksForUpdate` — é o lock, e
+ * não o `stock - $1`, que garante que ninguém leu o mesmo valor no meio.
+ */
+export async function decrementStock(
   id: string,
-  stock: number,
+  quantity: number,
   client: PoolClient,
 ): Promise<number> {
   const { rows } = await client.query<{ stock: number }>(
-    `update products set stock = $1, updated_at = now()
+    `update products set stock = stock - $1, updated_at = now()
       where id = $2 and deleted_at is null
       returning stock`,
-    [stock, id],
+    [quantity, id],
   );
   return rows[0].stock;
 }

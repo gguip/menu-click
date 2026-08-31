@@ -1,0 +1,274 @@
+import type { FastifyInstance } from "fastify";
+import { createRequire } from "node:module";
+import type { CreateOrderInput, OrderStatus } from "../domain/order.ts";
+import { ORDER_STATUSES } from "../domain/order.ts";
+import type { Pagination } from "../domain/pagination.ts";
+import * as ordersService from "../services/orders.ts";
+import {
+  addressProperties,
+  addressSchema,
+  errorResponseSchema,
+  pageResponseSchema,
+  paginationQuerystringSchema,
+} from "./schemas.ts";
+
+/**
+ * Rotas de pedidos — camada HTTP (controller), aninhadas em restaurantes.
+ *
+ * Só HTTP. Congelar preço, calcular total e decidir se o restaurante entrega
+ * são regra de negócio e moram no serviço; aqui elas chegam como
+ * `NotFoundError`/`ConflictError` e viram 404/409 no error handler central.
+ */
+
+// Mesmo motivo de `products.ts`: ajv/ajv-formats são CJS com `export default`.
+const nodeRequire = createRequire(import.meta.url);
+const Ajv = nodeRequire("ajv") as typeof import("ajv")["default"];
+const addFormats = nodeRequire(
+  "ajv-formats",
+) as typeof import("ajv-formats")["default"];
+
+/**
+ * Estrito para o corpo: `quantity: "2"` tem que ser 400, não virar 2
+ * silenciosamente — quantidade errada em pedido é dinheiro errado.
+ */
+const strictAjv = new Ajv({
+  coerceTypes: false,
+  useDefaults: true,
+  removeAdditional: true,
+  allErrors: false,
+});
+addFormats(strictAjv);
+
+/** Coercitivo para params/querystring: o que vem na URL é sempre string. */
+const coercingAjv = new Ajv({
+  coerceTypes: "array",
+  useDefaults: true,
+  removeAdditional: true,
+  allErrors: false,
+});
+addFormats(coercingAjv);
+
+// ===================== JSON Schemas =====================
+
+const createOrderBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["customer", "items"],
+  properties: {
+    customer: {
+      type: "object",
+      additionalProperties: false,
+      required: ["name", "phone"],
+      properties: {
+        name: { type: "string", minLength: 1 },
+        phone: { type: "string", minLength: 1 },
+      },
+    },
+    items: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["productId", "quantity"],
+        properties: {
+          productId: { type: "string", format: "uuid" },
+          quantity: { type: "integer", minimum: 1 },
+        },
+      },
+    },
+    // ausente = pedido de mesa (QR code); presente = entrega
+    deliveryAddress: addressSchema,
+  },
+  // `totalInCents` não está aqui de propósito: o total é calculado no servidor.
+  // Aceitá-lo do cliente seria deixar quem paga escolher o preço.
+};
+
+const customerResponseSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    name: { type: "string" },
+    phone: { type: "string" },
+    createdAt: { type: "string" },
+    updatedAt: { type: "string" },
+  },
+};
+
+const orderItemResponseSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    productId: { type: "string" },
+    name: { type: "string" },
+    priceInCents: { type: "integer" },
+    quantity: { type: "integer" },
+  },
+};
+
+const orderSummaryProperties = {
+  id: { type: "string" },
+  restaurantId: { type: "string" },
+  customer: customerResponseSchema,
+  status: { type: "string" },
+  totalInCents: { type: "integer" },
+  // `nullable` em vez de `anyOf: [..., {type:"null"}]` (F12); null = pedido de mesa
+  deliveryAddress: {
+    type: "object",
+    nullable: true,
+    properties: addressProperties,
+  },
+  createdAt: { type: "string" },
+  updatedAt: { type: "string" },
+};
+
+/** A listagem não devolve itens — ver o comentário de `OrderSummary`. */
+const orderSummaryResponseSchema = {
+  type: "object",
+  properties: orderSummaryProperties,
+};
+
+const orderResponseSchema = {
+  type: "object",
+  properties: {
+    ...orderSummaryProperties,
+    items: { type: "array", items: orderItemResponseSchema },
+  },
+};
+
+const orderPageResponseSchema = pageResponseSchema(orderSummaryResponseSchema);
+
+/** Paginação mais o filtro por status (o painel do restaurante usa `pending`). */
+const orderListQuerystringSchema = {
+  ...paginationQuerystringSchema,
+  properties: {
+    ...paginationQuerystringSchema.properties,
+    // enum fechado: o valor chega ao SQL como `$n` comparado a uma coluna,
+    // nunca como identificador — e mesmo assim só passa o que está na lista
+    status: { type: "string", enum: [...ORDER_STATUSES] },
+  },
+};
+
+const restaurantIdParamsSchema = {
+  type: "object",
+  required: ["restaurantId"],
+  properties: { restaurantId: { type: "string" } },
+};
+
+const orderParamsSchema = {
+  type: "object",
+  required: ["restaurantId", "orderId"],
+  properties: {
+    restaurantId: { type: "string" },
+    orderId: { type: "string" },
+  },
+};
+
+type OrderListQuery = Pagination & { status?: OrderStatus };
+
+// ===================== Rotas =====================
+
+/** Plugin encapsulado: os validadores abaixo não vazam para as irmãs (F2). */
+export async function orderRoutes(app: FastifyInstance) {
+  app.setValidatorCompiler(({ schema, httpPart }) =>
+    (httpPart === "body" ? strictAjv : coercingAjv).compile(schema as object),
+  );
+
+  // Criar pedido. Nasce `pending` e NÃO mexe em estoque — a baixa acontece na
+  // confirmação do restaurante.
+  app.post<{ Params: { restaurantId: string }; Body: CreateOrderInput }>(
+    "/restaurants/:restaurantId/orders",
+    {
+      schema: {
+        params: restaurantIdParamsSchema,
+        body: createOrderBodySchema,
+        response: {
+          201: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const order = await ordersService.create(
+        request.params.restaurantId,
+        request.body,
+      );
+      reply.code(201);
+      return order;
+    },
+  );
+
+  // Listar pedidos do restaurante, opcionalmente por status
+  app.get<{ Params: { restaurantId: string }; Querystring: OrderListQuery }>(
+    "/restaurants/:restaurantId/orders",
+    {
+      schema: {
+        params: restaurantIdParamsSchema,
+        querystring: orderListQuerystringSchema,
+        response: { 200: orderPageResponseSchema, 404: errorResponseSchema },
+      },
+    },
+    async (request) => {
+      const { limit, offset, status } = request.query;
+      return ordersService.listByRestaurant(
+        request.params.restaurantId,
+        { limit, offset },
+        status,
+      );
+    },
+  );
+
+  // Confirmar o pedido: é AQUI que o estoque é debitado
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/confirm",
+    {
+      schema: {
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.confirm(restaurantId, orderId);
+    },
+  );
+
+  // Cancelar um pedido pendente (não mexe em estoque: nada foi debitado ainda)
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/cancel",
+    {
+      schema: {
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.cancel(restaurantId, orderId);
+    },
+  );
+
+  // Buscar pedido específico, com os itens
+  app.get<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId",
+    {
+      schema: {
+        params: orderParamsSchema,
+        response: { 200: orderResponseSchema, 404: errorResponseSchema },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.getById(restaurantId, orderId);
+    },
+  );
+}

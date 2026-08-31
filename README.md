@@ -30,14 +30,16 @@ MenuClick/
 │        │  ├─ migrate.ts    # runner das migrations (pnpm migrate:up/down)
 │        │  ├─ seed.sql      # dados de exemplo
 │        │  └─ seed.ts       # aplica o seed (pnpm db:seed)
-│        ├─ domain/          # tipos do domínio (sem runtime), incl. pagination.ts
-│        ├─ repositories/    # só SQL: restaurants.ts, products.ts
-│        ├─ services/        # só regra de negócio: restaurants.ts, products.ts
+│        ├─ domain/          # tipos do domínio (sem runtime): restaurant, product,
+│        │                    # customer, order, pagination
+│        ├─ repositories/    # só SQL: restaurants, products, customers, orders
+│        ├─ services/        # só regra de negócio: restaurants, products, orders
 │        └─ routes/          # só HTTP (schema, params, status code)
 │           ├─ health.ts     # GET /health
+│           ├─ schemas.ts    # schemas compartilhados (erro, paginação, endereço)
 │           ├─ restaurants.ts        # CRUD de restaurantes
 │           ├─ products.ts           # CRUD de produtos do restaurante
-│           └─ products-purchase.ts  # POST /products/:id/purchase
+│           └─ orders.ts             # pedidos: criar, listar, confirmar, cancelar
 ├─ packages/          # libs compartilhadas (em breve)
 ├─ turbo.json         # tasks do Turborepo
 └─ pnpm-workspace.yaml
@@ -61,7 +63,7 @@ cp apps/api/.env.example apps/api/.env
 # cria as tabelas
 pnpm --filter @menuclick/api migrate:up
 
-# (opcional) popula com 2 restaurantes e 9 produtos de exemplo (já com estoque)
+# (opcional) popula 2 restaurantes, 9 produtos (com estoque), 1 cliente e 2 pedidos
 pnpm --filter @menuclick/api db:seed
 
 # sobe a API em modo dev (com --watch / hot reload)
@@ -141,7 +143,7 @@ pnpm --filter @menuclick/api migrate:create adiciona-categorias
 
 ## Listagens paginadas
 
-`GET /restaurants` e `GET /restaurants/:restaurantId/products` respondem um envelope, não um array:
+`GET /restaurants`, `GET /restaurants/:restaurantId/products` e `GET /restaurants/:restaurantId/orders` respondem um envelope, não um array:
 
 ```bash
 curl "http://localhost:3333/restaurants?limit=2&offset=0"
@@ -158,7 +160,37 @@ curl "http://localhost:3333/restaurants?limit=2&offset=0"
 
 `limit` vai de 1 a 100 (default 20) e `offset` é >= 0 (default 0). Valor fora da faixa responde **400** em vez de ser ajustado em silêncio — um `limit=500` atendido como 100 mentiria sobre o que foi devolvido. `total` conta só os registros vivos (soft delete não entra).
 
-## Estoque e compra
+## Pedidos
+
+Um pedido nasce `pending`, e daí vai para `confirmed` ou `cancelled`. Não há `DELETE`: pedido não se apaga, se cancela.
+
+```bash
+# criar (endereço de entrega é opcional: sem ele, é pedido de mesa/QR)
+curl -X POST http://localhost:3333/restaurants/$RID/orders \
+  -H 'content-type: application/json' \
+  -d '{
+        "customer": { "name": "Ana Souza", "phone": "11999990000" },
+        "items": [ { "productId": "'$PID'", "quantity": 2 } ]
+      }'
+
+# listar (envelope paginado, com filtro opcional por status)
+curl "http://localhost:3333/restaurants/$RID/orders?status=pending&limit=10"
+
+# confirmar — é aqui que o estoque é debitado (409 se faltar)
+curl -X POST http://localhost:3333/restaurants/$RID/orders/$OID/confirm
+
+# cancelar (só pedido pendente)
+curl -X POST http://localhost:3333/restaurants/$RID/orders/$OID/cancel
+```
+
+O que o pedido garante:
+
+- **Preço congelado.** Cada item guarda uma cópia de `name` e `priceInCents` do produto no momento do pedido. Reajustar o cardápio depois não muda o valor de um pedido já feito — e o endereço de entrega é cópia pelo mesmo motivo.
+- **Total calculado no servidor.** `totalInCents` não existe no corpo da requisição; mandar não adianta.
+- **Cliente identificado pelo telefone.** Não há login: o mesmo telefone reaproveita o cliente (e atualiza o nome).
+- **Pedido é histórico, não catálogo.** Remover um cliente ou um restaurante não apaga os pedidos deles.
+
+## Estoque
 
 Todo produto tem `stock` (inteiro, default 0). Ele é devolvido em toda resposta de produto, aceito no `POST` (estoque inicial) e no `PATCH` (reposição):
 
@@ -171,12 +203,11 @@ curl -X POST http://localhost:3333/restaurants/$RID/products \
 # repõe
 curl -X PATCH http://localhost:3333/restaurants/$RID/products/$PID \
   -H 'content-type: application/json' -d '{"stock":50}'
-
-# vende uma unidade (409 quando zera)
-curl -X POST http://localhost:3333/products/$PID/purchase
 ```
 
-A baixa acontece só na rota de compra, dentro de uma transação com `select ... for update` na linha do produto: duas compras concorrentes se serializam em vez de venderem a mesma unidade duas vezes. O teste `test/products-purchase.test.ts` dispara 10 compras simultâneas contra 5 unidades e exige exatamente 5 vendas.
+**A única coisa que tira unidade do estoque é a confirmação de pedido.** Ela roda numa transação que trava primeiro o pedido (para duas confirmações do mesmo pedido não debitarem duas vezes) e depois os produtos, em ordem fixa de id (para pedidos diferentes que disputam o mesmo item se serializarem). Todos os itens são conferidos antes de qualquer débito.
+
+O efeito colateral aceito: **pedido pendente não é reserva.** Dois pedidos podem existir para a última unidade — o primeiro a confirmar leva, o segundo recebe 409. `test/orders-confirm.test.ts` cobre os dois casos.
 
 ## Soft delete
 
@@ -188,8 +219,9 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 
 ## Próximos passos
 
+- [ ] Cancelar pedido já confirmado, devolvendo estoque (hoje `confirmed` é terminal)
 - [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
-- [ ] Domínio: pedidos (`orders` + `order_items`, com o preço congelado no item)
+- [ ] Histórico do cliente (`GET /customers/:id/orders`) e CRUD próprio de clientes
 - [ ] CORS, rate limit e `bodyLimit` — antes de expor a API para um front
 - [ ] `packages/` compartilhados (tipos, config) — quando o front existir
 - [ ] App do cliente (cardápio via QR code) e painel admin

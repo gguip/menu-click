@@ -28,9 +28,3 @@ export type Product = CreateProductInput & {
   createdAt: string;
   updatedAt: string;
 };
-
-/** Resultado de uma compra: o que sobrou no estoque depois de dar baixa. */
-export type Purchase = {
-  productId: string;
-  stockRemaining: number;
-};

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (health check, CRUD de restaurantes e de produtos no Postgres, controle de estoque e rota de compra). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (health check, CRUD de restaurantes e de produtos no Postgres, controle de estoque e o fluxo de pedidos: criar, listar, confirmar e cancelar). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -59,17 +59,19 @@ Não há bundler, `tsx`, `ts-node` nem passo de emit. O Node executa `.ts` diret
 
 ### Três camadas: rota → serviço → repositório
 
-O domínio (restaurantes e produtos) é dividido em três camadas, e cada uma só conhece a de baixo:
+O domínio (restaurantes, produtos, clientes e pedidos) é dividido em três camadas, e cada uma só conhece a de baixo:
 
 - **`src/routes/` (controller)** — só HTTP: JSON Schema de entrada/saída, ler `params`/`body`, chamar o serviço e escolher o status code do caminho feliz. **Nunca escreve SQL nem importa `pool`/repositório.**
-- **`src/services/`** — a regra de negócio: "produto só existe dentro de restaurante vivo", a transação da compra, a cascata do soft delete. Não conhece Fastify (nada de `request`/`reply`) e não escreve SQL. Quando a operação não pode acontecer, **lança erro tipado** de `src/errors.ts` (`NotFoundError`, `ConflictError`).
+- **`src/services/`** — a regra de negócio: "produto só existe dentro de restaurante vivo", o congelamento de preço no pedido, a transação da confirmação, a cascata do soft delete. Não conhece Fastify (nada de `request`/`reply`) e não escreve SQL. Quando a operação não pode acontecer, **lança erro tipado** de `src/errors.ts` (`NotFoundError`, `ConflictError`).
 - **`src/repositories/`** — só acesso a dados: as queries parametrizadas, os tipos de linha (`snake_case`) e o mapper para o formato camelCase. Sem regra de negócio: "não achei" volta como `null`/`false`. Cada função recebe um `Queryable` opcional no fim (pool por padrão, ou o `client` quando o serviço abriu uma transação).
 
-`src/domain/` guarda só os **tipos** compartilhados pelas três camadas (e o `isUuid`), sem runtime.
+`src/domain/` guarda só os **tipos** compartilhados pelas três camadas (mais o `isUuid` e a lista `ORDER_STATUSES`, os dois únicos valores em runtime).
+
+Nem todo domínio ganha serviço: **não existe `services/customers.ts`**, porque resolver o cliente é uma chamada ao repositório sem regra própria — uma camada de repasse não ganharia nada.
 
 ### Listagens paginadas
 
-As duas listagens (`GET /restaurants` e `GET /restaurants/:restaurantId/products`) respondem um **envelope**, nunca um array cru:
+As três listagens (`GET /restaurants`, `GET /restaurants/:restaurantId/products` e `GET /restaurants/:restaurantId/orders`) respondem um **envelope**, nunca um array cru:
 
 ```json
 { "data": [ ... ], "limit": 20, "offset": 0, "total": 137 }
@@ -79,17 +81,42 @@ As duas listagens (`GET /restaurants` e `GET /restaurants/:restaurantId/products
 
 O repositório devolve `{ rows, total }` e é o **serviço** que monta o `Page<T>` — o repositório não conhece o formato da resposta. `total` conta só registros vivos e sai de uma segunda query: `count(*) over ()` traria tudo numa ida só, mas devolve zero linhas quando a página está vazia, e aí um `offset` além do fim reportaria `total: 0`.
 
-### Estoque e a rota de compra
+### Pedidos
 
-`products.stock` é `not null default 0`. É **legível** em toda resposta de produto, **definível** no POST (estoque inicial) e **editável** no PATCH (reposição). Quem dá baixa é só `POST /products/:id/purchase`, que roda numa transação com `select ... for update` na linha — ler, decidir e gravar saem pela mesma conexão, então duas compras concorrentes se serializam em vez de venderem a mesma unidade duas vezes. `test/products-purchase.test.ts` cobre isso com 10 compras simultâneas para 5 unidades.
+O fluxo é `POST /restaurants/:restaurantId/orders` (nasce `pending`) → `.../orders/:orderId/confirm` **ou** `.../cancel`. Não há `DELETE`: pedido não se apaga, se cancela. `confirmed` é terminal — desfazer uma confirmação exigiria devolver estoque, e essa decisão de negócio ainda não foi tomada.
+
+Três invariantes valem para todo código novo de pedido:
+
+- **O pedido congela o que combinou.** `order_items` guarda **cópias** de `name` e `price_in_cents` do produto, e o endereço de entrega é cópia em colunas planas (nulas no pedido de mesa, tudo-ou-nada garantido por `check`). Reajustar o cardápio não muda pedido antigo, e nenhuma leitura de pedido junta `products`.
+- **O total é calculado no servidor.** `totalInCents` nem existe no schema do corpo: aceitá-lo seria deixar quem paga escolher o preço.
+- **Pedido não é catálogo, é histórico.** Remover cliente ou restaurante **não** cascateia para `orders` (a cascata do projeto vale para restaurante → produtos). Por isso o join com `customers` na leitura de pedido é o único do projeto que **não** filtra `deleted_at is null` — filtrar apagaria o passado junto com o cadastro.
+
+Cliente é contato, não conta: sem login, o telefone é a identidade (índice único **parcial**), e o serviço resolve por `insert ... on conflict (phone) where deleted_at is null do update`, o que fecha a janela em que dois pedidos simultâneos do mesmo telefone criariam dois clientes.
+
+Duas linhas do mesmo produto no corpo viram **uma** com a quantidade somada — é o que um carrinho faz, e apaga o caso em que a confirmação teria que travar e debitar o mesmo produto duas vezes na mesma transação.
+
+### Estoque e a confirmação
+
+`products.stock` é `not null default 0`. É **legível** em toda resposta de produto, **definível** no POST (estoque inicial) e **editável** no PATCH (reposição). Quem dá baixa é **só** a confirmação de pedido — um caminho único, para a disciplina de lock existir num lugar só.
+
+A transação de `confirm` trava duas coisas, nessa ordem:
+
+1. **o pedido** (`select status ... for update`), o que serializa confirmações simultâneas do mesmo pedido. Sem isso todas leem `pending` e todas debitam — o `update` de status sozinho não protege, porque cada transação já decidiu confirmar antes de escrever;
+2. **os produtos** (`select ... order by id for update`), o que serializa pedidos diferentes disputando o mesmo item. O `order by id` fixa a ordem de travamento para não depender do plano de execução.
+
+Todos os itens são conferidos **antes** de qualquer débito: o rollback resolveria de qualquer jeito, mas conferir antes deixa a regra explícita.
+
+Consequência assumida de debitar só na confirmação: **pedido `pending` não é reserva.** Dois pedidos podem existir para a última unidade; o primeiro a confirmar leva, o segundo recebe 409.
 
 Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-stock-to-products`): a constraint transformaria a race condition num erro do Postgres e esconderia o sintoma que o teste precisa enxergar.
+
+🚨 **Teste de concorrência precisa aquecer o pool antes da corrida** (`warmPool()` em `test/orders-confirm.test.ts`). Com o pool frio, cada requisição espera o handshake de uma conexão nova, e isso é lento o bastante para a primeira transação inteira terminar antes de a segunda começar: o teste passa mesmo com o lock removido. Ao escrever um teste de corrida, **remova o lock e confirme que ele falha** — senão ele não está testando nada.
 
 **Erro de negócio nunca vira status code na rota.** O serviço lança `NotFoundError`/`ConflictError` e o `setErrorHandler()` do `app.ts` traduz para **404**/**409**, com o corpo `{ statusCode, error, message }`. Nenhuma rota monta corpo de erro na mão.
 
 ### Banco: Postgres via `pg` (sem ORM)
 
-`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes e produtos já vivem no Postgres — não há mais nada em memória.
+`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, produtos, clientes e pedidos vivem no Postgres — não há mais nada em memória.
 
 O `server.ts` fecha o pool no hook `onClose` e trata `SIGINT`/`SIGTERM` (F26). Requer **Postgres >= 13** (`gen_random_uuid()` nativo).
 
