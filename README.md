@@ -115,6 +115,7 @@ Resposta esperada:
 | `pnpm dev`    | Roda a task `dev` de todos os apps via Turborepo |
 | `pnpm build`  | Type-check de todos os pacotes (`tsc --noEmit`)  |
 | `pnpm start`  | Sobe os apps em modo produção                    |
+| `pnpm lint`   | Roda o ESLint em todo o monorepo                 |
 
 Específicos da API (rode com `pnpm --filter @menuclick/api <script>`):
 
@@ -124,6 +125,7 @@ Específicos da API (rode com `pnpm --filter @menuclick/api <script>`):
 | `migrate:down`   | Desfaz a última migration                                        |
 | `migrate:create` | Cria um arquivo de migration SQL novo (com timestamp e template) |
 | `db:seed`        | Popula dados de exemplo — idempotente, não duplica               |
+| `test`           | Suíte de integração no Vitest (precisa do Postgres de pé)        |
 
 ### Migrations
 
@@ -186,8 +188,10 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 
 ## Próximos passos
 
-- [ ] `packages/` compartilhados (tipos, config)
-- [ ] Domínio: categorias de cardápio e pedidos
+- [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
+- [ ] Domínio: pedidos (`orders` + `order_items`, com o preço congelado no item)
+- [ ] CORS, rate limit e `bodyLimit` — antes de expor a API para um front
+- [ ] `packages/` compartilhados (tipos, config) — quando o front existir
 - [ ] App do cliente (cardápio via QR code) e painel admin
 # menu-click
 # menu-click

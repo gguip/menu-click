@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (health check, CRUD de restaurantes no Postgres e CRUD de produtos ainda em memória). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (health check, CRUD de restaurantes e de produtos no Postgres, controle de estoque e rota de compra). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -15,6 +15,7 @@ pnpm install                       # instala tudo no monorepo
 pnpm dev                           # sobe todos os apps em watch (API em http://localhost:3333)
 pnpm build                         # type-check de todos os pacotes (tsc --noEmit)
 pnpm start                         # sobe os apps em modo produção
+pnpm lint                          # eslint em todo o monorepo
 
 pnpm --filter @menuclick/api dev   # roda um script só num pacote
 curl http://localhost:3333/health  # smoke test da API
@@ -23,11 +24,22 @@ pnpm --filter @menuclick/api migrate:up       # aplica as migrations pendentes
 pnpm --filter @menuclick/api migrate:down     # desfaz a última migration
 pnpm --filter @menuclick/api migrate:create X # cria uma migration SQL nova
 pnpm --filter @menuclick/api db:seed          # popula dados de exemplo (idempotente)
+pnpm --filter @menuclick/api test             # suíte de integração (precisa do Postgres de pé)
 ```
 
 A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
 
-**Ainda não há test runner nem linter configurados** — é intencional (só TS + Fastify). Se precisar rodar/adicionar testes, confirme antes de trazer uma lib nova.
+Testes rodam no **Vitest** e o lint no **ESLint** (config mínima na raiz, `eslint.config.js`). O CI (`.github/workflows/ci.yml`) roda os três — lint, type-check e testes — contra um Postgres de serviço.
+
+```bash
+pnpm lint                                     # eslint em todo o monorepo
+pnpm --filter @menuclick/api test             # suíte de integração (vitest run)
+pnpm --filter @menuclick/api exec vitest run test/products.stock.test.ts   # um arquivo só
+```
+
+Os testes são de **integração de verdade**: sobem o app com `buildApp()` + `app.inject()` (F21) e batem num banco Postgres real, `capstone_test`, criado e migrado sozinho pelo `globalSetup` (`test/global-setup.ts`). O `setup.ts` dá `truncate` nas tabelas depois de cada teste, e `fileParallelism: false` evita que um arquivo apague dado de outro. Não há mock de banco — se o Postgres não estiver de pé, a suíte não roda.
+
+Fora Vitest e ESLint, a regra de dependência mínima continua valendo: confirme antes de trazer lib nova.
 
 ## Arquitetura
 
