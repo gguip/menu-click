@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.ts";
 import type { Queryable } from "../db/pool.ts";
+import type { Pagination } from "../domain/pagination.ts";
 import type {
   CreateProductInput,
   Product,
@@ -85,18 +86,34 @@ export async function insert(
   return toProduct(rows[0]);
 }
 
-/** Produtos vivos de um restaurante, em ordem de criação (D11). */
+/**
+ * Uma página de produtos vivos do restaurante (D11), mais o total de vivos
+ * daquele restaurante — não da tabela inteira.
+ *
+ * O `order by`/`limit` casa exatamente com o índice parcial
+ * `products_active_by_restaurant_idx (restaurant_id, created_at, id)`.
+ * Duas queries pelo mesmo motivo do repositório de restaurantes.
+ */
 export async function findByRestaurant(
   restaurantId: string,
+  { limit, offset }: Pagination,
   db: Queryable = pool,
-): Promise<Product[]> {
+): Promise<{ rows: Product[]; total: number }> {
   const { rows } = await db.query<ProductRow>(
     `select * from products
       where restaurant_id = $1 and deleted_at is null
-      order by created_at, id`,
+      order by created_at, id
+      limit $2 offset $3`,
+    [restaurantId, limit, offset],
+  );
+
+  const { rows: countRows } = await db.query<{ total: string }>(
+    `select count(*) as total from products
+      where restaurant_id = $1 and deleted_at is null`,
     [restaurantId],
   );
-  return rows.map(toProduct);
+
+  return { rows: rows.map(toProduct), total: Number(countRows[0].total) };
 }
 
 /**

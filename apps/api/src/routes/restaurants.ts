@@ -4,7 +4,12 @@ import type {
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
 import * as restaurantsService from "../services/restaurants.ts";
-import { errorResponseSchema } from "./schemas.ts";
+import type { Pagination } from "../domain/pagination.ts";
+import {
+  errorResponseSchema,
+  pageResponseSchema,
+  paginationQuerystringSchema,
+} from "./schemas.ts";
 
 /**
  * Rotas de restaurantes — camada HTTP (controller), plugin encapsulado (F2/F4).
@@ -78,10 +83,9 @@ const restaurantResponseSchema = {
   },
 };
 
-const restaurantListResponseSchema = {
-  type: "array",
-  items: restaurantResponseSchema,
-};
+const restaurantPageResponseSchema = pageResponseSchema(
+  restaurantResponseSchema,
+);
 
 const idParamsSchema = {
   type: "object",
@@ -108,12 +112,17 @@ export async function restaurantRoutes(app: FastifyInstance) {
     },
   );
 
-  // Listar todos (array vazio é resposta válida → 200)
-  app.get(
+  // Listar (página vazia é resposta válida → 200)
+  app.get<{ Querystring: Pagination }>(
     "/restaurants",
-    { schema: { response: { 200: restaurantListResponseSchema } } },
-    async () => {
-      return restaurantsService.list();
+    {
+      schema: {
+        querystring: paginationQuerystringSchema,
+        response: { 200: restaurantPageResponseSchema },
+      },
+    },
+    async (request) => {
+      return restaurantsService.list(request.query);
     },
   );
 

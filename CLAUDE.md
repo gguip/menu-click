@@ -55,6 +55,18 @@ O domínio (restaurantes e produtos) é dividido em três camadas, e cada uma s�
 
 `src/domain/` guarda só os **tipos** compartilhados pelas três camadas (e o `isUuid`), sem runtime.
 
+### Listagens paginadas
+
+As duas listagens (`GET /restaurants` e `GET /restaurants/:restaurantId/products`) respondem um **envelope**, nunca um array cru:
+
+```json
+{ "data": [ ... ], "limit": 20, "offset": 0, "total": 137 }
+```
+
+`limit` (1–100, default 20) e `offset` (>= 0, default 0) vêm da querystring e são preenchidos pelo `useDefaults` do Ajv — o handler sempre recebe os dois resolvidos. Fora da faixa é **400**, não um ajuste silencioso. O schema e o helper do envelope são compartilhados em `routes/schemas.ts` (`paginationQuerystringSchema`, `pageResponseSchema`); os tipos (`Pagination`, `Page<T>`) estão em `domain/pagination.ts`.
+
+O repositório devolve `{ rows, total }` e é o **serviço** que monta o `Page<T>` — o repositório não conhece o formato da resposta. `total` conta só registros vivos e sai de uma segunda query: `count(*) over ()` traria tudo numa ida só, mas devolve zero linhas quando a página está vazia, e aí um `offset` além do fim reportaria `total: 0`.
+
 ### Estoque e a rota de compra
 
 `products.stock` é `not null default 0`. É **legível** em toda resposta de produto, **definível** no POST (estoque inicial) e **editável** no PATCH (reposição). Quem dá baixa é só `POST /products/:id/purchase`, que roda numa transação com `select ... for update` na linha — ler, decidir e gravar saem pela mesma conexão, então duas compras concorrentes se serializam em vez de venderem a mesma unidade duas vezes. `test/products-purchase.test.ts` cobre isso com 10 compras simultâneas para 5 unidades.

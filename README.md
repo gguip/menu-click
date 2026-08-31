@@ -30,7 +30,7 @@ MenuClick/
 │        │  ├─ migrate.ts    # runner das migrations (pnpm migrate:up/down)
 │        │  ├─ seed.sql      # dados de exemplo
 │        │  └─ seed.ts       # aplica o seed (pnpm db:seed)
-│        ├─ domain/          # tipos do domínio (sem runtime)
+│        ├─ domain/          # tipos do domínio (sem runtime), incl. pagination.ts
 │        ├─ repositories/    # só SQL: restaurants.ts, products.ts
 │        ├─ services/        # só regra de negócio: restaurants.ts, products.ts
 │        └─ routes/          # só HTTP (schema, params, status code)
@@ -136,6 +136,25 @@ pnpm --filter @menuclick/api migrate:create adiciona-categorias
 ```
 
 > Se você já tem um banco com as tabelas criadas antes das migrations existirem, não rode `migrate:up` nele: faça o *baseline* inserindo o nome da migration inicial na tabela `pgmigrations` (ver `.claude/rules/database.md`, D19).
+
+## Listagens paginadas
+
+`GET /restaurants` e `GET /restaurants/:restaurantId/products` respondem um envelope, não um array:
+
+```bash
+curl "http://localhost:3333/restaurants?limit=2&offset=0"
+```
+
+```json
+{
+  "data": [ { "id": "...", "name": "Tokyo Ramen House" }, { "...": "..." } ],
+  "limit": 2,
+  "offset": 0,
+  "total": 137
+}
+```
+
+`limit` vai de 1 a 100 (default 20) e `offset` é >= 0 (default 0). Valor fora da faixa responde **400** em vez de ser ajustado em silêncio — um `limit=500` atendido como 100 mentiria sobre o que foi devolvido. `total` conta só os registros vivos (soft delete não entra).
 
 ## Estoque e compra
 

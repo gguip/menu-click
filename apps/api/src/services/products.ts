@@ -5,6 +5,7 @@ import type {
   Purchase,
   UpdateProductInput,
 } from "../domain/product.ts";
+import type { Page, Pagination } from "../domain/pagination.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError } from "../errors.ts";
 import * as productsRepository from "../repositories/products.ts";
@@ -34,12 +35,17 @@ export async function create(
   return productsRepository.insert(restaurantId, input);
 }
 
-/** Produtos de um restaurante. Restaurante vazio devolve lista vazia. */
+/** Produtos de um restaurante. Restaurante sem produtos devolve página vazia. */
 export async function listByRestaurant(
   restaurantId: string,
-): Promise<Product[]> {
+  pagination: Pagination,
+): Promise<Page<Product>> {
   await restaurantsService.ensureExists(restaurantId);
-  return productsRepository.findByRestaurant(restaurantId);
+  const { rows, total } = await productsRepository.findByRestaurant(
+    restaurantId,
+    pagination,
+  );
+  return { data: rows, ...pagination, total };
 }
 
 export async function getById(
