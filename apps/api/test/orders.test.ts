@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
 import {
+  buildTestApp,
   createOrder,
   createProduct,
   createRestaurant,
@@ -20,7 +20,7 @@ describe("pedidos", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
   });
 

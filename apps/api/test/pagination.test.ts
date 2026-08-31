@@ -1,7 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
-import { createProduct, createRestaurant } from "./helpers.ts";
+import {
+  buildTestApp,
+  createProduct,
+  createRestaurant,
+} from "./helpers.ts";
 
 /**
  * Paginação das listagens (`limit`/`offset` com envelope).
@@ -14,7 +17,7 @@ describe("paginação das listagens", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
   });
 

@@ -1,7 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
-import { validRestaurantBody, validUserBody } from "./helpers.ts";
+import {
+  buildTestApp,
+  validRestaurantBody,
+  validUserBody,
+} from "./helpers.ts";
 
 /**
  * Limites de corpo e de conexão.
@@ -14,7 +17,7 @@ describe("limites de exposição", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
   });
 

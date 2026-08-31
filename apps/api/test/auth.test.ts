@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
 import { pool } from "../src/db/pool.ts";
 import {
   authHeaders,
+  buildTestApp,
   login,
   registerRestaurant,
   validRestaurantBody,
@@ -21,7 +21,7 @@ describe("autenticação", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
   });
 

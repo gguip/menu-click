@@ -1,7 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
-import { registerResponse, validRestaurantBody as validBody } from "./helpers.ts";
+import {
+  buildTestApp,
+  registerResponse,
+  validRestaurantBody as validBody,
+} from "./helpers.ts";
 
 /**
  * Validação do corpo do restaurante no cadastro.
@@ -15,7 +18,7 @@ describe("POST /auth/register — corpo do restaurante", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
   });
 
