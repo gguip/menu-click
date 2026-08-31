@@ -60,3 +60,27 @@ export function pageResponseSchema(itemSchema: object) {
     },
   };
 }
+
+// ===================== Endereço =====================
+
+/**
+ * Campos de um endereço. Compartilhado por restaurantes (endereço da loja) e
+ * pedidos (endereço de entrega congelado) — declarar duas vezes seria duas
+ * verdades para o mesmo value object (F11).
+ */
+export const addressProperties = {
+  street: { type: "string", minLength: 1 },
+  number: { type: "string", minLength: 1 },
+  neighborhood: { type: "string", minLength: 1 },
+  city: { type: "string", minLength: 1 },
+  state: { type: "string", minLength: 1 },
+  zipCode: { type: "string", minLength: 1 },
+};
+
+/** Endereço como entrada: value object, então quando vem, vem completo. */
+export const addressSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["street", "number", "neighborhood", "city", "state", "zipCode"],
+  properties: addressProperties,
+};

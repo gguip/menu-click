@@ -6,6 +6,8 @@ import type {
 import * as restaurantsService from "../services/restaurants.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import {
+  addressProperties,
+  addressSchema,
   errorResponseSchema,
   pageResponseSchema,
   paginationQuerystringSchema,
@@ -22,23 +24,6 @@ import {
 
 // ===================== JSON Schemas =====================
 // Validação da entrada (F9) e serialização da saída (F10/S10).
-
-const addressProperties = {
-  street: { type: "string", minLength: 1 },
-  number: { type: "string", minLength: 1 },
-  neighborhood: { type: "string", minLength: 1 },
-  city: { type: "string", minLength: 1 },
-  state: { type: "string", minLength: 1 },
-  zipCode: { type: "string", minLength: 1 },
-};
-
-// Endereço é um "value object": quando enviado, vem completo.
-const addressSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["street", "number", "neighborhood", "city", "state", "zipCode"],
-  properties: addressProperties,
-};
 
 const createRestaurantBodySchema = {
   type: "object",
