@@ -1,3 +1,5 @@
+import { SLUG_MAX_LENGTH } from "../domain/slug.ts";
+
 /**
  * Schema de resposta de erro, compartilhado pelas rotas.
  *
@@ -84,3 +86,60 @@ export const addressSchema = {
   required: ["street", "number", "neighborhood", "city", "state", "zipCode"],
   properties: addressProperties,
 };
+
+// ===================== Restaurante =====================
+// Ficam aqui (e não em `routes/restaurants.ts`) porque o cadastro
+// (`POST /auth/register`) cria o restaurante junto com o primeiro usuário e
+// precisa exatamente do mesmo contrato de entrada e de saída (F11).
+
+export const createRestaurantBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "cuisineType", "address", "isDelivery", "isQrcode"],
+  properties: {
+    name: { type: "string", minLength: 1 },
+    // opcional: sem ele o serviço deriva do nome. O `pattern` é o mesmo do
+    // `isSlug` do domínio — o que entra aqui vira URL pública.
+    slug: {
+      type: "string",
+      pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      maxLength: SLUG_MAX_LENGTH,
+    },
+    cuisineType: { type: "string", minLength: 1 },
+    logoUrl: { type: "string", format: "uri" },
+    address: addressSchema,
+    isDelivery: { type: "boolean" },
+    isQrcode: { type: "boolean" },
+  },
+};
+
+export const updateRestaurantBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    name: { type: "string", minLength: 1 },
+    cuisineType: { type: "string", minLength: 1 },
+    logoUrl: { type: "string", format: "uri" },
+    address: addressSchema,
+    isDelivery: { type: "boolean" },
+    isQrcode: { type: "boolean" },
+  },
+};
+
+export const restaurantResponseSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    slug: { type: "string" },
+    name: { type: "string" },
+    cuisineType: { type: "string" },
+    logoUrl: { type: "string" },
+    address: { type: "object", properties: addressProperties },
+    isDelivery: { type: "boolean" },
+    isQrcode: { type: "boolean" },
+    createdAt: { type: "string" },
+    updatedAt: { type: "string" },
+  },
+};
+

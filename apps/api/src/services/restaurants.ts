@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { withTransaction } from "../db/pool.ts";
+import { pool, withTransaction } from "../db/pool.ts";
+import type { Queryable } from "../db/pool.ts";
 import type {
   CreateRestaurantInput,
   Restaurant,
@@ -59,15 +60,20 @@ const MAX_SLUG_ATTEMPTS = 5;
  *
  * A colisão é detectada pelo índice único (o repositório devolve `null`), não
  * por um `select` antes: entre checar e inserir cabe outra requisição.
+ *
+ * Aceita um `Queryable` opcional pelo mesmo motivo que os repositórios: o
+ * cadastro (`POST /auth/register`) cria restaurante e primeiro usuário na
+ * mesma transação, e as duas escritas precisam sair pela mesma conexão.
  */
 export async function create(
   input: CreateRestaurantInput,
+  db: Queryable = pool,
 ): Promise<Restaurant> {
   if (input.slug !== undefined) {
-    const created = await restaurantsRepository.insert({
-      ...input,
-      slug: input.slug,
-    });
+    const created = await restaurantsRepository.insert(
+      { ...input, slug: input.slug },
+      db,
+    );
     if (created === null) {
       throw new ConflictError(`O slug "${input.slug}" já está em uso`);
     }
@@ -83,7 +89,7 @@ export async function create(
     const slug =
       attempt === 0 && base !== "" ? base : [base, suffix].filter(Boolean).join("-");
 
-    const created = await restaurantsRepository.insert({ ...input, slug });
+    const created = await restaurantsRepository.insert({ ...input, slug }, db);
     if (created !== null) return created;
   }
 

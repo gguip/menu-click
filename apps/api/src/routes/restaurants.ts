@@ -3,15 +3,15 @@ import type {
   CreateRestaurantInput,
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
-import { SLUG_MAX_LENGTH } from "../domain/slug.ts";
 import * as restaurantsService from "../services/restaurants.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import {
-  addressProperties,
-  addressSchema,
+  createRestaurantBodySchema,
   errorResponseSchema,
   pageResponseSchema,
   paginationQuerystringSchema,
+  restaurantResponseSchema,
+  updateRestaurantBodySchema,
 } from "./schemas.ts";
 
 /**
@@ -25,57 +25,6 @@ import {
 
 // ===================== JSON Schemas =====================
 // Validação da entrada (F9) e serialização da saída (F10/S10).
-
-const createRestaurantBodySchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["name", "cuisineType", "address", "isDelivery", "isQrcode"],
-  properties: {
-    name: { type: "string", minLength: 1 },
-    // opcional: sem ele o serviço deriva do nome. O `pattern` é o mesmo do
-    // `isSlug` do domínio — o que entra aqui vira URL pública.
-    slug: {
-      type: "string",
-      pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
-      maxLength: SLUG_MAX_LENGTH,
-    },
-    cuisineType: { type: "string", minLength: 1 },
-    logoUrl: { type: "string", format: "uri" },
-    address: addressSchema,
-    isDelivery: { type: "boolean" },
-    isQrcode: { type: "boolean" },
-  },
-};
-
-const updateRestaurantBodySchema = {
-  type: "object",
-  additionalProperties: false,
-  minProperties: 1,
-  properties: {
-    name: { type: "string", minLength: 1 },
-    cuisineType: { type: "string", minLength: 1 },
-    logoUrl: { type: "string", format: "uri" },
-    address: addressSchema,
-    isDelivery: { type: "boolean" },
-    isQrcode: { type: "boolean" },
-  },
-};
-
-const restaurantResponseSchema = {
-  type: "object",
-  properties: {
-    id: { type: "string" },
-    slug: { type: "string" },
-    name: { type: "string" },
-    cuisineType: { type: "string" },
-    logoUrl: { type: "string" },
-    address: { type: "object", properties: addressProperties },
-    isDelivery: { type: "boolean" },
-    isQrcode: { type: "boolean" },
-    createdAt: { type: "string" },
-    updatedAt: { type: "string" },
-  },
-};
 
 const restaurantPageResponseSchema = pageResponseSchema(
   restaurantResponseSchema,

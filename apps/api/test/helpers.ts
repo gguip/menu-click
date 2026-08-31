@@ -67,3 +67,67 @@ export async function createOrder(
   });
   return response.json();
 }
+
+export const validUserBody = {
+  name: "Guilherme Dono",
+  email: "dono@tokyoramen.com.br",
+  password: "senha-do-dono-123",
+};
+
+/**
+ * Cadastra restaurante + primeiro usuário e devolve os dois, mais a senha em
+ * texto (os testes precisam dela para o login; a API nunca devolve).
+ */
+export async function registerRestaurant(
+  app: FastifyInstance,
+  overrides: {
+    restaurant?: Record<string, unknown>;
+    user?: Record<string, unknown>;
+  } = {},
+) {
+  const payload = {
+    restaurant: { ...validRestaurantBody, ...overrides.restaurant },
+    user: { ...validUserBody, ...overrides.user },
+  };
+  const response = await app.inject({
+    method: "POST",
+    url: "/auth/register",
+    payload,
+  });
+  return { ...response.json(), password: payload.user.password as string };
+}
+
+/** Faz login e devolve o token. */
+export async function login(
+  app: FastifyInstance,
+  email: string,
+  password: string,
+): Promise<string> {
+  const response = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: { email, password },
+  });
+  return response.json().token;
+}
+
+/** Header pronto para `app.inject({ headers })`. */
+export function authHeaders(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+/** Cadastra e já entra: o par que quase todo teste protegido precisa. */
+export async function registerAndLogin(
+  app: FastifyInstance,
+  overrides: {
+    restaurant?: Record<string, unknown>;
+    user?: Record<string, unknown>;
+  } = {},
+) {
+  const { restaurant, user, password } = await registerRestaurant(
+    app,
+    overrides,
+  );
+  const token = await login(app, user.email, password);
+  return { restaurant, user, token, headers: authHeaders(token) };
+}
