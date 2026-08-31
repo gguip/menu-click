@@ -203,6 +203,27 @@ export async function softDeleteByRestaurant(
  * o pool): `for update` fora de uma transação libera o lock na hora e não
  * protege nada. Devolve `null` se o produto não existe.
  */
+/**
+ * Produtos vivos do restaurante entre os ids informados, em uma query só.
+ *
+ * Os ids vão como array parametrizado (`= any($2::uuid[])`), nunca montando um
+ * `in (...)` por concatenação (S4). Quem chama compara o tamanho do resultado
+ * com o que pediu para descobrir o que faltou — o repositório não decide que
+ * "faltou" é erro.
+ */
+export async function findManyByIds(
+  restaurantId: string,
+  ids: string[],
+  db: Queryable = pool,
+): Promise<Product[]> {
+  const { rows } = await db.query<ProductRow>(
+    `select * from products
+      where restaurant_id = $1 and id = any($2::uuid[]) and deleted_at is null`,
+    [restaurantId, ids],
+  );
+  return rows.map(toProduct);
+}
+
 export async function selectStockForUpdate(
   id: string,
   client: PoolClient,

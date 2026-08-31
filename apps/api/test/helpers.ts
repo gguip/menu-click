@@ -47,3 +47,23 @@ export async function createProduct(
   });
   return response.json();
 }
+
+export const validCustomerBody = {
+  name: "Ana Souza",
+  phone: "11999990000",
+};
+
+/** Cria um pedido via API e devolve o corpo já em camelCase. */
+export async function createOrder(
+  app: FastifyInstance,
+  restaurantId: string,
+  items: { productId: string; quantity: number }[],
+  overrides: Record<string, unknown> = {},
+) {
+  const response = await app.inject({
+    method: "POST",
+    url: `/restaurants/${restaurantId}/orders`,
+    payload: { customer: validCustomerBody, items, ...overrides },
+  });
+  return response.json();
+}
