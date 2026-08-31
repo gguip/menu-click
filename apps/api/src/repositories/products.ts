@@ -199,11 +199,6 @@ export async function softDeleteByRestaurant(
 }
 
 /**
- * Lê o estoque travando a linha até o fim da transação. Exige um `client` (não
- * o pool): `for update` fora de uma transação libera o lock na hora e não
- * protege nada. Devolve `null` se o produto não existe.
- */
-/**
  * Produtos vivos do restaurante entre os ids informados, em uma query só.
  *
  * Os ids vão como array parametrizado (`= any($2::uuid[])`), nunca montando um
@@ -228,10 +223,13 @@ export async function findManyByIds(
  * Estoque dos produtos informados, com as linhas **travadas** até o fim da
  * transação. É o `select ... for update` da confirmação de pedido.
  *
- * O `order by id` não é estética: sem ordem fixa, dois pedidos que compartilham
- * os mesmos produtos travariam as linhas em ordens diferentes e um esperaria o
- * outro em ciclo — deadlock, que o Postgres resolve matando uma das transações.
- * Com ordem fixa, o segundo simplesmente espera o primeiro terminar.
+ * O `order by id` fixa a ordem em que as linhas são travadas. Sem ele a ordem
+ * fica por conta do plano de execução: hoje o plano é o mesmo nas duas
+ * transações e nada acontece, mas duas transações que travem os mesmos
+ * produtos em ordens diferentes esperam uma pela outra em ciclo — deadlock,
+ * que o Postgres resolve matando uma delas. É proteção contra um plano futuro
+ * (index scan virando seq scan com a tabela maior), não contra um bug
+ * observável hoje: nenhum teste falha se esta linha sair.
  *
  * Produto removido não volta na lista; quem chama decide o que fazer com isso.
  */
@@ -264,34 +262,6 @@ export async function decrementStock(
       where id = $2 and deleted_at is null
       returning stock`,
     [quantity, id],
-  );
-  return rows[0].stock;
-}
-
-export async function selectStockForUpdate(
-  id: string,
-  client: PoolClient,
-): Promise<number | null> {
-  const { rows } = await client.query<{ stock: number }>(
-    `select stock from products
-      where id = $1 and deleted_at is null
-      for update`,
-    [id],
-  );
-  return rows.length === 0 ? null : rows[0].stock;
-}
-
-/** Grava o novo estoque e devolve o valor gravado. Roda dentro da transação. */
-export async function updateStock(
-  id: string,
-  stock: number,
-  client: PoolClient,
-): Promise<number> {
-  const { rows } = await client.query<{ stock: number }>(
-    `update products set stock = $1, updated_at = now()
-      where id = $2 and deleted_at is null
-      returning stock`,
-    [stock, id],
   );
   return rows[0].stock;
 }

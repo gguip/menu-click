@@ -1,15 +1,21 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.ts";
-import { createProduct, createRestaurant, validProductBody } from "./helpers.ts";
+import {
+  createOrder,
+  createProduct,
+  createRestaurant,
+  validProductBody,
+} from "./helpers.ts";
 
 /**
  * `stock` no contrato da API.
  *
  * A coluna existe desde a migration `add-stock-to-products`, mas por um tempo
  * ficou invisível: não voltava na resposta e não dava para definir, então todo
- * produto nascia com 0 e `POST /products/:id/purchase` respondia 409 sempre.
- * Estes testes fixam as três pontas: leitura, criação e reposição.
+ * produto nascia com 0 e nenhuma venda passava. Estes testes fixam as três
+ * pontas: leitura, criação e reposição — quem DEBITA é a confirmação de
+ * pedido, coberta em `orders-confirm.test.ts`.
  */
 describe("stock do produto", () => {
   let app: FastifyInstance;
@@ -100,19 +106,24 @@ describe("stock do produto", () => {
     expect(response.statusCode).toBe(400);
   });
 
-  it("a compra reflete o estoque definido na criação", async () => {
+  it("a confirmação de pedido reflete o estoque definido na criação", async () => {
     const restaurant = await createRestaurant(app);
     const product = await createProduct(app, restaurant.id, { stock: 3 });
+    const order = await createOrder(app, restaurant.id, [
+      { productId: product.id, quantity: 1 },
+    ]);
 
     const response = await app.inject({
       method: "POST",
-      url: `/products/${product.id}/purchase`,
+      url: `/restaurants/${restaurant.id}/orders/${order.id}/confirm`,
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      productId: product.id,
-      stockRemaining: 2,
+
+    const reloaded = await app.inject({
+      method: "GET",
+      url: `/restaurants/${restaurant.id}/products/${product.id}`,
     });
+    expect(reloaded.json().stock).toBe(2);
   });
 });

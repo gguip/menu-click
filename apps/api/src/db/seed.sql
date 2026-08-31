@@ -8,7 +8,7 @@
 -- registros são novos mesmo.
 --
 -- Os produtos vêm com `stock` preenchido: sem isso todo produto nasceria com 0
--- (o default da coluna) e `POST /products/:id/purchase` responderia 409 já na
+-- (o default da coluna) e a confirmação de pedido responderia 409 já na
 -- primeira chamada num ambiente recém-populado.
 
 insert into restaurants

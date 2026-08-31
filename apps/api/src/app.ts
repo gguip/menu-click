@@ -5,7 +5,6 @@ import { ConflictError, NotFoundError } from "./errors.ts";
 import { healthRoutes } from "./routes/health.ts";
 import { restaurantRoutes } from "./routes/restaurants.ts";
 import { productRoutes } from "./routes/products.ts";
-import { productPurchaseRoutes } from "./routes/products-purchase.ts";
 import { orderRoutes } from "./routes/orders.ts";
 
 /**
@@ -72,7 +71,6 @@ export async function buildApp() {
   await app.register(healthRoutes);
   await app.register(restaurantRoutes);
   await app.register(productRoutes);
-  await app.register(productPurchaseRoutes);
   await app.register(orderRoutes);
 
   return app;
