@@ -53,6 +53,22 @@ values
    'Ossobuco alla Milanese', 'Pratos principais', 7450, 'Com risoto de açafrão', 8)
 on conflict (id) do nothing;
 
+-- Um usuário por restaurante, para dar em quem entrar num ambiente novo.
+--
+-- A senha é `senha-de-exemplo-123` nos dois, e o hash abaixo é bcrypt custo 12
+-- dela. Isto NÃO é o mesmo caso do `.env.example` (que nunca carrega senha
+-- real, nem de dev): aqui é dado de exemplo de um banco de exemplo, do mesmo
+-- naipe do "Tokyo Ramen House". Ambiente real cadastra pelo /auth/register.
+insert into restaurant_users (id, restaurant_id, name, email, password_hash)
+values
+  ('2f8a1c04-9d3e-4b57-8a26-0c5e7b91d4f3', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Dono do Tokyo Ramen', 'dono@tokyoramen.com.br',
+   '$2b$12$AVy5NxxvXd1kfy09F8jRSednE5STi1tPr3Ddsy4CDwIY7e6YW.a8u'),
+  ('6b1d9e75-2a48-4f30-b9c1-8d0f3a5e7c26', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8',
+   'Dona da Cantina', 'dona@cantinadanona.com.br',
+   '$2b$12$AVy5NxxvXd1kfy09F8jRSednE5STi1tPr3Ddsy4CDwIY7e6YW.a8u')
+on conflict (id) do nothing;
+
 -- Um cliente e dois pedidos: um pendente (para testar a confirmação e ver o
 -- estoque cair) e um já confirmado (para a listagem ter os dois status).
 --
