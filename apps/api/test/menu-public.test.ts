@@ -58,6 +58,7 @@ describe("cardápio público", () => {
       const restaurant = await createRestaurant(app, { slug: "vai-fechar" });
       await app.inject({
         method: "DELETE",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}`,
       });
 
@@ -73,11 +74,11 @@ describe("cardápio público", () => {
   describe("GET /menu/:slug/products", () => {
     it("não expõe o estoque, só se dá para pedir", async () => {
       const restaurant = await createRestaurant(app, { slug: "tokyo-ramen" });
-      await createProduct(app, restaurant.id, {
+      await createProduct(app, restaurant, {
         name: "Ramen Shoyu",
         stock: 30,
       });
-      await createProduct(app, restaurant.id, { name: "Guioza", stock: 0 });
+      await createProduct(app, restaurant, { name: "Guioza", stock: 0 });
 
       const response = await app.inject({
         method: "GET",
@@ -99,7 +100,7 @@ describe("cardápio público", () => {
     it("responde o mesmo envelope paginado das outras listagens", async () => {
       const restaurant = await createRestaurant(app, { slug: "tokyo-ramen" });
       for (let i = 0; i < 3; i++) {
-        await createProduct(app, restaurant.id, { name: `Prato ${i}` });
+        await createProduct(app, restaurant, { name: `Prato ${i}` });
       }
 
       const response = await app.inject({
@@ -113,9 +114,10 @@ describe("cardápio público", () => {
 
     it("produto removido não aparece no cardápio", async () => {
       const restaurant = await createRestaurant(app, { slug: "tokyo-ramen" });
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
       await app.inject({
         method: "DELETE",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/products/${product.id}`,
       });
 

@@ -1,7 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.ts";
-import { createRestaurant, validRestaurantBody } from "./helpers.ts";
+import {
+  createRestaurant,
+  registerResponse,
+  validRestaurantBody,
+} from "./helpers.ts";
 
 /**
  * `slug`: o identificador público do restaurante, o que vai no QR code.
@@ -56,10 +60,9 @@ describe("slug do restaurante", () => {
   it("409 com slug explícito já em uso (não inventa outro)", async () => {
     await createRestaurant(app, { slug: "ramen-da-paulista" });
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/restaurants",
-      payload: { ...validRestaurantBody, slug: "ramen-da-paulista" },
+    const response = await registerResponse(app, {
+      ...validRestaurantBody,
+      slug: "ramen-da-paulista",
     });
 
     expect(response.statusCode).toBe(409);
@@ -72,11 +75,7 @@ describe("slug do restaurante", () => {
     ["hífen duplo", "ramen--casa"],
     ["acento", "café"],
   ])("400 com slug inválido: %s", async (_caso, slug) => {
-    const response = await app.inject({
-      method: "POST",
-      url: "/restaurants",
-      payload: { ...validRestaurantBody, slug },
-    });
+    const response = await registerResponse(app, { ...validRestaurantBody, slug });
 
     expect(response.statusCode).toBe(400);
   });
@@ -86,7 +85,8 @@ describe("slug do restaurante", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/restaurants/${restaurant.id}`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}`,
       payload: { name: "Nome Novo", slug: "ramen-sequestrado" },
     });
 
@@ -97,15 +97,15 @@ describe("slug do restaurante", () => {
 
   it("slug de restaurante removido pode ser reusado (índice parcial)", async () => {
     const primeiro = await createRestaurant(app, { slug: "ramen-da-esquina" });
-    await app.inject({ method: "DELETE", url: `/restaurants/${primeiro.id}` });
+    await app.inject({ method: "DELETE", headers: primeiro.headers,
+        url: `/restaurants/${primeiro.id}` });
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/restaurants",
-      payload: { ...validRestaurantBody, slug: "ramen-da-esquina" },
+    const response = await registerResponse(app, {
+      ...validRestaurantBody,
+      slug: "ramen-da-esquina",
     });
 
     expect(response.statusCode).toBe(201);
-    expect(response.json().slug).toBe("ramen-da-esquina");
+    expect(response.json().restaurant.slug).toBe("ramen-da-esquina");
   });
 });

@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { AuthContext } from "../domain/session.ts";
-import { UnauthorizedError } from "../errors.ts";
+import { NotFoundError, UnauthorizedError } from "../errors.ts";
 import * as authService from "../services/auth.ts";
 
 /**
@@ -13,29 +13,68 @@ import * as authService from "../services/auth.ts";
 
 declare module "fastify" {
   interface FastifyRequest {
-    /** Preenchido pelo `authenticate`; `null` em rota pública. */
+    /** Preenchido pelo hook; `null` em rota pública. */
     auth: AuthContext | null;
+  }
+
+  interface FastifyContextConfig {
+    /**
+     * Marca a rota como acessível sem sessão. **Ausente = protegida.**
+     *
+     * A lista está invertida de propósito. Com opt-in (`preHandler` rota a
+     * rota), esquecer uma linha expõe a rota em silêncio; com opt-out, o mesmo
+     * esquecimento a fecha, e o sintoma é um 401 que aparece no primeiro teste.
+     * Os dois erros não custam a mesma coisa.
+     */
+    public?: boolean;
   }
 }
 
 /**
- * Instala o decorator na instância raiz.
+ * Instala a autenticação na instância raiz: o decorator e o hook que fecha tudo.
  *
- * Inicializado com `null` de propósito (F18): decorar com um valor "vazio"
- * desde o começo mantém o shape do objeto de requisição estável para a V8, em
- * vez de fazer a propriedade nascer no meio do caminho.
+ * O decorator nasce com `null` de propósito (F18): decorar com um valor
+ * "vazio" desde o começo mantém o shape do objeto de requisição estável para a
+ * V8, em vez de fazer a propriedade aparecer no meio do caminho.
  *
  * Não precisa de `fastify-plugin` (F3) porque é chamado direto na raiz pelo
- * `buildApp()` — o encapsulamento que o `fp` quebraria nem chega a existir.
+ * `buildApp()` — o encapsulamento que o `fp` quebraria nem chega a existir. E
+ * precisa ser chamado ANTES de registrar as rotas: hook de raiz vale para o
+ * que for registrado depois dele (F5).
  */
 export function installAuth(app: FastifyInstance): void {
   app.decorateRequest("auth", null);
+
+  // `onRequest` roda depois do roteamento, então `routeOptions.config` e
+  // `params` já existem aqui.
+  app.addHook("onRequest", async (request) => {
+    if (request.routeOptions.config.public === true) return;
+
+    await authenticate(request);
+
+    // Autorização, e não só autenticação: ter sessão não dá acesso a qualquer
+    // restaurante. A checagem é feita AQUI, e não em cada rota, pelo mesmo
+    // motivo da lista invertida — rota nova com `:restaurantId` já nasce
+    // protegida, sem depender de alguém lembrar de escrever a comparação.
+    const { restaurantId } = request.params as { restaurantId?: string };
+    if (
+      restaurantId !== undefined &&
+      restaurantId !== request.auth?.restaurantId
+    ) {
+      // 404, não 403: responder "proibido" confirmaria que esse restaurante
+      // existe. Do lado de fora, restaurante dos outros é indistinguível de
+      // restaurante que não existe.
+      throw new NotFoundError(
+        `Restaurante com id "${restaurantId}" não encontrado`,
+      );
+    }
+  });
 }
 
 const BEARER_PATTERN = /^Bearer (.+)$/;
 
 /**
- * `preHandler` que exige sessão válida.
+ * Resolve o header `Authorization` em `request.auth`, ou lança 401.
  *
  * O token viaja em `Authorization: Bearer <token>` — nunca na querystring, que
  * acabaria em log de proxy, histórico de navegador e `Referer`. O `app.ts`

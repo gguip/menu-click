@@ -1,9 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.ts";
-import { validRestaurantBody as validBody } from "./helpers.ts";
+import { registerResponse, validRestaurantBody as validBody } from "./helpers.ts";
 
-describe("POST /restaurants", () => {
+/**
+ * Validação do corpo do restaurante no cadastro.
+ *
+ * O `POST /restaurants` público deixou de existir: restaurante sem dono seria
+ * um registro que ninguém consegue acessar. Criar restaurante agora é criar
+ * conta, e é `POST /auth/register` — mas o contrato do corpo do restaurante é
+ * o mesmo, e é ele que estes testes cobrem.
+ */
+describe("POST /auth/register — corpo do restaurante", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
@@ -16,23 +24,20 @@ describe("POST /restaurants", () => {
   });
 
   it("201 com corpo válido", async () => {
-    const response = await app.inject({
-      method: "POST",
-      url: "/restaurants",
-      payload: validBody,
-    });
+    const response = await registerResponse(app);
 
     expect(response.statusCode).toBe(201);
-    const body = response.json();
-    expect(body).toMatchObject({
+    const { restaurant } = response.json();
+    expect(restaurant).toMatchObject({
       name: validBody.name,
       cuisineType: validBody.cuisineType,
       address: validBody.address,
       isDelivery: true,
       isQrcode: false,
     });
-    expect(body.id).toEqual(expect.any(String));
-    expect(body.createdAt).toEqual(expect.any(String));
+    expect(restaurant.id).toEqual(expect.any(String));
+    expect(restaurant.slug).toEqual(expect.any(String));
+    expect(restaurant.createdAt).toEqual(expect.any(String));
   });
 
   it("400 sem name", async () => {
@@ -40,39 +45,37 @@ describe("POST /restaurants", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: "/restaurants",
-      payload: withoutName,
+      url: "/auth/register",
+      payload: {
+        restaurant: withoutName,
+        user: { name: "Dono", email: "d@x.com", password: "senha-longa-123" },
+      },
     });
 
     expect(response.statusCode).toBe(400);
   });
 
   it("400 com isDelivery de tipo errado", async () => {
-    const response = await app.inject({
-      method: "POST",
-      url: "/restaurants",
-      payload: { ...validBody, isDelivery: "yes" },
-    });
+    const response = await registerResponse(app, { isDelivery: "yes" });
 
     expect(response.statusCode).toBe(400);
   });
 
-  it("400 com body vazio", async () => {
+  it("400 com restaurante vazio", async () => {
     const response = await app.inject({
       method: "POST",
-      url: "/restaurants",
-      payload: {},
+      url: "/auth/register",
+      payload: {
+        restaurant: {},
+        user: { name: "Dono", email: "d@x.com", password: "senha-longa-123" },
+      },
     });
 
     expect(response.statusCode).toBe(400);
   });
 
   it("400 com logoUrl malformada", async () => {
-    const response = await app.inject({
-      method: "POST",
-      url: "/restaurants",
-      payload: { ...validBody, logoUrl: "not-a-url" },
-    });
+    const response = await registerResponse(app, { logoUrl: "not-a-url" });
 
     expect(response.statusCode).toBe(400);
   });

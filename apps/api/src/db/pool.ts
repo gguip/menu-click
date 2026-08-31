@@ -76,3 +76,20 @@ export async function withTransaction<T>(
     client.release();
   }
 }
+
+/**
+ * É uma conexão de transação, e não o pool?
+ *
+ * Importa por um motivo concreto: dentro de uma transação, **qualquer** erro de
+ * comando aborta o bloco inteiro, e toda query seguinte falha com
+ * `current transaction is aborted`. Quem tenta uma operação que pode falhar de
+ * forma esperada (inserir com um slug que talvez já exista, e tentar outro)
+ * precisa proteger cada tentativa com um savepoint — mas só quando está dentro
+ * de uma transação. Com o pool, cada query já é a própria transação e não há
+ * nada a proteger.
+ *
+ * A comparação é com o singleton porque ele é o único `Pool` do processo.
+ */
+export function isTransactionClient(db: Queryable): db is PoolClient {
+  return db !== pool;
+}

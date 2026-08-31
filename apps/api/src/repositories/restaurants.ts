@@ -144,29 +144,36 @@ export async function findBySlug(
 }
 
 /**
- * Uma página de restaurantes vivos, em ordem de criação (D11), mais o total de
- * vivos na tabela.
+ * Uma página dos restaurantes informados que estejam vivos, em ordem de criação
+ * (D11), mais o total.
+ *
+ * Recebe ids em vez de listar a tabela inteira porque não existe mais listagem
+ * geral: quem chama sempre parte de "os restaurantes desta sessão".
  *
  * São duas queries de propósito: `count(*) over ()` traria o total na mesma
  * ida, mas devolve zero linhas quando a página está vazia — e aí um `offset`
  * além do fim reportaria `total: 0`, escondendo que há registros antes.
  */
-export async function findAll(
+export async function findAllByIds(
+  ids: string[],
   { limit, offset }: Pagination,
   db: Queryable = pool,
 ): Promise<{ rows: Restaurant[]; total: number }> {
+  // S4: array parametrizado, nunca um `in (...)` montado por concatenação
   const { rows } = await db.query<RestaurantRow>(
     `select * from restaurants
-      where deleted_at is null
+      where id = any($1::uuid[]) and deleted_at is null
       order by created_at, id
-      limit $1 offset $2`,
-    [limit, offset],
+      limit $2 offset $3`,
+    [ids, limit, offset],
   );
 
   // count(*) volta como string (bigint não cabe em number com segurança); aqui
   // o valor é uma contagem de linhas, então a conversão é segura.
   const { rows: countRows } = await db.query<{ total: string }>(
-    `select count(*) as total from restaurants where deleted_at is null`,
+    `select count(*) as total from restaurants
+      where id = any($1::uuid[]) and deleted_at is null`,
+    [ids],
   );
 
   return { rows: rows.map(toRestaurant), total: Number(countRows[0].total) };

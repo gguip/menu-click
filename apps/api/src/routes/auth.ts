@@ -4,7 +4,7 @@ import type { CreateRestaurantInput } from "../domain/restaurant.ts";
 import type { CreateRestaurantUserInput } from "../domain/restaurant-user.ts";
 import { PASSWORD_MIN_LENGTH } from "../domain/restaurant-user.ts";
 import * as authService from "../services/auth.ts";
-import { authenticate, requireAuth } from "./authenticate.ts";
+import { requireAuth } from "./authenticate.ts";
 import {
   createRestaurantBodySchema,
   errorResponseSchema,
@@ -14,9 +14,10 @@ import {
 /**
  * Rotas de autenticação — camada HTTP.
  *
- * `/register` e `/login` são públicas por natureza (quem ainda não tem conta
- * não tem como se autenticar). `/logout` e `/me` exigem sessão, e por isso
- * carregam `preHandler: authenticate`.
+ * `/register` e `/login` se declaram `public` (quem ainda não tem conta não
+ * tem como se autenticar). `/logout` e `/me` não declaram nada — e é
+ * justamente por não declarar que ficam protegidas: o hook de raiz fecha tudo
+ * que não pediu para ser aberto.
  */
 
 // Mesmo motivo de `products.ts`: ajv/ajv-formats são CJS com `export default`.
@@ -135,6 +136,8 @@ export async function authRoutes(app: FastifyInstance) {
   }>(
     "/auth/register",
     {
+      // sem conta ainda não há como se autenticar
+      config: { public: true },
       schema: {
         body: registerBodySchema,
         response: {
@@ -154,6 +157,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { email: string; password: string } }>(
     "/auth/login",
     {
+      config: { public: true },
       schema: {
         body: loginBodySchema,
         response: { 200: loginResponseSchema, 401: errorResponseSchema },
@@ -168,7 +172,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post(
     "/auth/logout",
     {
-      preHandler: authenticate,
+      // sem `config.public`: o hook de raiz já exige sessão
       schema: {
         response: { 204: { type: "null" }, 401: errorResponseSchema },
       },
@@ -182,7 +186,6 @@ export async function authRoutes(app: FastifyInstance) {
   app.get(
     "/auth/me",
     {
-      preHandler: authenticate,
       schema: {
         response: { 200: userResponseSchema, 401: errorResponseSchema },
       },

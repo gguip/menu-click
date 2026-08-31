@@ -63,6 +63,8 @@ export async function menuRoutes(app: FastifyInstance) {
   app.get<{ Params: { slug: string } }>(
     "/menu/:slug",
     {
+      // o cardápio é a superfície aberta: quem escaneia o QR não tem conta
+      config: { public: true },
       schema: {
         params: slugParamsSchema,
         response: {
@@ -79,6 +81,7 @@ export async function menuRoutes(app: FastifyInstance) {
   app.get<{ Params: { slug: string }; Querystring: Pagination }>(
     "/menu/:slug/products",
     {
+      config: { public: true },
       schema: {
         params: slugParamsSchema,
         querystring: paginationQuerystringSchema,

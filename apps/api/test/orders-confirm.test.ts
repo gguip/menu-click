@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.ts";
 import { pool } from "../src/db/pool.ts";
+import type { TestRestaurant } from "./helpers.ts";
 import { createOrder, createProduct, createRestaurant } from "./helpers.ts";
 
 /**
@@ -45,29 +46,35 @@ describe("confirmação e cancelamento de pedido", () => {
     return rows[0].stock;
   }
 
-  function confirm(restaurantId: string, orderId: string) {
+  /**
+   * Confirmar e cancelar são rotas do RESTAURANTE, não do cliente do QR code —
+   * daí os headers de sessão. Criar pedido, ao contrário, é público.
+   */
+  function confirm(restaurant: TestRestaurant, orderId: string) {
     return app.inject({
       method: "POST",
-      url: `/restaurants/${restaurantId}/orders/${orderId}/confirm`,
+      url: `/restaurants/${restaurant.id}/orders/${orderId}/confirm`,
+      headers: restaurant.headers,
     });
   }
 
-  function cancel(restaurantId: string, orderId: string) {
+  function cancel(restaurant: TestRestaurant, orderId: string) {
     return app.inject({
       method: "POST",
-      url: `/restaurants/${restaurantId}/orders/${orderId}/cancel`,
+      url: `/restaurants/${restaurant.id}/orders/${orderId}/cancel`,
+      headers: restaurant.headers,
     });
   }
 
   describe("POST .../confirm", () => {
     it("confirma o pedido e debita o estoque", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 10 });
+      const product = await createProduct(app, restaurant, { stock: 10 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 3 },
       ]);
 
-      const response = await confirm(restaurant.id, order.id);
+      const response = await confirm(restaurant, order.id);
 
       expect(response.statusCode).toBe(200);
       expect(response.json().status).toBe("confirmed");
@@ -76,11 +83,11 @@ describe("confirmação e cancelamento de pedido", () => {
 
     it("debita cada produto pela sua quantidade", async () => {
       const restaurant = await createRestaurant(app);
-      const ramen = await createProduct(app, restaurant.id, {
+      const ramen = await createProduct(app, restaurant, {
         name: "Ramen",
         stock: 10,
       });
-      const guioza = await createProduct(app, restaurant.id, {
+      const guioza = await createProduct(app, restaurant, {
         name: "Guioza",
         stock: 4,
       });
@@ -89,31 +96,31 @@ describe("confirmação e cancelamento de pedido", () => {
         { productId: guioza.id, quantity: 4 },
       ]);
 
-      expect((await confirm(restaurant.id, order.id)).statusCode).toBe(200);
+      expect((await confirm(restaurant, order.id)).statusCode).toBe(200);
       expect(await stockOf(ramen.id)).toBe(8);
       expect(await stockOf(guioza.id)).toBe(0);
     });
 
     it("409 ao confirmar duas vezes, sem debitar de novo", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 10 });
+      const product = await createProduct(app, restaurant, { stock: 10 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 3 },
       ]);
 
-      expect((await confirm(restaurant.id, order.id)).statusCode).toBe(200);
-      expect((await confirm(restaurant.id, order.id)).statusCode).toBe(409);
+      expect((await confirm(restaurant, order.id)).statusCode).toBe(200);
+      expect((await confirm(restaurant, order.id)).statusCode).toBe(409);
       expect(await stockOf(product.id)).toBe(7);
     });
 
     it("409 com estoque insuficiente, sem debitar nada", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 2 });
+      const product = await createProduct(app, restaurant, { stock: 2 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 5 },
       ]);
 
-      const response = await confirm(restaurant.id, order.id);
+      const response = await confirm(restaurant, order.id);
 
       expect(response.statusCode).toBe(409);
       expect(await stockOf(product.id)).toBe(2);
@@ -121,11 +128,11 @@ describe("confirmação e cancelamento de pedido", () => {
 
     it("um item sem estoque não deixa os outros serem debitados", async () => {
       const restaurant = await createRestaurant(app);
-      const ramen = await createProduct(app, restaurant.id, {
+      const ramen = await createProduct(app, restaurant, {
         name: "Ramen",
         stock: 10,
       });
-      const guioza = await createProduct(app, restaurant.id, {
+      const guioza = await createProduct(app, restaurant, {
         name: "Guioza",
         stock: 1,
       });
@@ -134,7 +141,7 @@ describe("confirmação e cancelamento de pedido", () => {
         { productId: guioza.id, quantity: 5 },
       ]);
 
-      expect((await confirm(restaurant.id, order.id)).statusCode).toBe(409);
+      expect((await confirm(restaurant, order.id)).statusCode).toBe(409);
       // o item que TINHA estoque continua intacto: a transação inteira voltou
       expect(await stockOf(ramen.id)).toBe(10);
       expect(await stockOf(guioza.id)).toBe(1);
@@ -142,29 +149,30 @@ describe("confirmação e cancelamento de pedido", () => {
 
     it("409 quando um produto saiu do cardápio depois do pedido", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 10 });
+      const product = await createProduct(app, restaurant, { stock: 10 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 1 },
       ]);
 
       await app.inject({
         method: "DELETE",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/products/${product.id}`,
       });
 
-      const response = await confirm(restaurant.id, order.id);
+      const response = await confirm(restaurant, order.id);
       expect(response.statusCode).toBe(409);
     });
 
     it("409 ao confirmar pedido cancelado", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 10 });
+      const product = await createProduct(app, restaurant, { stock: 10 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 1 },
       ]);
 
-      expect((await cancel(restaurant.id, order.id)).statusCode).toBe(200);
-      expect((await confirm(restaurant.id, order.id)).statusCode).toBe(409);
+      expect((await cancel(restaurant, order.id)).statusCode).toBe(200);
+      expect((await confirm(restaurant, order.id)).statusCode).toBe(409);
       expect(await stockOf(product.id)).toBe(10);
     });
 
@@ -172,21 +180,38 @@ describe("confirmação e cancelamento de pedido", () => {
       const restaurant = await createRestaurant(app);
 
       const response = await confirm(
-        restaurant.id,
+        restaurant,
         "00000000-0000-0000-0000-000000000000",
       );
       expect(response.statusCode).toBe(404);
     });
 
+    it("401 sem sessão: confirmar é do restaurante, não do cliente", async () => {
+      const restaurant = await createRestaurant(app);
+      const product = await createProduct(app, restaurant, { stock: 10 });
+      const order = await createOrder(app, restaurant.id, [
+        { productId: product.id, quantity: 1 },
+      ]);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders/${order.id}/confirm`,
+      });
+
+      expect(response.statusCode).toBe(401);
+      // e o estoque continua intacto
+      expect(await stockOf(product.id)).toBe(10);
+    });
+
     it("404 ao confirmar pedido de outro restaurante", async () => {
       const restaurantA = await createRestaurant(app);
       const restaurantB = await createRestaurant(app);
-      const product = await createProduct(app, restaurantA.id, { stock: 10 });
+      const product = await createProduct(app, restaurantA, { stock: 10 });
       const order = await createOrder(app, restaurantA.id, [
         { productId: product.id, quantity: 1 },
       ]);
 
-      const response = await confirm(restaurantB.id, order.id);
+      const response = await confirm(restaurantB, order.id);
 
       expect(response.statusCode).toBe(404);
       expect(await stockOf(product.id)).toBe(10);
@@ -196,12 +221,12 @@ describe("confirmação e cancelamento de pedido", () => {
   describe("POST .../cancel", () => {
     it("cancela pedido pendente sem mexer no estoque", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 10 });
+      const product = await createProduct(app, restaurant, { stock: 10 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 3 },
       ]);
 
-      const response = await cancel(restaurant.id, order.id);
+      const response = await cancel(restaurant, order.id);
 
       expect(response.statusCode).toBe(200);
       expect(response.json().status).toBe("cancelled");
@@ -210,26 +235,26 @@ describe("confirmação e cancelamento de pedido", () => {
 
     it("409 ao cancelar pedido já confirmado", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 10 });
+      const product = await createProduct(app, restaurant, { stock: 10 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 3 },
       ]);
 
-      expect((await confirm(restaurant.id, order.id)).statusCode).toBe(200);
-      expect((await cancel(restaurant.id, order.id)).statusCode).toBe(409);
+      expect((await confirm(restaurant, order.id)).statusCode).toBe(200);
+      expect((await cancel(restaurant, order.id)).statusCode).toBe(409);
       // continua debitado: cancelar confirmado não devolve estoque (nem cancela)
       expect(await stockOf(product.id)).toBe(7);
     });
 
     it("409 ao cancelar duas vezes", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 10 });
+      const product = await createProduct(app, restaurant, { stock: 10 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 1 },
       ]);
 
-      expect((await cancel(restaurant.id, order.id)).statusCode).toBe(200);
-      expect((await cancel(restaurant.id, order.id)).statusCode).toBe(409);
+      expect((await cancel(restaurant, order.id)).statusCode).toBe(200);
+      expect((await cancel(restaurant, order.id)).statusCode).toBe(409);
     });
   });
 
@@ -250,14 +275,14 @@ describe("confirmação e cancelamento de pedido", () => {
      */
     it("oito confirmações simultâneas do mesmo pedido debitam uma vez só", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 30 });
+      const product = await createProduct(app, restaurant, { stock: 30 });
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 3 },
       ]);
 
       await warmPool(8);
       const responses = await Promise.all(
-        Array.from({ length: 8 }, () => confirm(restaurant.id, order.id)),
+        Array.from({ length: 8 }, () => confirm(restaurant, order.id)),
       );
 
       const confirmed = responses.filter((r) => r.statusCode === 200);
@@ -274,7 +299,7 @@ describe("confirmação e cancelamento de pedido", () => {
      */
     it("dois pedidos para a última unidade: os dois nascem, só um confirma", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 1 });
+      const product = await createProduct(app, restaurant, { stock: 1 });
 
       const primeiro = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 1 },
@@ -292,8 +317,8 @@ describe("confirmação e cancelamento de pedido", () => {
 
       await warmPool(2);
       const responses = await Promise.all([
-        confirm(restaurant.id, primeiro.id),
-        confirm(restaurant.id, segundo.id),
+        confirm(restaurant, primeiro.id),
+        confirm(restaurant, segundo.id),
       ]);
 
       const codes = responses.map((r) => r.statusCode).sort();
@@ -316,11 +341,11 @@ describe("confirmação e cancelamento de pedido", () => {
      */
     it("pedidos com produtos em ordem invertida se resolvem sem travar", async () => {
       const restaurant = await createRestaurant(app);
-      const ramen = await createProduct(app, restaurant.id, {
+      const ramen = await createProduct(app, restaurant, {
         name: "Ramen",
         stock: 50,
       });
-      const guioza = await createProduct(app, restaurant.id, {
+      const guioza = await createProduct(app, restaurant, {
         name: "Guioza",
         stock: 50,
       });
@@ -341,8 +366,8 @@ describe("confirmação e cancelamento de pedido", () => {
 
       await warmPool(2);
       const responses = await Promise.all([
-        confirm(restaurant.id, primeiro.id),
-        confirm(restaurant.id, segundo.id),
+        confirm(restaurant, primeiro.id),
+        confirm(restaurant, segundo.id),
       ]);
 
       expect(responses.map((r) => r.statusCode)).toEqual([200, 200]);

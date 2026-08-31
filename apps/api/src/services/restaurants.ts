@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { pool, withTransaction } from "../db/pool.ts";
+import { isTransactionClient, pool, withTransaction } from "../db/pool.ts";
 import type { Queryable } from "../db/pool.ts";
 import type {
   CreateRestaurantInput,
@@ -65,15 +65,40 @@ const MAX_SLUG_ATTEMPTS = 5;
  * cadastro (`POST /auth/register`) cria restaurante e primeiro usuário na
  * mesma transação, e as duas escritas precisam sair pela mesma conexão.
  */
+/**
+ * Uma tentativa de inserir com um slug, protegida contra o efeito colateral de
+ * falhar dentro de uma transação.
+ *
+ * Sem o savepoint, a primeira colisão aborta a transação do cadastro inteiro e
+ * a tentativa seguinte estoura `current transaction is aborted` — um 500 no
+ * lugar do retry. Fora de transação (pool) não há o que proteger.
+ */
+async function tryInsert(
+  input: CreateRestaurantInput,
+  slug: string,
+  db: Queryable,
+): Promise<Restaurant | null> {
+  if (!isTransactionClient(db)) {
+    return restaurantsRepository.insert({ ...input, slug }, db);
+  }
+
+  // nome fixo, escrito no código: identificador não aceita $n (S3)
+  await db.query("savepoint slug_attempt");
+  const created = await restaurantsRepository.insert({ ...input, slug }, db);
+  await db.query(
+    created === null
+      ? "rollback to savepoint slug_attempt"
+      : "release savepoint slug_attempt",
+  );
+  return created;
+}
+
 export async function create(
   input: CreateRestaurantInput,
   db: Queryable = pool,
 ): Promise<Restaurant> {
   if (input.slug !== undefined) {
-    const created = await restaurantsRepository.insert(
-      { ...input, slug: input.slug },
-      db,
-    );
+    const created = await tryInsert(input, input.slug, db);
     if (created === null) {
       throw new ConflictError(`O slug "${input.slug}" já está em uso`);
     }
@@ -89,7 +114,7 @@ export async function create(
     const slug =
       attempt === 0 && base !== "" ? base : [base, suffix].filter(Boolean).join("-");
 
-    const created = await restaurantsRepository.insert({ ...input, slug }, db);
+    const created = await tryInsert(input, slug, db);
     if (created !== null) return created;
   }
 
@@ -107,11 +132,21 @@ export async function getBySlug(slug: string): Promise<Restaurant> {
   return restaurant;
 }
 
-/** Lista todos os vivos. Lista vazia é resultado válido, não erro. */
-export async function list(
+/**
+ * Os restaurantes que a sessão administra. Hoje é sempre um (um usuário
+ * pertence a um restaurante), mas o contrato é de lista: o dia em que existir
+ * usuário de rede, muda o serviço e não a resposta.
+ *
+ * Restaurante removido some da lista, como em toda leitura (D2).
+ */
+export async function listForSession(
+  restaurantId: string,
   pagination: Pagination,
 ): Promise<Page<Restaurant>> {
-  const { rows, total } = await restaurantsRepository.findAll(pagination);
+  const { rows, total } = await restaurantsRepository.findAllByIds(
+    [restaurantId],
+    pagination,
+  );
   return { data: rows, ...pagination, total };
 }
 

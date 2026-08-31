@@ -70,7 +70,13 @@ describe("autenticação", () => {
     });
 
     it("409 com e-mail já cadastrado, e o restaurante não é criado", async () => {
-      await registerRestaurant(app);
+      // e-mail fixo nos dois cadastros: o helper sorteia um novo a cada
+      // chamada, e é justamente a repetição que este teste precisa
+      await app.inject({
+        method: "POST",
+        url: "/auth/register",
+        payload: { restaurant: validRestaurantBody, user: validUserBody },
+      });
 
       const response = await app.inject({
         method: "POST",
