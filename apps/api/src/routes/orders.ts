@@ -219,6 +219,44 @@ export async function orderRoutes(app: FastifyInstance) {
     },
   );
 
+  // Confirmar o pedido: é AQUI que o estoque é debitado
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/confirm",
+    {
+      schema: {
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.confirm(restaurantId, orderId);
+    },
+  );
+
+  // Cancelar um pedido pendente (não mexe em estoque: nada foi debitado ainda)
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/cancel",
+    {
+      schema: {
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.cancel(restaurantId, orderId);
+    },
+  );
+
   // Buscar pedido específico, com os itens
   app.get<{ Params: { restaurantId: string; orderId: string } }>(
     "/restaurants/:restaurantId/orders/:orderId",

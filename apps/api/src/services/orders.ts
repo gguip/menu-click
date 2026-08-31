@@ -144,3 +144,114 @@ export async function getById(
   if (order === null) throw orderNotFound(orderId);
   return order;
 }
+
+/**
+ * Confirma o pedido e debita o estoque — o único ponto do sistema que tira
+ * unidade de `products.stock`.
+ *
+ * A transação faz três coisas que precisam valer juntas: travar o pedido,
+ * travar os produtos e gravar. A ordem importa:
+ *
+ *  1. `selectStatusForUpdate` trava o PEDIDO. Duas confirmações simultâneas do
+ *     mesmo pedido se serializam aqui — a segunda acorda vendo `confirmed`.
+ *  2. `selectStocksForUpdate` trava os PRODUTOS, sempre na mesma ordem (por
+ *     id), senão dois pedidos com produtos em comum entrariam em deadlock.
+ *  3. Só depois de conferir TODOS os itens é que algum é debitado. O rollback
+ *     resolveria de qualquer jeito, mas conferir antes deixa a regra explícita
+ *     em vez de depender do desfazer.
+ *
+ * Consequência de debitar só aqui: pedido `pending` não é reserva. Dois pedidos
+ * podem existir para a última unidade — o primeiro a confirmar leva, o segundo
+ * recebe 409. É o custo escolhido para não segurar estoque de pedido que talvez
+ * nunca seja confirmado.
+ */
+export async function confirm(
+  restaurantId: string,
+  orderId: string,
+): Promise<Order> {
+  await restaurantsService.ensureExists(restaurantId);
+  if (!isUuid(orderId)) throw orderNotFound(orderId);
+
+  return withTransaction(async (client) => {
+    const status = await ordersRepository.selectStatusForUpdate(
+      restaurantId,
+      orderId,
+      client,
+    );
+    if (status === null) throw orderNotFound(orderId);
+    if (status !== "pending") {
+      throw new ConflictError(
+        `Pedido não pode ser confirmado: já está "${status}"`,
+      );
+    }
+
+    const items = await ordersRepository.findItems(orderId, client);
+    const stocks = await productsRepository.selectStocksForUpdate(
+      items.map((item) => item.productId),
+      client,
+    );
+    const stockById = new Map(stocks.map((row) => [row.id, row.stock]));
+
+    for (const item of items) {
+      const stock = stockById.get(item.productId);
+      // produto removido do cardápio entre o pedido e a confirmação
+      if (stock === undefined) {
+        throw new ConflictError(
+          `O produto "${item.name}" saiu do cardápio e o pedido não pode ser confirmado`,
+        );
+      }
+      if (stock < item.quantity) {
+        throw new ConflictError(
+          `Estoque insuficiente de "${item.name}": ${item.quantity} pedidos, ${stock} disponíveis`,
+        );
+      }
+    }
+
+    for (const item of items) {
+      await productsRepository.decrementStock(
+        item.productId,
+        item.quantity,
+        client,
+      );
+    }
+    await ordersRepository.updateStatus(orderId, "confirmed", client);
+
+    const order = await ordersRepository.findById(restaurantId, orderId, client);
+    return order as Order;
+  });
+}
+
+/**
+ * Cancela um pedido pendente. Não mexe em estoque, porque pedido pendente nunca
+ * chegou a debitar nada.
+ *
+ * Pedido já confirmado não é cancelável: devolver estoque é uma operação
+ * própria (e uma decisão de negócio — devolve sempre? só antes de sair para
+ * entrega?), e fazer isso por tabela aqui seria adivinhar.
+ */
+export async function cancel(
+  restaurantId: string,
+  orderId: string,
+): Promise<Order> {
+  await restaurantsService.ensureExists(restaurantId);
+  if (!isUuid(orderId)) throw orderNotFound(orderId);
+
+  return withTransaction(async (client) => {
+    const status = await ordersRepository.selectStatusForUpdate(
+      restaurantId,
+      orderId,
+      client,
+    );
+    if (status === null) throw orderNotFound(orderId);
+    if (status !== "pending") {
+      throw new ConflictError(
+        `Pedido não pode ser cancelado: já está "${status}"`,
+      );
+    }
+
+    await ordersRepository.updateStatus(orderId, "cancelled", client);
+
+    const order = await ordersRepository.findById(restaurantId, orderId, client);
+    return order as Order;
+  });
+}

@@ -224,6 +224,50 @@ export async function findManyByIds(
   return rows.map(toProduct);
 }
 
+/**
+ * Estoque dos produtos informados, com as linhas **travadas** até o fim da
+ * transação. É o `select ... for update` da confirmação de pedido.
+ *
+ * O `order by id` não é estética: sem ordem fixa, dois pedidos que compartilham
+ * os mesmos produtos travariam as linhas em ordens diferentes e um esperaria o
+ * outro em ciclo — deadlock, que o Postgres resolve matando uma das transações.
+ * Com ordem fixa, o segundo simplesmente espera o primeiro terminar.
+ *
+ * Produto removido não volta na lista; quem chama decide o que fazer com isso.
+ */
+export async function selectStocksForUpdate(
+  ids: string[],
+  client: PoolClient,
+): Promise<{ id: string; stock: number }[]> {
+  const { rows } = await client.query<{ id: string; stock: number }>(
+    `select id, stock from products
+      where id = any($1::uuid[]) and deleted_at is null
+      order by id
+      for update`,
+    [ids],
+  );
+  return rows;
+}
+
+/**
+ * Debita `quantity` do estoque e devolve o que sobrou. Roda dentro da
+ * transação, com a linha já travada por `selectStocksForUpdate` — é o lock, e
+ * não o `stock - $1`, que garante que ninguém leu o mesmo valor no meio.
+ */
+export async function decrementStock(
+  id: string,
+  quantity: number,
+  client: PoolClient,
+): Promise<number> {
+  const { rows } = await client.query<{ stock: number }>(
+    `update products set stock = stock - $1, updated_at = now()
+      where id = $2 and deleted_at is null
+      returning stock`,
+    [quantity, id],
+  );
+  return rows[0].stock;
+}
+
 export async function selectStockForUpdate(
   id: string,
   client: PoolClient,

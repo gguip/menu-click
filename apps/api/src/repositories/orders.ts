@@ -1,5 +1,6 @@
 import { pool } from "../db/pool.ts";
 import type { Queryable } from "../db/pool.ts";
+import type { PoolClient } from "pg";
 import type { CustomerRow } from "./customers.ts";
 import { toCustomer } from "./customers.ts";
 import type { Pagination } from "../domain/pagination.ts";
@@ -211,17 +212,59 @@ export async function findById(
   );
   if (rows.length === 0) return null;
 
-  const { rows: itemRows } = await db.query<OrderItemRow>(
+  return {
+    ...toOrderSummary(rows[0]),
+    items: await findItems(orderId, db),
+  };
+}
+
+/** Itens vivos do pedido, em ordem de criação (D11). */
+export async function findItems(
+  orderId: string,
+  db: Queryable = pool,
+): Promise<OrderItem[]> {
+  const { rows } = await db.query<OrderItemRow>(
     `select * from order_items
       where order_id = $1 and deleted_at is null
       order by created_at, id`,
     [orderId],
   );
+  return rows.map(toOrderItem);
+}
 
-  return {
-    ...toOrderSummary(rows[0]),
-    items: itemRows.map(toOrderItem),
-  };
+/**
+ * Status do pedido com a linha **travada** até o fim da transação.
+ *
+ * É o que serializa duas confirmações simultâneas do mesmo pedido: a segunda
+ * fica bloqueada nesta leitura até a primeira commitar, e aí enxerga
+ * `confirmed` em vez de `pending`. Sem o lock, as duas leriam `pending` e as
+ * duas debitariam estoque.
+ */
+export async function selectStatusForUpdate(
+  restaurantId: string,
+  orderId: string,
+  client: PoolClient,
+): Promise<OrderStatus | null> {
+  const { rows } = await client.query<{ status: OrderStatus }>(
+    `select status from orders
+      where id = $1 and restaurant_id = $2 and deleted_at is null
+      for update`,
+    [orderId, restaurantId],
+  );
+  return rows.length === 0 ? null : rows[0].status;
+}
+
+/** Grava a transição de status. Quem valida a transição é o serviço. */
+export async function updateStatus(
+  orderId: string,
+  status: OrderStatus,
+  client: PoolClient,
+): Promise<void> {
+  await client.query(
+    `update orders set status = $1, updated_at = now()
+      where id = $2 and deleted_at is null`,
+    [status, orderId],
+  );
 }
 
 /**
