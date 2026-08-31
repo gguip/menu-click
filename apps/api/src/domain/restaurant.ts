@@ -22,6 +22,13 @@ export type Address = {
  */
 export type CreateRestaurantInput = {
   name: string;
+  /**
+   * Identificador público (o que vai no QR code). Opcional na criação: quando
+   * não vem, o serviço deriva do `name`. Não é editável por PATCH — mudar a
+   * URL pública de um restaurante quebra QR code já impresso, então isso
+   * precisa ser uma operação explícita, não efeito colateral de edição.
+   */
+  slug?: string;
   cuisineType: string;
   logoUrl?: string;
   address: Address;
@@ -29,12 +36,19 @@ export type CreateRestaurantInput = {
   isQrcode: boolean;
 };
 
-/** Edição parcial: qualquer subconjunto dos campos de criação. */
-export type UpdateRestaurantInput = Partial<CreateRestaurantInput>;
+/**
+ * Edição parcial: qualquer subconjunto dos campos de criação, menos o `slug`
+ * (ver o comentário dele acima).
+ */
+export type UpdateRestaurantInput = Partial<
+  Omit<CreateRestaurantInput, "slug">
+>;
 
 /** Restaurante completo, como é guardado e devolvido na resposta. */
 export type Restaurant = CreateRestaurantInput & {
   id: string;
+  /** Sempre presente na leitura, mesmo quando não foi enviado na criação. */
+  slug: string;
   createdAt: string;
   updatedAt: string;
 };

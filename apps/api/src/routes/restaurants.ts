@@ -3,6 +3,7 @@ import type {
   CreateRestaurantInput,
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
+import { SLUG_MAX_LENGTH } from "../domain/slug.ts";
 import * as restaurantsService from "../services/restaurants.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import {
@@ -31,6 +32,13 @@ const createRestaurantBodySchema = {
   required: ["name", "cuisineType", "address", "isDelivery", "isQrcode"],
   properties: {
     name: { type: "string", minLength: 1 },
+    // opcional: sem ele o serviço deriva do nome. O `pattern` é o mesmo do
+    // `isSlug` do domínio — o que entra aqui vira URL pública.
+    slug: {
+      type: "string",
+      pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      maxLength: SLUG_MAX_LENGTH,
+    },
     cuisineType: { type: "string", minLength: 1 },
     logoUrl: { type: "string", format: "uri" },
     address: addressSchema,
@@ -57,6 +65,7 @@ const restaurantResponseSchema = {
   type: "object",
   properties: {
     id: { type: "string" },
+    slug: { type: "string" },
     name: { type: "string" },
     cuisineType: { type: "string" },
     logoUrl: { type: "string" },
@@ -87,7 +96,11 @@ export async function restaurantRoutes(app: FastifyInstance) {
     {
       schema: {
         body: createRestaurantBodySchema,
-        response: { 201: restaurantResponseSchema },
+        response: {
+          201: restaurantResponseSchema,
+          // slug explícito já em uso
+          409: errorResponseSchema,
+        },
       },
     },
     async (request, reply) => {

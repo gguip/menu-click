@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { withTransaction } from "../db/pool.ts";
 import type {
   CreateRestaurantInput,
@@ -5,8 +6,9 @@ import type {
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
+import { SLUG_MAX_LENGTH, slugify } from "../domain/slug.ts";
 import { isUuid } from "../domain/uuid.ts";
-import { NotFoundError } from "../errors.ts";
+import { ConflictError, NotFoundError } from "../errors.ts";
 import * as productsRepository from "../repositories/products.ts";
 import * as restaurantsRepository from "../repositories/restaurants.ts";
 
@@ -35,10 +37,68 @@ export async function ensureExists(id: string): Promise<void> {
   if (!(await restaurantsRepository.exists(id))) throw restaurantNotFound(id);
 }
 
+/** Tamanho do sufixo aleatório (`-a1b2c3`) usado para desempatar slug. */
+const SLUG_SUFFIX_BYTES = 3;
+const SLUG_SUFFIX_LENGTH = SLUG_SUFFIX_BYTES * 2 + 1;
+
+/** Quantas vezes tentar antes de desistir. Colidir 5 vezes seguidas em 2^24 */
+/* combinações significa que algo está errado, não que deu azar. */
+const MAX_SLUG_ATTEMPTS = 5;
+
+/**
+ * Cria o restaurante, resolvendo o slug público.
+ *
+ * Duas políticas diferentes, de propósito:
+ *
+ * - **Slug explícito que colide é 409.** O cliente pediu aquele endereço exato
+ *   (é o que vai no QR code impresso); entregar outro em silêncio seria pior
+ *   que falhar.
+ * - **Slug derivado do nome que colide ganha sufixo e tenta de novo.** Duas
+ *   "Cantina da Nona" é situação normal, e travar o cadastro por isso seria
+ *   hostil com quem nem sabe que slug existe.
+ *
+ * A colisão é detectada pelo índice único (o repositório devolve `null`), não
+ * por um `select` antes: entre checar e inserir cabe outra requisição.
+ */
 export async function create(
   input: CreateRestaurantInput,
 ): Promise<Restaurant> {
-  return restaurantsRepository.insert(input);
+  if (input.slug !== undefined) {
+    const created = await restaurantsRepository.insert({
+      ...input,
+      slug: input.slug,
+    });
+    if (created === null) {
+      throw new ConflictError(`O slug "${input.slug}" já está em uso`);
+    }
+    return created;
+  }
+
+  // `slugify` pode devolver vazio (nome só de emoji, por exemplo); nesse caso
+  // o slug é só o sufixo aleatório.
+  const base = slugify(input.name).slice(0, SLUG_MAX_LENGTH - SLUG_SUFFIX_LENGTH);
+
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+    const suffix = randomBytes(SLUG_SUFFIX_BYTES).toString("hex");
+    const slug =
+      attempt === 0 && base !== "" ? base : [base, suffix].filter(Boolean).join("-");
+
+    const created = await restaurantsRepository.insert({ ...input, slug });
+    if (created !== null) return created;
+  }
+
+  throw new ConflictError(
+    "Não foi possível gerar um slug único para esse nome; envie um `slug` explícito",
+  );
+}
+
+/** Restaurante pelo slug público (a busca do cardápio do QR code). */
+export async function getBySlug(slug: string): Promise<Restaurant> {
+  const restaurant = await restaurantsRepository.findBySlug(slug);
+  if (restaurant === null) {
+    throw new NotFoundError(`Restaurante "${slug}" não encontrado`);
+  }
+  return restaurant;
 }
 
 /** Lista todos os vivos. Lista vazia é resultado válido, não erro. */

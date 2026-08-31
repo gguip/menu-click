@@ -11,12 +11,19 @@
 -- (o default da coluna) e a confirmação de pedido responderia 409 já na
 -- primeira chamada num ambiente recém-populado.
 
+-- O `slug` é explícito para a URL pública do exemplo ficar legível:
+-- /menu/tokyo-ramen-house.
+--
+-- Vale para banco NOVO. Num banco que já tinha estes restaurantes, o
+-- `on conflict do nothing` não toca na linha existente, e o slug continua
+-- sendo o que o backfill da migration gerou (`tokyo-ramen-house-cb95db58`).
+-- Isso é o certo: o seed não sobrescreve dado que já está lá.
 insert into restaurants
-  (id, name, cuisine_type, street, number, neighborhood, city, state, zip_code, is_delivery, is_qrcode)
+  (id, name, slug, cuisine_type, street, number, neighborhood, city, state, zip_code, is_delivery, is_qrcode)
 values
-  ('cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Tokyo Ramen House', 'Japonesa',
+  ('cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Tokyo Ramen House', 'tokyo-ramen-house', 'Japonesa',
    'Avenida Paulista', '2300', 'Bela Vista', 'São Paulo', 'SP', '01310-300', true, false),
-  ('d05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Cantina da Nona', 'Italiana',
+  ('d05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Cantina da Nona', 'cantina-da-nona', 'Italiana',
    'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, true)
 on conflict (id) do nothing;
 
