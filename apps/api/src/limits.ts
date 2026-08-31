@@ -71,3 +71,26 @@ export const RATE_LIMIT_MAX = 100;
 export const LOGIN_RATE_LIMIT_MAX = 5;
 
 export const RATE_LIMIT_WINDOW = "1 minute";
+
+/**
+ * Origens autorizadas a chamar a API de dentro de um navegador.
+ *
+ * Lista separada por vírgula em `CORS_ORIGINS`. **Sem a variável, nenhuma
+ * origem cruzada passa** — falha fechado, que é o lado certo para errar: um
+ * esquecimento em produção quebra o front (visível na hora) em vez de abrir a
+ * API para qualquer site (invisível até dar errado).
+ *
+ * Não há `credentials: true` e não deve haver: a API se autentica pelo header
+ * `Authorization`, não por cookie. Sem credenciais no jogo, some de saída a
+ * combinação clássica de `origin: "*"` com cookie de sessão.
+ *
+ * É função, e não constante, porque o valor é lido a cada `buildApp()`: assim
+ * o teste consegue montar uma app com a lista configurada e outra sem ela, que
+ * são justamente os dois casos que precisam de prova.
+ */
+export function corsOrigins(): string[] {
+  return (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origem) => origem.trim())
+    .filter((origem) => origem !== "");
+}

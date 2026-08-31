@@ -1,7 +1,9 @@
 import Fastify from "fastify";
+import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import {
   BODY_LIMIT_BYTES,
+  corsOrigins,
   CONNECTION_TIMEOUT_MS,
   KEEP_ALIVE_TIMEOUT_MS,
   RATE_LIMIT_MAX,
@@ -50,6 +52,27 @@ export async function buildApp() {
         remove: true,
       },
     },
+  });
+
+  /**
+   * CORS, registrado **antes** do `installAuth()`.
+   *
+   * A ordem não é estética. O preflight `OPTIONS` que o navegador manda antes
+   * de uma requisição com header customizado **não carrega o `Authorization`**
+   * — ele é anônimo por definição. O hook de negação por padrão responderia
+   * 401 a ele, e um preflight que falha faz o navegador recusar a requisição
+   * real e reportar "erro de CORS". O sintoma aponta para o lugar errado, e a
+   * causa é autenticação. Registrando o CORS primeiro, o preflight é respondido
+   * por ele e nunca chega ao hook.
+   *
+   * Com `CORS_ORIGINS` vazio (o default), nenhuma origem cruzada é aceita.
+   */
+  const origens = corsOrigins();
+  await app.register(cors, {
+    origin: origens.length === 0 ? false : origens,
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+    allowedHeaders: ["content-type", "authorization"],
+    // sem `credentials`: a API usa header, não cookie
   });
 
   /**
