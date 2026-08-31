@@ -21,8 +21,54 @@ import { installAuth } from "./routes/authenticate.ts";
  * chamador — `.listen()` no `server.ts` real, `app.inject()` nos testes
  * (F21), sem precisar abrir socket nenhum.
  */
+/**
+ * Maior corpo aceito. O default do Fastify é 1 MB; o maior corpo real desta API
+ * é um cadastro (restaurante + usuário) ou um pedido com muitos itens, que não
+ * passam de dezenas de KB. 128 KB deixa margem larga para os dois e ainda
+ * assim recusa upload acidental antes de ele ocupar memória (F27/S16).
+ */
+const BODY_LIMIT_BYTES = 128 * 1024;
+
+/**
+ * Quanto uma conexão ociosa com keep-alive sobrevive.
+ *
+ * Tem que ser **maior** que o idle timeout do proxy à frente (F24). Se for
+ * menor, existe a janela em que a app fecha a conexão no mesmo instante em que
+ * o proxy manda a requisição seguinte por ela — e isso vira 502 intermitente,
+ * do tipo que ninguém reproduz. O default do Node é 5s; a maioria dos
+ * balanceadores usa 60s, então 72s deixa folga em cima do caso comum.
+ */
+const KEEP_ALIVE_TIMEOUT_MS = 72_000;
+
+/**
+ * Teto para uma conexão que abre e não completa a requisição. O default é 0
+ * (sem limite), que é um socket preso de graça.
+ */
+const CONNECTION_TIMEOUT_MS = 10_000;
+
+/**
+ * A app confia no `X-Forwarded-For`?
+ *
+ * Precisa ser `true` **exatamente** quando houver um proxy à frente, e `false`
+ * caso contrário — os dois erros custam caro, em direções opostas:
+ *
+ * - `false` atrás de proxy: `request.ip` é o IP do proxy, o mesmo para todo
+ *   mundo. Rate limit por IP deixa de proteger e passa a atrapalhar, porque o
+ *   teto vira compartilhado entre todos os clientes juntos.
+ * - `true` exposto direto: qualquer um forja o header e escolhe o próprio IP,
+ *   e o rate limit vira decorativo.
+ *
+ * Default `false` porque é o que vale em desenvolvimento e nos testes. Ligar é
+ * decisão de quem faz o deploy, e está documentada no `.env.example`.
+ */
+const TRUST_PROXY = process.env.TRUST_PROXY === "true";
+
 export async function buildApp() {
   const app = Fastify({
+    bodyLimit: BODY_LIMIT_BYTES,
+    keepAliveTimeout: KEEP_ALIVE_TIMEOUT_MS,
+    connectionTimeout: CONNECTION_TIMEOUT_MS,
+    trustProxy: TRUST_PROXY,
     logger: {
       // S13/F20. Hoje isto não filtra nada: o serializer padrão do Fastify
       // loga só method/url/host/remoteAddress, sem headers — verificado.
