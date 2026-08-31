@@ -273,6 +273,29 @@ curl -X PATCH http://localhost:3333/restaurants/$RID/products/$PID \
 
 O efeito colateral aceito: **pedido pendente não é reserva.** Dois pedidos podem existir para a última unidade — o primeiro a confirmar leva, o segundo recebe 409. `test/orders-confirm.test.ts` cobre os dois casos.
 
+## Limites de exposição
+
+Nenhum destes números é o default do Fastify — todos estão em `apps/api/src/limits.ts`, com o porquê ao lado:
+
+| | Valor | Por quê |
+| --- | --- | --- |
+| `bodyLimit` | 128 KB | o maior corpo real (cadastro, pedido grande) não passa de dezenas de KB |
+| `keepAliveTimeout` | 72s | tem que ser **maior** que o do proxy à frente, senão dá 502 intermitente |
+| `connectionTimeout` | 10s | conexão que abre e não fala nada não fica presa de graça |
+| Rate limit geral | 100/min por IP | cobre cardápio público e criação de pedido |
+| Rate limit do login | **5/min por IP** | rota anônima e cara: bcrypt custa centenas de ms de propósito |
+
+O contador do rate limit é em memória, **por processo**: com duas instâncias, o limite efetivo dobra. Trocar por Redis é decisão de infra.
+
+### Duas variáveis que precisam de atenção no deploy
+
+**`TRUST_PROXY`** decide se a app confia no `X-Forwarded-For`. Ligue **apenas** se houver mesmo um proxy à frente:
+
+- `false` atrás de um proxy → todo cliente aparece com o IP do proxy, e o limite por IP vira um teto compartilhado por todo mundo.
+- `true` com a app exposta direto → qualquer um forja o header e escolhe o próprio IP.
+
+**`CORS_ORIGINS`** é a lista de origens que podem chamar a API de dentro de um navegador, separada por vírgula. **Vazio = ninguém.** Deixe assim até o front existir: falhar fechado quebra o front de forma visível, enquanto liberar demais não dá sintoma nenhum.
+
 ## Soft delete
 
 **Nada é apagado do banco.** Toda tabela tem uma coluna `deleted_at timestamptz`: `NULL` = registro vivo, preenchido = removido. O `DELETE` da API responde `204` normalmente, mas por baixo faz `update ... set deleted_at = now()` — o registro some da API (vira 404 em tudo) e continua no banco.
@@ -283,13 +306,12 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 
 ## Próximos passos
 
-- [ ] Rate limit no `/auth/login` — é o alvo óbvio de força bruta
 - [ ] Recuperação de senha e papéis dentro do restaurante (dono vs. garçom)
 - [ ] Cancelar pedido já confirmado, devolvendo estoque (hoje `confirmed` é terminal)
 - [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
 - [ ] Histórico do cliente (`GET /customers/:id/orders`) e CRUD próprio de clientes
-- [ ] CORS e `bodyLimit` — antes de expor a API para um front
 - [ ] `packages/` compartilhados (tipos, config) — quando o front existir
-- [ ] App do cliente (cardápio via QR code) e painel admin
+- [ ] App do cliente (cardápio via QR code) e painel admin — a API já está pronta para os dois
+- [ ] Contador de rate limit compartilhado (Redis), quando houver mais de uma instância
 # menu-click
 # menu-click

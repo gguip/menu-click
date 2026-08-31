@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
 import {
+  buildTestApp,
   createRestaurant,
   registerResponse,
   validRestaurantBody,
@@ -18,7 +18,7 @@ describe("slug do restaurante", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
   });
 

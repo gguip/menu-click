@@ -1,7 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
-import { createProduct, createRestaurant, validProductBody } from "./helpers.ts";
+import {
+  buildTestApp,
+  createProduct,
+  createRestaurant,
+  validProductBody,
+} from "./helpers.ts";
 
 const NONEXISTENT_ID = "00000000-0000-0000-0000-000000000000";
 
@@ -9,7 +13,7 @@ describe("CRUD /restaurants/:restaurantId/products", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
   });
 

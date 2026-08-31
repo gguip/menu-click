@@ -1,9 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
 import { pool } from "../src/db/pool.ts";
 import type { TestRestaurant } from "./helpers.ts";
-import { createOrder, createProduct, createRestaurant } from "./helpers.ts";
+import {
+  buildTestApp,
+  createOrder,
+  createProduct,
+  createRestaurant,
+} from "./helpers.ts";
 
 /**
  * Confirmação e cancelamento de pedido.
@@ -17,7 +21,7 @@ describe("confirmação e cancelamento de pedido", () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
   });
 

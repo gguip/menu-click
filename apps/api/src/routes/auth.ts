@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import type { CreateRestaurantInput } from "../domain/restaurant.ts";
 import type { CreateRestaurantUserInput } from "../domain/restaurant-user.ts";
 import { PASSWORD_MIN_LENGTH } from "../domain/restaurant-user.ts";
+import { LOGIN_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW } from "../limits.ts";
 import * as authService from "../services/auth.ts";
 import { requireAuth } from "./authenticate.ts";
 import {
@@ -157,10 +158,18 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { email: string; password: string } }>(
     "/auth/login",
     {
-      config: { public: true },
+      config: {
+        public: true,
+        // teto próprio, bem abaixo do global: ver LOGIN_RATE_LIMIT_MAX no app.ts
+        rateLimit: { max: LOGIN_RATE_LIMIT_MAX, timeWindow: RATE_LIMIT_WINDOW },
+      },
       schema: {
         body: loginBodySchema,
-        response: { 200: loginResponseSchema, 401: errorResponseSchema },
+        response: {
+          200: loginResponseSchema,
+          401: errorResponseSchema,
+          429: errorResponseSchema,
+        },
       },
     },
     async (request) => {

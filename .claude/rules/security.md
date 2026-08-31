@@ -58,7 +58,13 @@ O projeto já tem autenticação (seção 6); exposição pública ainda não.
 ## 5. Exposição
 
 - **S15 — TLS termina no proxy** (F24); a app nunca fica direto na internet. Para banco gerenciado, exija TLS na conexão (`?sslmode=require` no `DATABASE_URL`).
-- **S16 — Antes de abrir para a internet:** revise `bodyLimit`/`connectionTimeout` (F27) e adicione rate limit. Sem isso, qualquer um mantém o pool ocupado com requisições grandes.
+- **S16 — Os limites são explícitos, e ficam em `src/limits.ts`.** `bodyLimit`, `keepAliveTimeout`, `connectionTimeout` e os tetos de rate limit já saíram do default (F27). Ao mexer em qualquer um, mexa lá e mantenha o porquê ao lado do número.
+
+- **S24 — `TRUST_PROXY` tem que casar com a topologia real.** `false` atrás de um proxy faz todo cliente aparecer com o IP do proxy, e qualquer limite por IP vira teto compartilhado. `true` com a app exposta direto deixa qualquer um forjar o `X-Forwarded-For`. Os dois erros são silenciosos, então a variável é decisão de deploy, nunca default esperto.
+
+- **S25 — Rota anônima e cara precisa de teto próprio.** O `/auth/login` é o caso: bcrypt custa centenas de milissegundos de propósito, e a defesa contra oráculo de timing faz e-mail inventado custar o mesmo que legítimo. Teto por IP, nunca por e-mail — por e-mail vira uma forma de trancar o dono da conta para fora.
+
+- **S26 — CORS falha fechado.** `CORS_ORIGINS` vazio não libera ninguém. Nunca use `*`: a criação de pedido é pública, então `*` deixaria qualquer site fazer pedido em nome de quem o visita. E o CORS é registrado antes do hook de autenticação, porque o preflight `OPTIONS` é anônimo e seria recusado por ele.
 
 ## 6. Autenticação e autorização
 

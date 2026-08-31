@@ -1,4 +1,23 @@
 import type { FastifyInstance } from "fastify";
+import { buildApp } from "../src/app.ts";
+import { currentTestIp } from "./setup.ts";
+
+/**
+ * O `buildApp()` da aplicação, com um detalhe só: cada `inject` sai do IP do
+ * teste em execução, em vez de todos saírem de 127.0.0.1.
+ *
+ * É feito aqui, embrulhando o `inject`, para não ter que repetir
+ * `remoteAddress` em cada uma das centenas de chamadas — e para que um teste
+ * novo herde o comportamento sem saber que ele existe. Chamada que passa
+ * `remoteAddress` explicitamente continua mandando (o spread preserva).
+ */
+export async function buildTestApp(): Promise<FastifyInstance> {
+  const app = await buildApp();
+  const inject = app.inject.bind(app);
+  app.inject = ((options: Record<string, unknown>) =>
+    inject({ remoteAddress: currentTestIp(), ...options })) as typeof app.inject;
+  return app;
+}
 
 export const validRestaurantBody = {
   name: "Tokyo Ramen House",

@@ -1,4 +1,15 @@
 import Fastify from "fastify";
+import cors from "@fastify/cors";
+import rateLimit from "@fastify/rate-limit";
+import {
+  BODY_LIMIT_BYTES,
+  corsOrigins,
+  CONNECTION_TIMEOUT_MS,
+  KEEP_ALIVE_TIMEOUT_MS,
+  RATE_LIMIT_MAX,
+  RATE_LIMIT_WINDOW,
+  TRUST_PROXY,
+} from "./limits.ts";
 import type { FastifyError } from "fastify";
 import { pool } from "./db/pool.ts";
 import {
@@ -23,6 +34,10 @@ import { installAuth } from "./routes/authenticate.ts";
  */
 export async function buildApp() {
   const app = Fastify({
+    bodyLimit: BODY_LIMIT_BYTES,
+    keepAliveTimeout: KEEP_ALIVE_TIMEOUT_MS,
+    connectionTimeout: CONNECTION_TIMEOUT_MS,
+    trustProxy: TRUST_PROXY,
     logger: {
       // S13/F20. Hoje isto não filtra nada: o serializer padrão do Fastify
       // loga só method/url/host/remoteAddress, sem headers — verificado.
@@ -37,6 +52,64 @@ export async function buildApp() {
         remove: true,
       },
     },
+  });
+
+  /**
+   * CORS, registrado **antes** do `installAuth()`.
+   *
+   * A ordem não é estética. O preflight `OPTIONS` que o navegador manda antes
+   * de uma requisição com header customizado **não carrega o `Authorization`**
+   * — ele é anônimo por definição. O hook de negação por padrão responderia
+   * 401 a ele, e um preflight que falha faz o navegador recusar a requisição
+   * real e reportar "erro de CORS". O sintoma aponta para o lugar errado, e a
+   * causa é autenticação. Registrando o CORS primeiro, o preflight é respondido
+   * por ele e nunca chega ao hook.
+   *
+   * Com `CORS_ORIGINS` vazio (o default), nenhuma origem cruzada é aceita.
+   */
+  const origens = corsOrigins();
+  await app.register(cors, {
+    origin: origens.length === 0 ? false : origens,
+    methods: ["GET", "POST", "PATCH", "DELETE"],
+    allowedHeaders: ["content-type", "authorization"],
+    // sem `credentials`: a API usa header, não cookie
+  });
+
+  /**
+   * Rate limit por IP.
+   *
+   * O plugin instala a checagem como hook **de rota**, e hook de rota roda
+   * depois dos hooks de instância — ou seja, depois da autenticação. Isso é
+   * imposto pelo plugin, não escolha nossa: ele marca a requisição e roda no
+   * máximo uma vez, então instalar um hook de instância por fora (para chegar
+   * antes) faz o limite específico do login ser ignorado. Testado.
+   *
+   * A ordem custa pouco no fim das contas:
+   *
+   * - No `/auth/login`, que é o alvo real, a rota é pública — a autenticação
+   *   devolve na primeira linha e o limitador roda ANTES do bcrypt, que é o
+   *   recurso caro que precisa de proteção.
+   * - Em rota protegida, uma enxurrada sem token é recusada pela autenticação
+   *   antes de o contador incrementar. Não custa consulta ao banco: sem header
+   *   `Authorization`, o `authenticate` lança na hora.
+   *
+   * O contador é em memória, por processo. Com uma instância só (o caso hoje)
+   * isso é exato; com duas, cada uma tem o próprio contador e o limite efetivo
+   * dobra. Resolver é trocar o store por Redis, e é decisão de infra.
+   *
+   * `request.ip` respeita o `trustProxy` de `limits.ts` — sem ele, atrás de um
+   * proxy todos os clientes contam como um só.
+   */
+  await app.register(rateLimit, {
+    global: true,
+    max: RATE_LIMIT_MAX,
+    timeWindow: RATE_LIMIT_WINDOW,
+    // o plugin tem corpo de erro próprio; este casa com o resto da API (S11)
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: 429,
+      error: "Too Many Requests",
+      message: `Muitas requisições. Tente de novo em ${context.after}.`,
+    }),
   });
 
   // `request.auth` precisa existir antes de qualquer rota ser registrada (F5).
@@ -96,7 +169,15 @@ export async function buildApp() {
     if (statusCode < 500) {
       // validação, JSON malformado, rota inexistente: a mensagem fala da
       // requisição, não das tripas do servidor. Delega pro handler padrão.
-      return reply.send(error);
+      //
+      // O `reply.code()` explícito não é redundante. Quando o erro vem do
+      // caminho de validação do próprio Fastify, o status já está no `reply` e
+      // o `send` o preserva — mas erro lançado por um hook de plugin (o 429 do
+      // rate limit, por exemplo) chega aqui com o reply ainda em 200, e sem
+      // esta linha a resposta sai **200 com o corpo serializado pelo schema do
+      // 200**, ou seja, `{}`. Foi exatamente o que aconteceu quando o rate
+      // limit entrou.
+      return reply.code(statusCode).send(error);
     }
 
     request.log.error({ err: error }, "erro não tratado");

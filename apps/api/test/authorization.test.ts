@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildApp } from "../src/app.ts";
+import { buildTestApp } from "./helpers.ts";
 
 /**
  * A garantia do "fechado por padrão", testada como garantia — e não rota a rota.
@@ -71,7 +71,7 @@ describe("autorização: fechado por padrão", () => {
   let rotas: string[];
 
   beforeAll(async () => {
-    app = await buildApp();
+    app = await buildTestApp();
     await app.ready();
     rotas = listarRotas(app);
   });
