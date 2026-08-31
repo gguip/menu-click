@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (health check, CRUD de restaurantes no Postgres e CRUD de produtos ainda em memória). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (health check, CRUD de restaurantes e de produtos no Postgres, controle de estoque e rota de compra). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -15,6 +15,7 @@ pnpm install                       # instala tudo no monorepo
 pnpm dev                           # sobe todos os apps em watch (API em http://localhost:3333)
 pnpm build                         # type-check de todos os pacotes (tsc --noEmit)
 pnpm start                         # sobe os apps em modo produção
+pnpm lint                          # eslint em todo o monorepo
 
 pnpm --filter @menuclick/api dev   # roda um script só num pacote
 curl http://localhost:3333/health  # smoke test da API
@@ -23,11 +24,22 @@ pnpm --filter @menuclick/api migrate:up       # aplica as migrations pendentes
 pnpm --filter @menuclick/api migrate:down     # desfaz a última migration
 pnpm --filter @menuclick/api migrate:create X # cria uma migration SQL nova
 pnpm --filter @menuclick/api db:seed          # popula dados de exemplo (idempotente)
+pnpm --filter @menuclick/api test             # suíte de integração (precisa do Postgres de pé)
 ```
 
 A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
 
-**Ainda não há test runner nem linter configurados** — é intencional (só TS + Fastify). Se precisar rodar/adicionar testes, confirme antes de trazer uma lib nova.
+Testes rodam no **Vitest** e o lint no **ESLint** (config mínima na raiz, `eslint.config.js`). O CI (`.github/workflows/ci.yml`) roda os três — lint, type-check e testes — contra um Postgres de serviço.
+
+```bash
+pnpm lint                                     # eslint em todo o monorepo
+pnpm --filter @menuclick/api test             # suíte de integração (vitest run)
+pnpm --filter @menuclick/api exec vitest run test/products.stock.test.ts   # um arquivo só
+```
+
+Os testes são de **integração de verdade**: sobem o app com `buildApp()` + `app.inject()` (F21) e batem num banco Postgres real, `capstone_test`, criado e migrado sozinho pelo `globalSetup` (`test/global-setup.ts`). O `setup.ts` dá `truncate` nas tabelas depois de cada teste, e `fileParallelism: false` evita que um arquivo apague dado de outro. Não há mock de banco — se o Postgres não estiver de pé, a suíte não roda.
+
+Fora Vitest e ESLint, a regra de dependência mínima continua valendo: confirme antes de trazer lib nova.
 
 ## Arquitetura
 
@@ -54,6 +66,24 @@ O domínio (restaurantes e produtos) é dividido em três camadas, e cada uma s�
 - **`src/repositories/`** — só acesso a dados: as queries parametrizadas, os tipos de linha (`snake_case`) e o mapper para o formato camelCase. Sem regra de negócio: "não achei" volta como `null`/`false`. Cada função recebe um `Queryable` opcional no fim (pool por padrão, ou o `client` quando o serviço abriu uma transação).
 
 `src/domain/` guarda só os **tipos** compartilhados pelas três camadas (e o `isUuid`), sem runtime.
+
+### Listagens paginadas
+
+As duas listagens (`GET /restaurants` e `GET /restaurants/:restaurantId/products`) respondem um **envelope**, nunca um array cru:
+
+```json
+{ "data": [ ... ], "limit": 20, "offset": 0, "total": 137 }
+```
+
+`limit` (1–100, default 20) e `offset` (>= 0, default 0) vêm da querystring e são preenchidos pelo `useDefaults` do Ajv — o handler sempre recebe os dois resolvidos. Fora da faixa é **400**, não um ajuste silencioso. O schema e o helper do envelope são compartilhados em `routes/schemas.ts` (`paginationQuerystringSchema`, `pageResponseSchema`); os tipos (`Pagination`, `Page<T>`) estão em `domain/pagination.ts`.
+
+O repositório devolve `{ rows, total }` e é o **serviço** que monta o `Page<T>` — o repositório não conhece o formato da resposta. `total` conta só registros vivos e sai de uma segunda query: `count(*) over ()` traria tudo numa ida só, mas devolve zero linhas quando a página está vazia, e aí um `offset` além do fim reportaria `total: 0`.
+
+### Estoque e a rota de compra
+
+`products.stock` é `not null default 0`. É **legível** em toda resposta de produto, **definível** no POST (estoque inicial) e **editável** no PATCH (reposição). Quem dá baixa é só `POST /products/:id/purchase`, que roda numa transação com `select ... for update` na linha — ler, decidir e gravar saem pela mesma conexão, então duas compras concorrentes se serializam em vez de venderem a mesma unidade duas vezes. `test/products-purchase.test.ts` cobre isso com 10 compras simultâneas para 5 unidades.
+
+Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-stock-to-products`): a constraint transformaria a race condition num erro do Postgres e esconderia o sintoma que o teste precisa enxergar.
 
 **Erro de negócio nunca vira status code na rota.** O serviço lança `NotFoundError`/`ConflictError` e o `setErrorHandler()` do `app.ts` traduz para **404**/**409**, com o corpo `{ statusCode, error, message }`. Nenhuma rota monta corpo de erro na mão.
 

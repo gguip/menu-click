@@ -30,7 +30,7 @@ MenuClick/
 │        │  ├─ migrate.ts    # runner das migrations (pnpm migrate:up/down)
 │        │  ├─ seed.sql      # dados de exemplo
 │        │  └─ seed.ts       # aplica o seed (pnpm db:seed)
-│        ├─ domain/          # tipos do domínio (sem runtime)
+│        ├─ domain/          # tipos do domínio (sem runtime), incl. pagination.ts
 │        ├─ repositories/    # só SQL: restaurants.ts, products.ts
 │        ├─ services/        # só regra de negócio: restaurants.ts, products.ts
 │        └─ routes/          # só HTTP (schema, params, status code)
@@ -61,7 +61,7 @@ cp apps/api/.env.example apps/api/.env
 # cria as tabelas
 pnpm --filter @menuclick/api migrate:up
 
-# (opcional) popula com 2 restaurantes e 4 produtos de exemplo
+# (opcional) popula com 2 restaurantes e 9 produtos de exemplo (já com estoque)
 pnpm --filter @menuclick/api db:seed
 
 # sobe a API em modo dev (com --watch / hot reload)
@@ -73,8 +73,8 @@ A API sobe em `http://localhost:3333`.
 Se não tiver um Postgres à mão, sobe um em um comando:
 
 ```bash
-docker run -d --name menuclick-db \
-  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=menuclick \
+docker run -d --name capstone-db \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=capstone \
   -p 5432:5432 postgres:16
 ```
 
@@ -87,7 +87,7 @@ Ficam em `apps/api/.env` e são carregadas pelo próprio Node (`--env-file-if-ex
 | `DATABASE_URL`              | —           | URL completa do Postgres; tem prioridade sobre `DB_*` |
 | `DB_HOST` / `DB_PORT`       | `localhost` / `5432` | Host e porta do banco                       |
 | `DB_USER` / `DB_PASSWORD`   | `postgres` / `postgres` | Credenciais                              |
-| `DB_NAME`                   | `menuclick` | Nome do banco                                        |
+| `DB_NAME`                   | `capstone`  | Nome do banco (o de teste é `capstone_test`)         |
 | `DB_POOL_MAX`               | `10`        | Máximo de conexões no pool                           |
 | `PORT` / `HOST`             | `3333` / `0.0.0.0` | Onde a API escuta                             |
 
@@ -115,6 +115,7 @@ Resposta esperada:
 | `pnpm dev`    | Roda a task `dev` de todos os apps via Turborepo |
 | `pnpm build`  | Type-check de todos os pacotes (`tsc --noEmit`)  |
 | `pnpm start`  | Sobe os apps em modo produção                    |
+| `pnpm lint`   | Roda o ESLint em todo o monorepo                 |
 
 Específicos da API (rode com `pnpm --filter @menuclick/api <script>`):
 
@@ -124,6 +125,7 @@ Específicos da API (rode com `pnpm --filter @menuclick/api <script>`):
 | `migrate:down`   | Desfaz a última migration                                        |
 | `migrate:create` | Cria um arquivo de migration SQL novo (com timestamp e template) |
 | `db:seed`        | Popula dados de exemplo — idempotente, não duplica               |
+| `test`           | Suíte de integração no Vitest (precisa do Postgres de pé)        |
 
 ### Migrations
 
@@ -137,6 +139,45 @@ pnpm --filter @menuclick/api migrate:create adiciona-categorias
 
 > Se você já tem um banco com as tabelas criadas antes das migrations existirem, não rode `migrate:up` nele: faça o *baseline* inserindo o nome da migration inicial na tabela `pgmigrations` (ver `.claude/rules/database.md`, D19).
 
+## Listagens paginadas
+
+`GET /restaurants` e `GET /restaurants/:restaurantId/products` respondem um envelope, não um array:
+
+```bash
+curl "http://localhost:3333/restaurants?limit=2&offset=0"
+```
+
+```json
+{
+  "data": [ { "id": "...", "name": "Tokyo Ramen House" }, { "...": "..." } ],
+  "limit": 2,
+  "offset": 0,
+  "total": 137
+}
+```
+
+`limit` vai de 1 a 100 (default 20) e `offset` é >= 0 (default 0). Valor fora da faixa responde **400** em vez de ser ajustado em silêncio — um `limit=500` atendido como 100 mentiria sobre o que foi devolvido. `total` conta só os registros vivos (soft delete não entra).
+
+## Estoque e compra
+
+Todo produto tem `stock` (inteiro, default 0). Ele é devolvido em toda resposta de produto, aceito no `POST` (estoque inicial) e no `PATCH` (reposição):
+
+```bash
+# cria já com estoque
+curl -X POST http://localhost:3333/restaurants/$RID/products \
+  -H 'content-type: application/json' \
+  -d '{"name":"Ramen Shoyu","category":"Pratos principais","priceInCents":4890,"stock":20}'
+
+# repõe
+curl -X PATCH http://localhost:3333/restaurants/$RID/products/$PID \
+  -H 'content-type: application/json' -d '{"stock":50}'
+
+# vende uma unidade (409 quando zera)
+curl -X POST http://localhost:3333/products/$PID/purchase
+```
+
+A baixa acontece só na rota de compra, dentro de uma transação com `select ... for update` na linha do produto: duas compras concorrentes se serializam em vez de venderem a mesma unidade duas vezes. O teste `test/products-purchase.test.ts` dispara 10 compras simultâneas contra 5 unidades e exige exatamente 5 vendas.
+
 ## Soft delete
 
 **Nada é apagado do banco.** Toda tabela tem uma coluna `deleted_at timestamptz`: `NULL` = registro vivo, preenchido = removido. O `DELETE` da API responde `204` normalmente, mas por baixo faz `update ... set deleted_at = now()` — o registro some da API (vira 404 em tudo) e continua no banco.
@@ -147,8 +188,10 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 
 ## Próximos passos
 
-- [ ] `packages/` compartilhados (tipos, config)
-- [ ] Domínio: categorias de cardápio e pedidos
+- [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
+- [ ] Domínio: pedidos (`orders` + `order_items`, com o preço congelado no item)
+- [ ] CORS, rate limit e `bodyLimit` — antes de expor a API para um front
+- [ ] `packages/` compartilhados (tipos, config) — quando o front existir
 - [ ] App do cliente (cardápio via QR code) e painel admin
 # menu-click
 # menu-click

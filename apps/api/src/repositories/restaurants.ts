@@ -1,5 +1,6 @@
 import { pool } from "../db/pool.ts";
 import type { Queryable } from "../db/pool.ts";
+import type { Pagination } from "../domain/pagination.ts";
 import type {
   Address,
   CreateRestaurantInput,
@@ -110,14 +111,33 @@ export async function insert(
   return toRestaurant(rows[0]);
 }
 
-/** Todos os restaurantes vivos, em ordem de criação (D11). */
-export async function findAll(db: Queryable = pool): Promise<Restaurant[]> {
+/**
+ * Uma página de restaurantes vivos, em ordem de criação (D11), mais o total de
+ * vivos na tabela.
+ *
+ * São duas queries de propósito: `count(*) over ()` traria o total na mesma
+ * ida, mas devolve zero linhas quando a página está vazia — e aí um `offset`
+ * além do fim reportaria `total: 0`, escondendo que há registros antes.
+ */
+export async function findAll(
+  { limit, offset }: Pagination,
+  db: Queryable = pool,
+): Promise<{ rows: Restaurant[]; total: number }> {
   const { rows } = await db.query<RestaurantRow>(
     `select * from restaurants
       where deleted_at is null
-      order by created_at, id`,
+      order by created_at, id
+      limit $1 offset $2`,
+    [limit, offset],
   );
-  return rows.map(toRestaurant);
+
+  // count(*) volta como string (bigint não cabe em number com segurança); aqui
+  // o valor é uma contagem de linhas, então a conversão é segura.
+  const { rows: countRows } = await db.query<{ total: string }>(
+    `select count(*) as total from restaurants where deleted_at is null`,
+  );
+
+  return { rows: rows.map(toRestaurant), total: Number(countRows[0].total) };
 }
 
 /** Restaurante vivo com esse id, ou `null`. */

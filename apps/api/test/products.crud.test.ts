@@ -90,9 +90,11 @@ describe("CRUD /restaurants/:restaurantId/products", () => {
       });
 
       expect(response.statusCode).toBe(200);
-      const body = response.json() as Array<{ restaurantId: string }>;
-      expect(body).toHaveLength(2);
-      expect(body.every((product) => product.restaurantId === restaurantA.id)).toBe(
+      const { data } = response.json() as {
+        data: Array<{ restaurantId: string }>;
+      };
+      expect(data).toHaveLength(2);
+      expect(data.every((product) => product.restaurantId === restaurantA.id)).toBe(
         true,
       );
     });

@@ -4,8 +4,13 @@ import type {
   CreateProductInput,
   UpdateProductInput,
 } from "../domain/product.ts";
+import type { Pagination } from "../domain/pagination.ts";
 import * as productsService from "../services/products.ts";
-import { errorResponseSchema } from "./schemas.ts";
+import {
+  errorResponseSchema,
+  pageResponseSchema,
+  paginationQuerystringSchema,
+} from "./schemas.ts";
 
 /**
  * Rotas de produtos — camada HTTP (controller), aninhadas em restaurantes.
@@ -39,6 +44,20 @@ const strictAjv = new Ajv({
 });
 addFormats(strictAjv);
 
+/**
+ * Validador para params e querystring — aqui a coerção é obrigatória, não
+ * opcional: tudo que vem na URL chega como string, então `?limit=20` seria
+ * rejeitado por `type: "integer"` se usássemos o validador estrito. Mesmas
+ * opções do default do Fastify.
+ */
+const coercingAjv = new Ajv({
+  coerceTypes: "array",
+  useDefaults: true,
+  removeAdditional: true,
+  allErrors: false,
+});
+addFormats(coercingAjv);
+
 // ===================== JSON Schemas =====================
 
 const createProductBodySchema = {
@@ -51,6 +70,7 @@ const createProductBodySchema = {
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
     photoUrl: { type: "string", format: "uri" },
+    stock: { type: "integer", minimum: 0 },
   },
 };
 
@@ -64,6 +84,7 @@ const updateProductBodySchema = {
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
     photoUrl: { type: "string", format: "uri" },
+    stock: { type: "integer", minimum: 0 },
   },
 };
 
@@ -77,15 +98,13 @@ const productResponseSchema = {
     priceInCents: { type: "integer" },
     description: { type: "string" },
     photoUrl: { type: "string" },
+    stock: { type: "integer" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
 };
 
-const productListResponseSchema = {
-  type: "array",
-  items: productResponseSchema,
-};
+const productPageResponseSchema = pageResponseSchema(productResponseSchema);
 
 const restaurantIdParamsSchema = {
   type: "object",
@@ -106,7 +125,11 @@ const productParamsSchema = {
 
 /** Plugin encapsulado: o validador estrito abaixo não vaza para as irmãs (F2). */
 export async function productRoutes(app: FastifyInstance) {
-  app.setValidatorCompiler(({ schema }) => strictAjv.compile(schema as object));
+  // O estrito vale só para o corpo (é lá que "4890" não pode virar 4890); o
+  // resto usa o coercitivo, porque URL não tem tipo.
+  app.setValidatorCompiler(({ schema, httpPart }) =>
+    (httpPart === "body" ? strictAjv : coercingAjv).compile(schema as object),
+  );
 
   // Criar produto no restaurante
   app.post<{ Params: { restaurantId: string }; Body: CreateProductInput }>(
@@ -128,20 +151,24 @@ export async function productRoutes(app: FastifyInstance) {
     },
   );
 
-  // Listar produtos do restaurante (sem produtos → 200 [])
-  app.get<{ Params: { restaurantId: string } }>(
+  // Listar produtos do restaurante (sem produtos → 200 com data vazia)
+  app.get<{ Params: { restaurantId: string }; Querystring: Pagination }>(
     "/restaurants/:restaurantId/products",
     {
       schema: {
         params: restaurantIdParamsSchema,
+        querystring: paginationQuerystringSchema,
         response: {
-          200: productListResponseSchema,
+          200: productPageResponseSchema,
           404: errorResponseSchema,
         },
       },
     },
     async (request) => {
-      return productsService.listByRestaurant(request.params.restaurantId);
+      return productsService.listByRestaurant(
+        request.params.restaurantId,
+        request.query,
+      );
     },
   );
 

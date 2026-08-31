@@ -12,6 +12,8 @@ export type CreateProductInput = {
   priceInCents: number; // inteiro (centavos) — nunca float
   description?: string;
   photoUrl?: string;
+  /** Estoque inicial. Ausente = 0 (o default da coluna). */
+  stock?: number;
 };
 
 /** Edição parcial de produto. */
@@ -21,6 +23,8 @@ export type UpdateProductInput = Partial<CreateProductInput>;
 export type Product = CreateProductInput & {
   id: string;
   restaurantId: string;
+  /** Sempre presente na leitura, mesmo quando não foi enviado na criação. */
+  stock: number;
   createdAt: string;
   updatedAt: string;
 };

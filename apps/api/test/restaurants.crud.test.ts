@@ -18,14 +18,14 @@ describe("CRUD /restaurants", () => {
   });
 
   describe("GET /restaurants", () => {
-    it("200 com array com os restaurantes criados", async () => {
+    it("200 com os restaurantes criados dentro do envelope", async () => {
       await createRestaurant(app, { name: "Tokyo Ramen House" });
       await createRestaurant(app, { name: "Cantina da Nona" });
 
       const response = await app.inject({ method: "GET", url: "/restaurants" });
 
       expect(response.statusCode).toBe(200);
-      expect(response.json()).toHaveLength(2);
+      expect(response.json().data).toHaveLength(2);
     });
   });
 

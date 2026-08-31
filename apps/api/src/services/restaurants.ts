@@ -4,6 +4,7 @@ import type {
   Restaurant,
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
+import type { Page, Pagination } from "../domain/pagination.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { NotFoundError } from "../errors.ts";
 import * as productsRepository from "../repositories/products.ts";
@@ -41,8 +42,11 @@ export async function create(
 }
 
 /** Lista todos os vivos. Lista vazia é resultado válido, não erro. */
-export async function list(): Promise<Restaurant[]> {
-  return restaurantsRepository.findAll();
+export async function list(
+  pagination: Pagination,
+): Promise<Page<Restaurant>> {
+  const { rows, total } = await restaurantsRepository.findAll(pagination);
+  return { data: rows, ...pagination, total };
 }
 
 export async function getById(id: string): Promise<Restaurant> {
