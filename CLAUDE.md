@@ -37,6 +37,8 @@ pnpm --filter @menuclick/api test             # suíte de integração (vitest r
 pnpm --filter @menuclick/api exec vitest run test/products.stock.test.ts   # um arquivo só
 ```
 
+**Cada teste sai de um IP próprio.** O `buildTestApp()` de `test/helpers.ts` embrulha o `inject` para isso: 143 testes vindo de 127.0.0.1 contariam como um cliente só e estourariam o rate limit. O efeito colateral é bom — a suíte roda contra os valores **reais** de `limits.ts`, não contra limites afrouxados para os testes passarem. Quem quer exercitar o limite (`rate-limit.test.ts`) repete o IP de propósito.
+
 Os testes são de **integração de verdade**: sobem o app com `buildApp()` + `app.inject()` (F21) e batem num banco Postgres real, `capstone_test`, criado e migrado sozinho pelo `globalSetup` (`test/global-setup.ts`). O `setup.ts` dá `truncate` nas tabelas depois de cada teste, e `fileParallelism: false` evita que um arquivo apague dado de outro. Não há mock de banco — se o Postgres não estiver de pé, a suíte não roda.
 
 Fora Vitest e ESLint, a regra de dependência mínima continua valendo: confirme antes de trazer lib nova.
@@ -148,6 +150,20 @@ Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-s
 🚨 **Teste de concorrência precisa aquecer o pool antes da corrida** (`warmPool()` em `test/orders-confirm.test.ts`). Com o pool frio, cada requisição espera o handshake de uma conexão nova, e isso é lento o bastante para a primeira transação inteira terminar antes de a segunda começar: o teste passa mesmo com o lock removido. Ao escrever um teste de corrida, **remova o lock e confirme que ele falha** — senão ele não está testando nada.
 
 **Erro de negócio nunca vira status code na rota.** O serviço lança `NotFoundError`/`ConflictError` e o `setErrorHandler()` do `app.ts` traduz para **404**/**409**, com o corpo `{ statusCode, error, message }`. Nenhuma rota monta corpo de erro na mão.
+
+### Limites de exposição
+
+Todos os números vivem em `src/limits.ts`, cada um com o porquê ao lado, e **nenhum é o default** (F27/S16): `bodyLimit` 128 KB, `keepAliveTimeout` 72s (tem que ser **maior** que o do proxy à frente, senão vira 502 intermitente), `connectionTimeout` 10s, e os tetos de rate limit.
+
+**Rate limit:** 100 req/min por IP no geral, **5 req/min no `/auth/login`**. A chave é só o IP — por e-mail protegeria uma conta de ataque distribuído, mas viraria uma forma de trancar o dono para fora. O contador é em memória, **por processo**: com duas instâncias, o limite efetivo dobra.
+
+⚠️ **`TRUST_PROXY` precisa estar certo, e os dois erros custam caro.** `false` atrás de um proxy faz `request.ip` ser o IP do proxy para todo mundo, e o teto vira compartilhado entre todos os clientes juntos. `true` com a app exposta direto deixa qualquer um forjar o `X-Forwarded-For` e escolher o próprio IP. Default `false`.
+
+⚠️ **O rate limit roda DEPOIS da autenticação**, e isso não é escolha nossa: o plugin instala a checagem como hook de rota, e hook de rota roda depois dos hooks de instância. Instalar um hook de instância por fora não resolve — o plugin marca a requisição e roda no máximo uma vez, então o hook global engoliria o limite específico do login. Na prática custa pouco: no login (rota pública) a autenticação devolve na primeira linha e o limitador roda antes do bcrypt, e em rota protegida a recusa sem token não custa consulta ao banco.
+
+**CORS:** `CORS_ORIGINS` separado por vírgula; **vazio = nenhuma origem cruzada**. Sem `credentials`, porque a API usa header e não cookie.
+
+⚠️ **O CORS é registrado ANTES do `installAuth()`.** O preflight `OPTIONS` não carrega `Authorization` — é anônimo por definição —, então o hook de negação por padrão responderia 401 e o navegador reportaria "erro de CORS", apontando para o lugar errado. Inverter a ordem quebra dois testes.
 
 ### Banco: Postgres via `pg` (sem ORM)
 
