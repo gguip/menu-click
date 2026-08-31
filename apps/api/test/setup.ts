@@ -12,7 +12,9 @@ import { pool } from "../src/db/pool.ts";
  */
 afterEach(async () => {
   await pool.query(
-    `truncate table order_items, orders, customers, products, restaurants
+    `truncate table order_items, orders, customers,
+                    sessions, restaurant_users,
+                    products, restaurants
        restart identity cascade`,
   );
 });

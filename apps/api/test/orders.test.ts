@@ -31,7 +31,7 @@ describe("pedidos", () => {
   describe("POST /restaurants/:restaurantId/orders", () => {
     it("cria pedido de mesa: pending, sem endereço, com os itens", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, {
+      const product = await createProduct(app, restaurant, {
         name: "Ramen Shoyu",
         priceInCents: 4890,
       });
@@ -65,11 +65,11 @@ describe("pedidos", () => {
 
     it("soma o total de vários itens, no servidor", async () => {
       const restaurant = await createRestaurant(app);
-      const ramen = await createProduct(app, restaurant.id, {
+      const ramen = await createProduct(app, restaurant, {
         name: "Ramen",
         priceInCents: 4890,
       });
-      const guioza = await createProduct(app, restaurant.id, {
+      const guioza = await createProduct(app, restaurant, {
         name: "Guioza",
         priceInCents: 2250,
       });
@@ -85,7 +85,7 @@ describe("pedidos", () => {
 
     it("ignora um `totalInCents` enviado pelo cliente", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, {
+      const product = await createProduct(app, restaurant, {
         priceInCents: 4890,
       });
 
@@ -101,7 +101,7 @@ describe("pedidos", () => {
 
     it("congela nome e preço: reajustar o cardápio não mexe no pedido", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, {
+      const product = await createProduct(app, restaurant, {
         name: "Ramen Shoyu",
         priceInCents: 4890,
       });
@@ -111,12 +111,14 @@ describe("pedidos", () => {
 
       await app.inject({
         method: "PATCH",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/products/${product.id}`,
         payload: { name: "Ramen Shoyu Especial", priceInCents: 6000 },
       });
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/orders/${order.id}`,
       });
 
@@ -130,7 +132,7 @@ describe("pedidos", () => {
 
     it("duas linhas do mesmo produto viram uma, com a quantidade somada", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, {
+      const product = await createProduct(app, restaurant, {
         priceInCents: 1000,
       });
 
@@ -146,7 +148,7 @@ describe("pedidos", () => {
 
     it("criar pedido não dá baixa em estoque", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id, { stock: 10 });
+      const product = await createProduct(app, restaurant, { stock: 10 });
 
       await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 4 },
@@ -154,6 +156,7 @@ describe("pedidos", () => {
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/products/${product.id}`,
       });
       expect(response.json().stock).toBe(10);
@@ -161,7 +164,7 @@ describe("pedidos", () => {
 
     it("aceita endereço de entrega em restaurante que entrega", async () => {
       const restaurant = await createRestaurant(app, { isDelivery: true });
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
 
       const order = await createOrder(
         app,
@@ -178,7 +181,7 @@ describe("pedidos", () => {
 
     it("409 ao pedir entrega em restaurante que não entrega", async () => {
       const restaurant = await createRestaurant(app, { isDelivery: false });
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
 
       const response = await app.inject({
         method: "POST",
@@ -196,7 +199,7 @@ describe("pedidos", () => {
     it("404 com produto de outro restaurante", async () => {
       const restaurantA = await createRestaurant(app);
       const restaurantB = await createRestaurant(app);
-      const product = await createProduct(app, restaurantB.id);
+      const product = await createProduct(app, restaurantB);
 
       const response = await app.inject({
         method: "POST",
@@ -212,9 +215,10 @@ describe("pedidos", () => {
 
     it("404 com produto removido", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
       await app.inject({
         method: "DELETE",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/products/${product.id}`,
       });
 
@@ -250,7 +254,7 @@ describe("pedidos", () => {
 
     it("mesmo telefone reaproveita o cliente e atualiza o nome", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
       const items = [{ productId: product.id, quantity: 1 }];
 
       const first = await createOrder(app, restaurant.id, items);
@@ -276,7 +280,7 @@ describe("pedidos", () => {
 
     it("400 com quantity string (o validador estrito não coage)", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
 
       const response = await app.inject({
         method: "POST",
@@ -292,7 +296,7 @@ describe("pedidos", () => {
 
     it("400 com quantity zero", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
 
       const response = await app.inject({
         method: "POST",
@@ -308,7 +312,7 @@ describe("pedidos", () => {
 
     it("400 sem cliente", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
 
       const response = await app.inject({
         method: "POST",
@@ -323,7 +327,7 @@ describe("pedidos", () => {
   describe("GET /restaurants/:restaurantId/orders", () => {
     it("envelope paginado, sem os itens", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
       const items = [{ productId: product.id, quantity: 1 }];
       await createOrder(app, restaurant.id, items);
       await createOrder(app, restaurant.id, items, {
@@ -332,6 +336,7 @@ describe("pedidos", () => {
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/orders`,
       });
 
@@ -346,8 +351,8 @@ describe("pedidos", () => {
     it("lista só os pedidos do restaurante da URL", async () => {
       const restaurantA = await createRestaurant(app);
       const restaurantB = await createRestaurant(app);
-      const productA = await createProduct(app, restaurantA.id);
-      const productB = await createProduct(app, restaurantB.id);
+      const productA = await createProduct(app, restaurantA);
+      const productB = await createProduct(app, restaurantB);
 
       await createOrder(app, restaurantA.id, [
         { productId: productA.id, quantity: 1 },
@@ -358,6 +363,7 @@ describe("pedidos", () => {
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurantA.headers,
         url: `/restaurants/${restaurantA.id}/orders`,
       });
 
@@ -366,17 +372,19 @@ describe("pedidos", () => {
 
     it("filtra por status", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
       await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 1 },
       ]);
 
       const pending = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/orders?status=pending`,
       });
       const confirmed = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/orders?status=confirmed`,
       });
 
@@ -390,32 +398,49 @@ describe("pedidos", () => {
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/orders?status=entregue`,
       });
 
       expect(response.statusCode).toBe(400);
     });
 
-    it("404 com restaurante inexistente", async () => {
+    it("404 ao listar pedidos de restaurante que não é o da sessão", async () => {
+      const restaurant = await createRestaurant(app);
+
       const response = await app.inject({
         method: "GET",
         url: "/restaurants/00000000-0000-0000-0000-000000000000/orders",
+        headers: restaurant.headers,
       });
 
+      // 404 e não 403: responder "proibido" confirmaria a existência
       expect(response.statusCode).toBe(404);
+    });
+
+    it("401 sem sessão: a lista de pedidos tem nome e telefone de cliente", async () => {
+      const restaurant = await createRestaurant(app);
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/orders`,
+      });
+
+      expect(response.statusCode).toBe(401);
     });
   });
 
   describe("GET /restaurants/:restaurantId/orders/:orderId", () => {
     it("devolve o pedido com os itens", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant.id);
+      const product = await createProduct(app, restaurant);
       const order = await createOrder(app, restaurant.id, [
         { productId: product.id, quantity: 2 },
       ]);
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/orders/${order.id}`,
       });
 
@@ -428,6 +453,7 @@ describe("pedidos", () => {
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/orders/00000000-0000-0000-0000-000000000000`,
       });
 
@@ -439,6 +465,7 @@ describe("pedidos", () => {
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurant.headers,
         url: `/restaurants/${restaurant.id}/orders/nao-e-uuid`,
       });
 
@@ -448,13 +475,14 @@ describe("pedidos", () => {
     it("404 ao buscar pedido de outro restaurante", async () => {
       const restaurantA = await createRestaurant(app);
       const restaurantB = await createRestaurant(app);
-      const product = await createProduct(app, restaurantA.id);
+      const product = await createProduct(app, restaurantA);
       const order = await createOrder(app, restaurantA.id, [
         { productId: product.id, quantity: 1 },
       ]);
 
       const response = await app.inject({
         method: "GET",
+        headers: restaurantB.headers,
         url: `/restaurants/${restaurantB.id}/orders/${order.id}`,
       });
 

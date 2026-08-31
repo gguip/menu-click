@@ -34,7 +34,8 @@ describe("stock do produto", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: `/restaurants/${restaurant.id}/products`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}/products`,
       payload: validProductBody,
     });
 
@@ -47,7 +48,8 @@ describe("stock do produto", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: `/restaurants/${restaurant.id}/products`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}/products`,
       payload: { ...validProductBody, stock: 20 },
     });
 
@@ -57,11 +59,12 @@ describe("stock do produto", () => {
 
   it("GET devolve o stock atual", async () => {
     const restaurant = await createRestaurant(app);
-    const product = await createProduct(app, restaurant.id, { stock: 7 });
+    const product = await createProduct(app, restaurant, { stock: 7 });
 
     const response = await app.inject({
       method: "GET",
-      url: `/restaurants/${restaurant.id}/products/${product.id}`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}/products/${product.id}`,
     });
 
     expect(response.statusCode).toBe(200);
@@ -70,11 +73,12 @@ describe("stock do produto", () => {
 
   it("PATCH stock repõe o estoque", async () => {
     const restaurant = await createRestaurant(app);
-    const product = await createProduct(app, restaurant.id, { stock: 2 });
+    const product = await createProduct(app, restaurant, { stock: 2 });
 
     const response = await app.inject({
       method: "PATCH",
-      url: `/restaurants/${restaurant.id}/products/${product.id}`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}/products/${product.id}`,
       payload: { stock: 50 },
     });
 
@@ -87,7 +91,8 @@ describe("stock do produto", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: `/restaurants/${restaurant.id}/products`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}/products`,
       payload: { ...validProductBody, stock: -1 },
     });
 
@@ -99,7 +104,8 @@ describe("stock do produto", () => {
 
     const response = await app.inject({
       method: "POST",
-      url: `/restaurants/${restaurant.id}/products`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}/products`,
       payload: { ...validProductBody, stock: "20" },
     });
 
@@ -108,21 +114,23 @@ describe("stock do produto", () => {
 
   it("a confirmação de pedido reflete o estoque definido na criação", async () => {
     const restaurant = await createRestaurant(app);
-    const product = await createProduct(app, restaurant.id, { stock: 3 });
+    const product = await createProduct(app, restaurant, { stock: 3 });
     const order = await createOrder(app, restaurant.id, [
       { productId: product.id, quantity: 1 },
     ]);
 
     const response = await app.inject({
       method: "POST",
-      url: `/restaurants/${restaurant.id}/orders/${order.id}/confirm`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}/orders/${order.id}/confirm`,
     });
 
     expect(response.statusCode).toBe(200);
 
     const reloaded = await app.inject({
       method: "GET",
-      url: `/restaurants/${restaurant.id}/products/${product.id}`,
+      headers: restaurant.headers,
+        url: `/restaurants/${restaurant.id}/products/${product.id}`,
     });
     expect(reloaded.json().stock).toBe(2);
   });

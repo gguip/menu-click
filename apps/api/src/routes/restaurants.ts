@@ -1,16 +1,14 @@
 import type { FastifyInstance } from "fastify";
-import type {
-  CreateRestaurantInput,
-  UpdateRestaurantInput,
-} from "../domain/restaurant.ts";
+import type { UpdateRestaurantInput } from "../domain/restaurant.ts";
 import * as restaurantsService from "../services/restaurants.ts";
+import { requireAuth } from "./authenticate.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import {
-  addressProperties,
-  addressSchema,
   errorResponseSchema,
   pageResponseSchema,
   paginationQuerystringSchema,
+  restaurantResponseSchema,
+  updateRestaurantBodySchema,
 } from "./schemas.ts";
 
 /**
@@ -25,79 +23,31 @@ import {
 // ===================== JSON Schemas =====================
 // Validação da entrada (F9) e serialização da saída (F10/S10).
 
-const createRestaurantBodySchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["name", "cuisineType", "address", "isDelivery", "isQrcode"],
-  properties: {
-    name: { type: "string", minLength: 1 },
-    cuisineType: { type: "string", minLength: 1 },
-    logoUrl: { type: "string", format: "uri" },
-    address: addressSchema,
-    isDelivery: { type: "boolean" },
-    isQrcode: { type: "boolean" },
-  },
-};
-
-const updateRestaurantBodySchema = {
-  type: "object",
-  additionalProperties: false,
-  minProperties: 1,
-  properties: {
-    name: { type: "string", minLength: 1 },
-    cuisineType: { type: "string", minLength: 1 },
-    logoUrl: { type: "string", format: "uri" },
-    address: addressSchema,
-    isDelivery: { type: "boolean" },
-    isQrcode: { type: "boolean" },
-  },
-};
-
-const restaurantResponseSchema = {
-  type: "object",
-  properties: {
-    id: { type: "string" },
-    name: { type: "string" },
-    cuisineType: { type: "string" },
-    logoUrl: { type: "string" },
-    address: { type: "object", properties: addressProperties },
-    isDelivery: { type: "boolean" },
-    isQrcode: { type: "boolean" },
-    createdAt: { type: "string" },
-    updatedAt: { type: "string" },
-  },
-};
-
 const restaurantPageResponseSchema = pageResponseSchema(
   restaurantResponseSchema,
 );
 
-const idParamsSchema = {
+/**
+ * O parâmetro se chama `restaurantId` (e não `id`) de propósito: é esse nome
+ * que o hook de autorização em `authenticate.ts` procura para comparar com o
+ * restaurante da sessão. Uma rota que chamasse o mesmo valor de `id` ficaria
+ * autenticada mas NÃO escopada — passaria a sessão de um restaurante em cima
+ * de outro. A URL é a mesma; o nome é o que liga a rota à checagem.
+ */
+const restaurantIdParamsSchema = {
   type: "object",
-  required: ["id"],
-  properties: { id: { type: "string" } },
+  required: ["restaurantId"],
+  properties: { restaurantId: { type: "string" } },
 };
 
 // ===================== Rotas =====================
 
 export async function restaurantRoutes(app: FastifyInstance) {
-  // Criar
-  app.post<{ Body: CreateRestaurantInput }>(
-    "/restaurants",
-    {
-      schema: {
-        body: createRestaurantBodySchema,
-        response: { 201: restaurantResponseSchema },
-      },
-    },
-    async (request, reply) => {
-      const restaurant = await restaurantsService.create(request.body);
-      reply.code(201);
-      return restaurant;
-    },
-  );
-
-  // Listar (página vazia é resposta válida → 200)
+  // Listar. Devolve o restaurante da SESSÃO, não todos: uma listagem geral
+  // entregaria a qualquer usuário logado o cadastro dos concorrentes. Continua
+  // paginada (mesmo envelope) porque um usuário em várias lojas é o próximo
+  // passo natural — e porque vitrine pública, se um dia existir, é rota
+  // própria com schema próprio, como o /menu.
   app.get<{ Querystring: Pagination }>(
     "/restaurants",
     {
@@ -107,50 +57,53 @@ export async function restaurantRoutes(app: FastifyInstance) {
       },
     },
     async (request) => {
-      return restaurantsService.list(request.query);
+      return restaurantsService.listForSession(
+        requireAuth(request).restaurantId,
+        request.query,
+      );
     },
   );
 
   // Buscar por id
-  app.get<{ Params: { id: string } }>(
-    "/restaurants/:id",
+  app.get<{ Params: { restaurantId: string } }>(
+    "/restaurants/:restaurantId",
     {
       schema: {
-        params: idParamsSchema,
+        params: restaurantIdParamsSchema,
         response: { 200: restaurantResponseSchema, 404: errorResponseSchema },
       },
     },
     async (request) => {
-      return restaurantsService.getById(request.params.id);
+      return restaurantsService.getById(request.params.restaurantId);
     },
   );
 
   // Edição parcial
-  app.patch<{ Params: { id: string }; Body: UpdateRestaurantInput }>(
-    "/restaurants/:id",
+  app.patch<{ Params: { restaurantId: string }; Body: UpdateRestaurantInput }>(
+    "/restaurants/:restaurantId",
     {
       schema: {
-        params: idParamsSchema,
+        params: restaurantIdParamsSchema,
         body: updateRestaurantBodySchema,
         response: { 200: restaurantResponseSchema, 404: errorResponseSchema },
       },
     },
     async (request) => {
-      return restaurantsService.update(request.params.id, request.body);
+      return restaurantsService.update(request.params.restaurantId, request.body);
     },
   );
 
   // Remover (o serviço cuida da cascata nos produtos)
-  app.delete<{ Params: { id: string } }>(
-    "/restaurants/:id",
+  app.delete<{ Params: { restaurantId: string } }>(
+    "/restaurants/:restaurantId",
     {
       schema: {
-        params: idParamsSchema,
+        params: restaurantIdParamsSchema,
         response: { 404: errorResponseSchema },
       },
     },
     async (request, reply) => {
-      await restaurantsService.remove(request.params.id);
+      await restaurantsService.remove(request.params.restaurantId);
       return reply.code(204).send();
     },
   );

@@ -2,7 +2,7 @@
 
 Regras **obrigatórias** para todo código da API (`apps/api`). Complementam `.claude/rules/database.md` (soft delete, SQL) e `.claude/rules/fastify.md` (schemas, logging).
 
-O projeto ainda não tem autenticação nem exposição pública — mas as decisões abaixo são baratas agora e caras depois.
+O projeto já tem autenticação (seção 6); exposição pública ainda não.
 
 ## 1. SQL injection
 
@@ -60,6 +60,22 @@ O projeto ainda não tem autenticação nem exposição pública — mas as deci
 - **S15 — TLS termina no proxy** (F24); a app nunca fica direto na internet. Para banco gerenciado, exija TLS na conexão (`?sslmode=require` no `DATABASE_URL`).
 - **S16 — Antes de abrir para a internet:** revise `bodyLimit`/`connectionTimeout` (F27) e adicione rate limit. Sem isso, qualquer um mantém o pool ocupado com requisições grandes.
 
-## 6. Quando entrar autenticação
+## 6. Autenticação e autorização
 
-Nada disso existe ainda; ao implementar, valem desde o primeiro commit: senha com **argon2id** ou **bcrypt** (nunca hash próprio, nunca SHA puro); token/sessão fora do log e fora da URL; comparação de segredo com `crypto.timingSafeEqual`; e **autorização checada no banco, na mesma query** (`where id = $1 and restaurant_id = $2`, como as rotas de produto já fazem) — nunca só no cliente.
+Existe desde o commit que adicionou `restaurant_users` e `sessions`. As regras abaixo descrevem o que está no código — mudar qualquer uma delas é decisão consciente, não refatoração.
+
+- **S17 — Fechado por padrão.** O hook `onRequest` de `routes/authenticate.ts` exige sessão em **toda** rota; pública é quem declara `config: { public: true }`. Nunca inverta isso para uma lista de rotas protegidas: com opt-in, esquecer uma linha expõe a rota em silêncio; com opt-out, o mesmo esquecimento a fecha e aparece no primeiro teste. `test/authorization.test.ts` lê a árvore de rotas do Fastify e exige 401 de tudo que não esteja na lista de públicas.
+
+- **S18 — Toda rota escopada em restaurante chama o parâmetro de `restaurantId`.** É esse nome que o hook procura para comparar com a sessão. Uma rota que o chamasse de `id` ficaria autenticada mas **não** escopada — uma sessão operando sobre outro restaurante, sem erro nenhum.
+
+- **S19 — Acesso a recurso de outro dono é 404, não 403.** "Proibido" confirma que o recurso existe. Do lado de fora, restaurante dos outros tem que ser indistinguível de restaurante que não existe.
+
+- **S20 — Senha em bcrypt** (nunca hash próprio, nunca SHA puro). E o bcrypt **ignora tudo depois do byte 72, em silêncio**: duas senhas que só diferem do byte 73 conferem como iguais. `maxLength` do JSON Schema conta caracteres, não bytes (40 letras "ç" = 80 bytes), então o limite é checado com `Buffer.byteLength` no serviço.
+
+- **S21 — Token de sessão é aleatório e o banco só guarda o hash.** SHA-256 puro é correto para o token — 256 bits sorteados não têm dicionário — e continua proibido para senha. O token viaja em `Authorization: Bearer`, nunca na URL (que vai para log de proxy, histórico e `Referer`), e o `logger.redact` do `app.ts` cobre o header.
+
+- **S22 — Falha de login é sempre a mesma resposta, no mesmo tempo.** Mensagem única para e-mail inexistente e senha errada, e o bcrypt roda mesmo sem usuário (contra um hash descartável): sem isso, o tempo de resposta diz quais e-mails estão cadastrados.
+
+- **S23 — Autorização é checada no banco, na mesma query** (`where id = $1 and restaurant_id = $2`, como as rotas de produto já fazem) — nunca só no cliente, nunca só no hook.
+
+Ainda **não** existe, e ao implementar vale desde o primeiro commit: recuperação de senha, papéis dentro do restaurante (a tabela comporta, a checagem não existe) e **rate limit no `/auth/login`**, que é o alvo óbvio de força bruta.

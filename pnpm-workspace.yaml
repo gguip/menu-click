@@ -1,3 +1,18 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# O pnpm 10+ não roda script de install de dependência sem autorização
+# explícita, e trata "não decidido" como ERRO — sem esta seção, todo
+# `pnpm build`/`test`/`dev` para de rodar (e o `--frozen-lockfile` do CI falha).
+#
+# `bcrypt: false` = não rode o script de build dele. O pacote já traz binário
+# pré-compilado para linux-x64/arm64, darwin e win32 (`prebuilds/`), que é o
+# que a máquina de dev e o `ubuntu-latest` do CI usam — verificado carregando o
+# módulo com o script desligado. Não autorizar o script é a posição mais segura:
+# um install script é código de terceiro rodando na sua máquina e no CI.
+#
+# Se um dia faltar prebuild para alguma plataforma, o sintoma é erro claro no
+# require — e aí a decisão consciente é virar isto para `true`.
+allowBuilds:
+  bcrypt: false

@@ -1,12 +1,15 @@
-import { withTransaction } from "../db/pool.ts";
+import { randomBytes } from "node:crypto";
+import { isTransactionClient, pool, withTransaction } from "../db/pool.ts";
+import type { Queryable } from "../db/pool.ts";
 import type {
   CreateRestaurantInput,
   Restaurant,
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
+import { SLUG_MAX_LENGTH, slugify } from "../domain/slug.ts";
 import { isUuid } from "../domain/uuid.ts";
-import { NotFoundError } from "../errors.ts";
+import { ConflictError, NotFoundError } from "../errors.ts";
 import * as productsRepository from "../repositories/products.ts";
 import * as restaurantsRepository from "../repositories/restaurants.ts";
 
@@ -35,17 +38,115 @@ export async function ensureExists(id: string): Promise<void> {
   if (!(await restaurantsRepository.exists(id))) throw restaurantNotFound(id);
 }
 
-export async function create(
+/** Tamanho do sufixo aleatório (`-a1b2c3`) usado para desempatar slug. */
+const SLUG_SUFFIX_BYTES = 3;
+const SLUG_SUFFIX_LENGTH = SLUG_SUFFIX_BYTES * 2 + 1;
+
+/** Quantas vezes tentar antes de desistir. Colidir 5 vezes seguidas em 2^24 */
+/* combinações significa que algo está errado, não que deu azar. */
+const MAX_SLUG_ATTEMPTS = 5;
+
+/**
+ * Cria o restaurante, resolvendo o slug público.
+ *
+ * Duas políticas diferentes, de propósito:
+ *
+ * - **Slug explícito que colide é 409.** O cliente pediu aquele endereço exato
+ *   (é o que vai no QR code impresso); entregar outro em silêncio seria pior
+ *   que falhar.
+ * - **Slug derivado do nome que colide ganha sufixo e tenta de novo.** Duas
+ *   "Cantina da Nona" é situação normal, e travar o cadastro por isso seria
+ *   hostil com quem nem sabe que slug existe.
+ *
+ * A colisão é detectada pelo índice único (o repositório devolve `null`), não
+ * por um `select` antes: entre checar e inserir cabe outra requisição.
+ *
+ * Aceita um `Queryable` opcional pelo mesmo motivo que os repositórios: o
+ * cadastro (`POST /auth/register`) cria restaurante e primeiro usuário na
+ * mesma transação, e as duas escritas precisam sair pela mesma conexão.
+ */
+/**
+ * Uma tentativa de inserir com um slug, protegida contra o efeito colateral de
+ * falhar dentro de uma transação.
+ *
+ * Sem o savepoint, a primeira colisão aborta a transação do cadastro inteiro e
+ * a tentativa seguinte estoura `current transaction is aborted` — um 500 no
+ * lugar do retry. Fora de transação (pool) não há o que proteger.
+ */
+async function tryInsert(
   input: CreateRestaurantInput,
-): Promise<Restaurant> {
-  return restaurantsRepository.insert(input);
+  slug: string,
+  db: Queryable,
+): Promise<Restaurant | null> {
+  if (!isTransactionClient(db)) {
+    return restaurantsRepository.insert({ ...input, slug }, db);
+  }
+
+  // nome fixo, escrito no código: identificador não aceita $n (S3)
+  await db.query("savepoint slug_attempt");
+  const created = await restaurantsRepository.insert({ ...input, slug }, db);
+  await db.query(
+    created === null
+      ? "rollback to savepoint slug_attempt"
+      : "release savepoint slug_attempt",
+  );
+  return created;
 }
 
-/** Lista todos os vivos. Lista vazia é resultado válido, não erro. */
-export async function list(
+export async function create(
+  input: CreateRestaurantInput,
+  db: Queryable = pool,
+): Promise<Restaurant> {
+  if (input.slug !== undefined) {
+    const created = await tryInsert(input, input.slug, db);
+    if (created === null) {
+      throw new ConflictError(`O slug "${input.slug}" já está em uso`);
+    }
+    return created;
+  }
+
+  // `slugify` pode devolver vazio (nome só de emoji, por exemplo); nesse caso
+  // o slug é só o sufixo aleatório.
+  const base = slugify(input.name).slice(0, SLUG_MAX_LENGTH - SLUG_SUFFIX_LENGTH);
+
+  for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
+    const suffix = randomBytes(SLUG_SUFFIX_BYTES).toString("hex");
+    const slug =
+      attempt === 0 && base !== "" ? base : [base, suffix].filter(Boolean).join("-");
+
+    const created = await tryInsert(input, slug, db);
+    if (created !== null) return created;
+  }
+
+  throw new ConflictError(
+    "Não foi possível gerar um slug único para esse nome; envie um `slug` explícito",
+  );
+}
+
+/** Restaurante pelo slug público (a busca do cardápio do QR code). */
+export async function getBySlug(slug: string): Promise<Restaurant> {
+  const restaurant = await restaurantsRepository.findBySlug(slug);
+  if (restaurant === null) {
+    throw new NotFoundError(`Restaurante "${slug}" não encontrado`);
+  }
+  return restaurant;
+}
+
+/**
+ * Os restaurantes que a sessão administra. Hoje é sempre um (um usuário
+ * pertence a um restaurante), mas o contrato é de lista: o dia em que existir
+ * usuário de rede, muda o serviço e não a resposta.
+ *
+ * Restaurante removido some da lista, como em toda leitura (D2).
+ */
+export async function listForSession(
+  restaurantId: string,
   pagination: Pagination,
 ): Promise<Page<Restaurant>> {
-  const { rows, total } = await restaurantsRepository.findAll(pagination);
+  const { rows, total } = await restaurantsRepository.findAllByIds(
+    [restaurantId],
+    pagination,
+  );
   return { data: rows, ...pagination, total };
 }
 

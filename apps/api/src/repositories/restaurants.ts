@@ -24,6 +24,7 @@ import type {
 type RestaurantRow = {
   id: string;
   name: string;
+  slug: string;
   cuisine_type: string;
   logo_url: string | null;
   street: string;
@@ -43,6 +44,7 @@ function toRestaurant(row: RestaurantRow): Restaurant {
   return {
     id: row.id,
     name: row.name,
+    slug: row.slug,
     cuisineType: row.cuisine_type,
     // logoUrl é opcional: quando é NULL no banco, a chave nem entra na resposta.
     ...(row.logo_url === null ? {} : { logoUrl: row.logo_url }),
@@ -80,61 +82,98 @@ const addressColumns = {
   zipCode: "zip_code",
 } as const;
 
-/** Insere e devolve o restaurante criado. */
-export async function insert(
-  input: CreateRestaurantInput,
-  db: Queryable = pool,
-): Promise<Restaurant> {
-  // id/createdAt/updatedAt saem dos defaults da tabela — daí o RETURNING * (D9).
-  const { rows } = await db.query<RestaurantRow>(
-    `insert into restaurants
-       (name, cuisine_type, logo_url,
-        street, number, neighborhood, city, state, zip_code,
-        is_delivery, is_qrcode)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     returning *`,
-    [
-      input.name,
-      input.cuisineType,
-      input.logoUrl ?? null,
-      input.address.street,
-      input.address.number,
-      input.address.neighborhood,
-      input.address.city,
-      input.address.state,
-      input.address.zipCode,
-      input.isDelivery,
-      input.isQrcode,
-    ],
-  );
+/** Violação de unicidade no Postgres. */
+const UNIQUE_VIOLATION = "23505";
 
-  return toRestaurant(rows[0]);
+/**
+ * Insere e devolve o restaurante criado — ou `null` se o `slug` já está em uso.
+ *
+ * O conflito é detectado pelo índice único, não por um `select` antes: entre a
+ * checagem e o insert cabe outra requisição com o mesmo slug, e aí quem
+ * decidiria seria o banco de qualquer jeito (com um 500 em vez de um 409).
+ *
+ * Traduzir o código `23505` para `null` é trabalho do repositório justamente
+ * para o serviço não precisar conhecer código de erro do Postgres — do lado de
+ * fora isso é só mais um "não deu", igual ao `null` de "não achei".
+ */
+export async function insert(
+  input: CreateRestaurantInput & { slug: string },
+  db: Queryable = pool,
+): Promise<Restaurant | null> {
+  try {
+    // id/createdAt/updatedAt saem dos defaults da tabela — daí o RETURNING (D9)
+    const { rows } = await db.query<RestaurantRow>(
+      `insert into restaurants
+         (name, slug, cuisine_type, logo_url,
+          street, number, neighborhood, city, state, zip_code,
+          is_delivery, is_qrcode)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       returning *`,
+      [
+        input.name,
+        input.slug,
+        input.cuisineType,
+        input.logoUrl ?? null,
+        input.address.street,
+        input.address.number,
+        input.address.neighborhood,
+        input.address.city,
+        input.address.state,
+        input.address.zipCode,
+        input.isDelivery,
+        input.isQrcode,
+      ],
+    );
+    return toRestaurant(rows[0]);
+  } catch (error) {
+    if ((error as { code?: string }).code === UNIQUE_VIOLATION) return null;
+    throw error;
+  }
+}
+
+/** Restaurante vivo com esse slug, ou `null`. É a busca do cardápio público. */
+export async function findBySlug(
+  slug: string,
+  db: Queryable = pool,
+): Promise<Restaurant | null> {
+  const { rows } = await db.query<RestaurantRow>(
+    "select * from restaurants where slug = $1 and deleted_at is null",
+    [slug],
+  );
+  return rows.length === 0 ? null : toRestaurant(rows[0]);
 }
 
 /**
- * Uma página de restaurantes vivos, em ordem de criação (D11), mais o total de
- * vivos na tabela.
+ * Uma página dos restaurantes informados que estejam vivos, em ordem de criação
+ * (D11), mais o total.
+ *
+ * Recebe ids em vez de listar a tabela inteira porque não existe mais listagem
+ * geral: quem chama sempre parte de "os restaurantes desta sessão".
  *
  * São duas queries de propósito: `count(*) over ()` traria o total na mesma
  * ida, mas devolve zero linhas quando a página está vazia — e aí um `offset`
  * além do fim reportaria `total: 0`, escondendo que há registros antes.
  */
-export async function findAll(
+export async function findAllByIds(
+  ids: string[],
   { limit, offset }: Pagination,
   db: Queryable = pool,
 ): Promise<{ rows: Restaurant[]; total: number }> {
+  // S4: array parametrizado, nunca um `in (...)` montado por concatenação
   const { rows } = await db.query<RestaurantRow>(
     `select * from restaurants
-      where deleted_at is null
+      where id = any($1::uuid[]) and deleted_at is null
       order by created_at, id
-      limit $1 offset $2`,
-    [limit, offset],
+      limit $2 offset $3`,
+    [ids, limit, offset],
   );
 
   // count(*) volta como string (bigint não cabe em number com segurança); aqui
   // o valor é uma contagem de linhas, então a conversão é segura.
   const { rows: countRows } = await db.query<{ total: string }>(
-    `select count(*) as total from restaurants where deleted_at is null`,
+    `select count(*) as total from restaurants
+      where id = any($1::uuid[]) and deleted_at is null`,
+    [ids],
   );
 
   return { rows: rows.map(toRestaurant), total: Number(countRows[0].total) };

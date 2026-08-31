@@ -11,12 +11,19 @@
 -- (o default da coluna) e a confirmação de pedido responderia 409 já na
 -- primeira chamada num ambiente recém-populado.
 
+-- O `slug` é explícito para a URL pública do exemplo ficar legível:
+-- /menu/tokyo-ramen-house.
+--
+-- Vale para banco NOVO. Num banco que já tinha estes restaurantes, o
+-- `on conflict do nothing` não toca na linha existente, e o slug continua
+-- sendo o que o backfill da migration gerou (`tokyo-ramen-house-cb95db58`).
+-- Isso é o certo: o seed não sobrescreve dado que já está lá.
 insert into restaurants
-  (id, name, cuisine_type, street, number, neighborhood, city, state, zip_code, is_delivery, is_qrcode)
+  (id, name, slug, cuisine_type, street, number, neighborhood, city, state, zip_code, is_delivery, is_qrcode)
 values
-  ('cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Tokyo Ramen House', 'Japonesa',
+  ('cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Tokyo Ramen House', 'tokyo-ramen-house', 'Japonesa',
    'Avenida Paulista', '2300', 'Bela Vista', 'São Paulo', 'SP', '01310-300', true, false),
-  ('d05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Cantina da Nona', 'Italiana',
+  ('d05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Cantina da Nona', 'cantina-da-nona', 'Italiana',
    'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, true)
 on conflict (id) do nothing;
 
@@ -44,6 +51,22 @@ values
    'Bruschetta al Pomodoro', 'Entradas', 1890, 'Pão italiano, tomate e manjericão', 40),
   ('aa3d4bc2-b2db-4c0d-b2fd-8d1f4db92850', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8',
    'Ossobuco alla Milanese', 'Pratos principais', 7450, 'Com risoto de açafrão', 8)
+on conflict (id) do nothing;
+
+-- Um usuário por restaurante, para dar em quem entrar num ambiente novo.
+--
+-- A senha é `senha-de-exemplo-123` nos dois, e o hash abaixo é bcrypt custo 12
+-- dela. Isto NÃO é o mesmo caso do `.env.example` (que nunca carrega senha
+-- real, nem de dev): aqui é dado de exemplo de um banco de exemplo, do mesmo
+-- naipe do "Tokyo Ramen House". Ambiente real cadastra pelo /auth/register.
+insert into restaurant_users (id, restaurant_id, name, email, password_hash)
+values
+  ('2f8a1c04-9d3e-4b57-8a26-0c5e7b91d4f3', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Dono do Tokyo Ramen', 'dono@tokyoramen.com.br',
+   '$2b$12$AVy5NxxvXd1kfy09F8jRSednE5STi1tPr3Ddsy4CDwIY7e6YW.a8u'),
+  ('6b1d9e75-2a48-4f30-b9c1-8d0f3a5e7c26', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8',
+   'Dona da Cantina', 'dona@cantinadanona.com.br',
+   '$2b$12$AVy5NxxvXd1kfy09F8jRSednE5STi1tPr3Ddsy4CDwIY7e6YW.a8u')
 on conflict (id) do nothing;
 
 -- Um cliente e dois pedidos: um pendente (para testar a confirmação e ver o

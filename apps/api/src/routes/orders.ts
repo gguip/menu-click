@@ -179,6 +179,9 @@ export async function orderRoutes(app: FastifyInstance) {
   app.post<{ Params: { restaurantId: string }; Body: CreateOrderInput }>(
     "/restaurants/:restaurantId/orders",
     {
+      // pública: quem escaneia o QR code pede sem ter conta. As demais rotas
+      // de pedido (listar, confirmar, cancelar) são do restaurante.
+      config: { public: true },
       schema: {
         params: restaurantIdParamsSchema,
         body: createOrderBodySchema,

@@ -32,11 +32,15 @@ MenuClick/
 │        │  └─ seed.ts       # aplica o seed (pnpm db:seed)
 │        ├─ domain/          # tipos do domínio (sem runtime): restaurant, product,
 │        │                    # customer, order, pagination
-│        ├─ repositories/    # só SQL: restaurants, products, customers, orders
-│        ├─ services/        # só regra de negócio: restaurants, products, orders
+│        ├─ repositories/    # só SQL: restaurants, restaurant-users, sessions,
+│        │                    # products, customers, orders
+│        ├─ services/        # só regra: auth, restaurants, menu, products, orders
 │        └─ routes/          # só HTTP (schema, params, status code)
 │           ├─ health.ts     # GET /health
 │           ├─ schemas.ts    # schemas compartilhados (erro, paginação, endereço)
+│           ├─ authenticate.ts      # hook que fecha tudo por padrão
+│           ├─ auth.ts              # cadastro, login, logout, /me
+│           ├─ menu.ts              # cardápio PÚBLICO por slug (o QR code)
 │           ├─ restaurants.ts        # CRUD de restaurantes
 │           ├─ products.ts           # CRUD de produtos do restaurante
 │           └─ orders.ts             # pedidos: criar, listar, confirmar, cancelar
@@ -63,7 +67,7 @@ cp apps/api/.env.example apps/api/.env
 # cria as tabelas
 pnpm --filter @menuclick/api migrate:up
 
-# (opcional) popula 2 restaurantes, 9 produtos (com estoque), 1 cliente e 2 pedidos
+# (opcional) popula 2 restaurantes com dono, 9 produtos, 1 cliente e 2 pedidos
 pnpm --filter @menuclick/api db:seed
 
 # sobe a API em modo dev (com --watch / hot reload)
@@ -160,12 +164,69 @@ curl "http://localhost:3333/restaurants?limit=2&offset=0"
 
 `limit` vai de 1 a 100 (default 20) e `offset` é >= 0 (default 0). Valor fora da faixa responde **400** em vez de ser ajustado em silêncio — um `limit=500` atendido como 100 mentiria sobre o que foi devolvido. `total` conta só os registros vivos (soft delete não entra).
 
+## Duas superfícies
+
+A API atende dois públicos, e a diferença é a coisa mais importante a entender antes de mexer nela:
+
+| Quem | O que pode | Como |
+| --- | --- | --- |
+| Quem escaneia o QR code | ler o cardápio, fazer pedido | sem conta, sem token |
+| O restaurante | todo o resto | `Authorization: Bearer <token>` |
+
+**Toda rota exige sessão por padrão.** Ser pública é uma declaração explícita na rota, e a lista completa é curta: `GET /health`, `GET /menu/:slug`, `GET /menu/:slug/products`, `POST /auth/register`, `POST /auth/login` e `POST /restaurants/:restaurantId/orders`.
+
+A lista está invertida de propósito: rota nova nasce fechada. Se o autor esquecer de pensar no assunto, o erro é um 401 que aparece no primeiro teste — não um vazamento silencioso.
+
+Pedir um restaurante que não é o da sua sessão responde **404**, não 403: "proibido" confirmaria que ele existe.
+
+## Autenticação
+
+```bash
+# cadastrar (cria o restaurante e o primeiro usuário, numa transação)
+curl -X POST http://localhost:3333/auth/register \
+  -H 'content-type: application/json' \
+  -d '{
+        "restaurant": { "name": "Tokyo Ramen House", "cuisineType": "Japonesa",
+                        "address": { "street": "Av. Paulista", "number": "2300",
+                                     "neighborhood": "Bela Vista", "city": "São Paulo",
+                                     "state": "SP", "zipCode": "01310-300" },
+                        "isDelivery": true, "isQrcode": true },
+        "user": { "name": "Dono", "email": "dono@tokyoramen.com.br",
+                  "password": "senha-de-exemplo-123" }
+      }'
+
+# entrar (o seed já deixa dono@tokyoramen.com.br / senha-de-exemplo-123 pronto)
+TOKEN=$(curl -s -X POST http://localhost:3333/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"dono@tokyoramen.com.br","password":"senha-de-exemplo-123"}' \
+  | jq -r .token)
+
+curl -H "authorization: Bearer $TOKEN" http://localhost:3333/auth/me
+curl -X POST -H "authorization: Bearer $TOKEN" http://localhost:3333/auth/logout
+```
+
+A sessão é opaca e mora no banco (não é JWT): custa uma consulta por requisição, e em troca revogar é apagar uma linha. O banco guarda o **hash** do token, nunca o token; a senha vai em bcrypt.
+
+## Cardápio público (o QR code)
+
+O QR code aponta para o `slug`, não para o UUID:
+
+```bash
+curl http://localhost:3333/menu/tokyo-ramen-house
+curl "http://localhost:3333/menu/tokyo-ramen-house/products?limit=10"
+```
+
+O cardápio público **não devolve `stock`** — quantas unidades o restaurante tem é informação dele. O que sai é `available: true|false`.
+
+O slug é gerado do nome (sem acento) ou enviado no cadastro, e **não muda por PATCH**: alterar a URL pública quebraria QR code já impresso.
+
 ## Pedidos
 
 Um pedido nasce `pending`, e daí vai para `confirmed` ou `cancelled`. Não há `DELETE`: pedido não se apaga, se cancela.
 
 ```bash
-# criar (endereço de entrega é opcional: sem ele, é pedido de mesa/QR)
+# criar — PÚBLICO: quem escaneia o QR pede sem ter conta
+# (endereço de entrega é opcional: sem ele, é pedido de mesa)
 curl -X POST http://localhost:3333/restaurants/$RID/orders \
   -H 'content-type: application/json' \
   -d '{
@@ -173,14 +234,17 @@ curl -X POST http://localhost:3333/restaurants/$RID/orders \
         "items": [ { "productId": "'$PID'", "quantity": 2 } ]
       }'
 
-# listar (envelope paginado, com filtro opcional por status)
-curl "http://localhost:3333/restaurants/$RID/orders?status=pending&limit=10"
+# listar — do RESTAURANTE (a lista traz nome e telefone dos clientes)
+curl -H "authorization: Bearer $TOKEN" \
+  "http://localhost:3333/restaurants/$RID/orders?status=pending&limit=10"
 
 # confirmar — é aqui que o estoque é debitado (409 se faltar)
-curl -X POST http://localhost:3333/restaurants/$RID/orders/$OID/confirm
+curl -X POST -H "authorization: Bearer $TOKEN" \
+  http://localhost:3333/restaurants/$RID/orders/$OID/confirm
 
 # cancelar (só pedido pendente)
-curl -X POST http://localhost:3333/restaurants/$RID/orders/$OID/cancel
+curl -X POST -H "authorization: Bearer $TOKEN" \
+  http://localhost:3333/restaurants/$RID/orders/$OID/cancel
 ```
 
 O que o pedido garante:
@@ -219,10 +283,12 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 
 ## Próximos passos
 
+- [ ] Rate limit no `/auth/login` — é o alvo óbvio de força bruta
+- [ ] Recuperação de senha e papéis dentro do restaurante (dono vs. garçom)
 - [ ] Cancelar pedido já confirmado, devolvendo estoque (hoje `confirmed` é terminal)
 - [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
 - [ ] Histórico do cliente (`GET /customers/:id/orders`) e CRUD próprio de clientes
-- [ ] CORS, rate limit e `bodyLimit` — antes de expor a API para um front
+- [ ] CORS e `bodyLimit` — antes de expor a API para um front
 - [ ] `packages/` compartilhados (tipos, config) — quando o front existir
 - [ ] App do cliente (cardápio via QR code) e painel admin
 # menu-click

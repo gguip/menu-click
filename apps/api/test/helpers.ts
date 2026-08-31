@@ -15,18 +15,29 @@ export const validRestaurantBody = {
   isQrcode: false,
 };
 
-/** Cria um restaurante via API e devolve o corpo já em camelCase. */
+/**
+ * Cria um restaurante — hoje isso significa **cadastrar**, porque não existe
+ * mais restaurante sem dono (`POST /restaurants` deixou de existir).
+ *
+ * Devolve o restaurante com `token` e `headers` junto: quase toda rota de
+ * gestão precisa deles, e passá-los à parte espalharia o mesmo par por todos
+ * os testes.
+ */
 export async function createRestaurant(
   app: FastifyInstance,
   overrides: Record<string, unknown> = {},
 ) {
-  const response = await app.inject({
-    method: "POST",
-    url: "/restaurants",
-    payload: { ...validRestaurantBody, ...overrides },
+  const { restaurant, token } = await registerAndLogin(app, {
+    restaurant: overrides,
   });
-  return response.json();
+  return { ...restaurant, token, headers: authHeaders(token) };
 }
+
+/** Restaurante criado por `createRestaurant`, já com credencial. */
+export type TestRestaurant = { id: string; slug: string } & Record<
+  string,
+  unknown
+> & { token: string; headers: { authorization: string } };
 
 export const validProductBody = {
   name: "Ramen Shoyu",
@@ -34,15 +45,19 @@ export const validProductBody = {
   priceInCents: 4890,
 };
 
-/** Cria um produto num restaurante via API e devolve o corpo já em camelCase. */
+/**
+ * Cria um produto via API. Recebe o restaurante inteiro (não só o id) porque
+ * criar produto é rota de gestão e precisa do `headers` que vem junto dele.
+ */
 export async function createProduct(
   app: FastifyInstance,
-  restaurantId: string,
+  restaurant: TestRestaurant,
   overrides: Record<string, unknown> = {},
 ) {
   const response = await app.inject({
     method: "POST",
-    url: `/restaurants/${restaurantId}/products`,
+    url: `/restaurants/${restaurant.id}/products`,
+    headers: restaurant.headers,
     payload: { ...validProductBody, ...overrides },
   });
   return response.json();
@@ -66,4 +81,98 @@ export async function createOrder(
     payload: { customer: validCustomerBody, items, ...overrides },
   });
   return response.json();
+}
+
+export const validUserBody = {
+  name: "Guilherme Dono",
+  email: "dono@tokyoramen.com.br",
+  password: "senha-do-dono-123",
+};
+
+/**
+ * E-mail diferente a cada chamada. O índice é único entre os vivos, então dois
+ * cadastros no mesmo teste colidiriam — e o `truncate` do `setup.ts` só roda
+ * entre testes, não dentro de um.
+ */
+let emailCounter = 0;
+export function uniqueEmail(): string {
+  emailCounter += 1;
+  return `dono-${emailCounter}@tokyoramen.com.br`;
+}
+
+/**
+ * A resposta CRUA de `POST /auth/register` — para os testes que verificam 4xx,
+ * onde `registerRestaurant` (que já espera sucesso) não serve.
+ */
+export function registerResponse(
+  app: FastifyInstance,
+  restaurant: Record<string, unknown> = {},
+  user: Record<string, unknown> = {},
+) {
+  return app.inject({
+    method: "POST",
+    url: "/auth/register",
+    payload: {
+      restaurant: { ...validRestaurantBody, ...restaurant },
+      user: { ...validUserBody, email: uniqueEmail(), ...user },
+    },
+  });
+}
+
+/**
+ * Cadastra restaurante + primeiro usuário e devolve os dois, mais a senha em
+ * texto (os testes precisam dela para o login; a API nunca devolve).
+ */
+export async function registerRestaurant(
+  app: FastifyInstance,
+  overrides: {
+    restaurant?: Record<string, unknown>;
+    user?: Record<string, unknown>;
+  } = {},
+) {
+  const payload = {
+    restaurant: { ...validRestaurantBody, ...overrides.restaurant },
+    user: { ...validUserBody, email: uniqueEmail(), ...overrides.user },
+  };
+  const response = await app.inject({
+    method: "POST",
+    url: "/auth/register",
+    payload,
+  });
+  return { ...response.json(), password: payload.user.password as string };
+}
+
+/** Faz login e devolve o token. */
+export async function login(
+  app: FastifyInstance,
+  email: string,
+  password: string,
+): Promise<string> {
+  const response = await app.inject({
+    method: "POST",
+    url: "/auth/login",
+    payload: { email, password },
+  });
+  return response.json().token;
+}
+
+/** Header pronto para `app.inject({ headers })`. */
+export function authHeaders(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+/** Cadastra e já entra: o par que quase todo teste protegido precisa. */
+export async function registerAndLogin(
+  app: FastifyInstance,
+  overrides: {
+    restaurant?: Record<string, unknown>;
+    user?: Record<string, unknown>;
+  } = {},
+) {
+  const { restaurant, user, password } = await registerRestaurant(
+    app,
+    overrides,
+  );
+  const token = await login(app, user.email, password);
+  return { restaurant, user, token, headers: authHeaders(token) };
 }

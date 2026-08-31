@@ -18,6 +18,10 @@ export default defineConfig({
     globals: false,
     env: {
       DB_NAME: TEST_DB_NAME,
+      // Custo mínimo do bcrypt SÓ nos testes: a cada +1 o hash dobra de tempo,
+      // e a suíte faz dezenas de cadastros e logins. O padrão de produção (12)
+      // está em `services/auth.ts`, que prende o valor entre 4 e 15.
+      BCRYPT_ROUNDS: "4",
     },
     globalSetup: ["./test/global-setup.ts"],
     setupFiles: ["./test/setup.ts"],

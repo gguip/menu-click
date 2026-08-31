@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (health check, CRUD de restaurantes e de produtos no Postgres, controle de estoque e o fluxo de pedidos: criar, listar, confirmar e cancelar). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug, CRUD de restaurantes e de produtos no Postgres, controle de estoque e o fluxo de pedidos: criar, listar, confirmar e cancelar). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -59,7 +59,7 @@ Não há bundler, `tsx`, `ts-node` nem passo de emit. O Node executa `.ts` diret
 
 ### Três camadas: rota → serviço → repositório
 
-O domínio (restaurantes, produtos, clientes e pedidos) é dividido em três camadas, e cada uma só conhece a de baixo:
+O domínio (restaurantes, usuários, produtos, clientes e pedidos) é dividido em três camadas, e cada uma só conhece a de baixo:
 
 - **`src/routes/` (controller)** — só HTTP: JSON Schema de entrada/saída, ler `params`/`body`, chamar o serviço e escolher o status code do caminho feliz. **Nunca escreve SQL nem importa `pool`/repositório.**
 - **`src/services/`** — a regra de negócio: "produto só existe dentro de restaurante vivo", o congelamento de preço no pedido, a transação da confirmação, a cascata do soft delete. Não conhece Fastify (nada de `request`/`reply`) e não escreve SQL. Quando a operação não pode acontecer, **lança erro tipado** de `src/errors.ts` (`NotFoundError`, `ConflictError`).
@@ -80,6 +80,41 @@ As três listagens (`GET /restaurants`, `GET /restaurants/:restaurantId/products
 `limit` (1–100, default 20) e `offset` (>= 0, default 0) vêm da querystring e são preenchidos pelo `useDefaults` do Ajv — o handler sempre recebe os dois resolvidos. Fora da faixa é **400**, não um ajuste silencioso. O schema e o helper do envelope são compartilhados em `routes/schemas.ts` (`paginationQuerystringSchema`, `pageResponseSchema`); os tipos (`Pagination`, `Page<T>`) estão em `domain/pagination.ts`.
 
 O repositório devolve `{ rows, total }` e é o **serviço** que monta o `Page<T>` — o repositório não conhece o formato da resposta. `total` conta só registros vivos e sai de uma segunda query: `count(*) over ()` traria tudo numa ida só, mas devolve zero linhas quando a página está vazia, e aí um `offset` além do fim reportaria `total: 0`.
+
+### 🔒 Duas superfícies: a pública e a do restaurante
+
+A API atende **duas audiências**, e a diferença entre elas é a coisa mais importante a respeitar em código novo:
+
+| Quem | O que pode | Como |
+| --- | --- | --- |
+| Cliente do QR code | ler o cardápio, criar pedido | sem conta, sem token |
+| Restaurante | todo o resto | `Authorization: Bearer <token>` |
+
+**A lista está invertida de propósito: um hook `onRequest` na raiz (`routes/authenticate.ts`) exige sessão em tudo, e a rota pública se declara com `config: { public: true }`.** Rota nova nasce fechada. Com opt-in rota a rota, esquecer uma linha exporia a rota em silêncio; com opt-out, o mesmo esquecimento a fecha e o sintoma aparece no primeiro teste — os dois erros não custam a mesma coisa.
+
+Público hoje, e nada além disso: `GET /health`, `GET /menu/:slug`, `GET /menu/:slug/products`, `POST /auth/register`, `POST /auth/login` e `POST /restaurants/:restaurantId/orders`.
+
+**Autorização também mora no hook.** Ele compara o `:restaurantId` da URL com o da sessão e responde **404** na divergência — 403 confirmaria que aquele restaurante existe. Por isso **toda rota escopada em restaurante precisa chamar o parâmetro de `restaurantId`**: uma rota que o chamasse de `id` ficaria autenticada mas **não** escopada, e uma sessão passaria por cima de outro restaurante. É o tipo de erro que não aparece em teste de caminho feliz.
+
+`test/authorization.test.ts` testa a garantia, não as rotas de hoje: lê a árvore de rotas do próprio Fastify e exige 401 de tudo que não esteja na lista de públicas escrita à mão. Rota nova só passa exigindo sessão ou entrando conscientemente nessa lista.
+
+### Autenticação
+
+- **Sessão opaca no banco**, não JWT (`sessions`). Custa uma consulta por requisição autenticada; em troca, revogar é apagar uma linha em vez de manter lista negra — que seria justamente o estado no banco que o JWT queria evitar.
+- **O banco guarda o hash do token**, nunca o token. SHA-256 puro é o certo *aqui e só aqui*: o token são 256 bits sorteados, sem dicionário a que seja vulnerável. **Senha continua em bcrypt** — segredo escolhido por gente exige KDF caro.
+- **O bcrypt ignora tudo depois do byte 72, em silêncio.** Verificado: duas senhas que só diferem do byte 73 em diante conferem como iguais, e 40 letras "ç" já são 80 bytes. Como `maxLength` do JSON Schema conta caracteres, a checagem é `Buffer.byteLength` no serviço, e falha com `ValidationError` (400).
+- **Login errado responde sempre a mesma coisa, e leva sempre o mesmo tempo**: o bcrypt roda contra um hash descartável quando o e-mail não existe, senão o tempo de resposta viraria um oráculo de quais e-mails estão cadastrados.
+- `BCRYPT_ROUNDS` existe só para a suíte baixar o custo para 4; o padrão é 12 e o valor é preso entre 4 e 15.
+
+### Cardápio público e o slug
+
+`slug` é o identificador público do restaurante — o que vai dentro do QR code, porque um UUID não é endereço que alguém digita ou imprime. É gerado do nome (com `String.normalize("NFD")` tirando o acento, sem dependência), pode vir explícito no cadastro, e **não é editável por PATCH**: mudar a URL pública quebra QR code já impresso.
+
+Colisão tem duas políticas: slug **explícito** que colide é **409** (o cliente pediu aquele endereço exato), slug **derivado do nome** ganha sufixo aleatório e tenta de novo. A detecção é pelo índice único parcial, nunca por um `select` antes — entre checar e inserir cabe outra requisição.
+
+⚠️ **Retry de insert dentro de transação precisa de savepoint.** No Postgres, um comando que falha aborta o bloco inteiro, e a query seguinte estoura `current transaction is aborted`. Foi um 500 real no cadastro (que cria restaurante e usuário na mesma transação) até cada tentativa ganhar o seu savepoint. Fora de transação o problema não existe, porque cada query já é a própria transação — ver `isTransactionClient()` em `db/pool.ts`.
+
+As rotas de `/menu` têm `schema.response` próprio, mais enxuto que o das rotas de gestão. **`stock` não sai por ali** — quantas unidades o restaurante tem é informação dele; o cliente recebe `available: boolean`. É a diferença entre a superfície aberta e a fechada, e é o que impede uma coluna nova de vazar sozinha (S10).
 
 ### Pedidos
 
@@ -116,7 +151,7 @@ Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-s
 
 ### Banco: Postgres via `pg` (sem ORM)
 
-`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, produtos, clientes e pedidos vivem no Postgres — não há mais nada em memória.
+`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, usuários, sessões, produtos, clientes e pedidos vivem no Postgres — não há mais nada em memória.
 
 O `server.ts` fecha o pool no hook `onClose` e trata `SIGINT`/`SIGTERM` (F26). Requer **Postgres >= 13** (`gen_random_uuid()` nativo).
 
@@ -132,6 +167,7 @@ Turborepo (`turbo.json`) + pnpm workspaces (`pnpm-workspace.yaml`: `apps/*` + `p
 
 - Código de domínio/identificadores em inglês; textos e mensagens voltadas ao usuário em pt-BR.
 - Mantenha as dependências mínimas — o dono do projeto prefere só o que foi pedido explicitamente.
+- Dependência com script de install exige decisão explícita no `pnpm-workspace.yaml` (`allowBuilds`). O pnpm trata "não decidido" como **erro**, não aviso: sem isso, todo `pnpm build`/`test`/`dev` para de rodar e o `--frozen-lockfile` do CI falha. O `bcrypt` está como `false` (usa o binário pré-compilado), que é a posição mais segura.
 
 ## Regras
 
