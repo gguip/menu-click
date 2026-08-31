@@ -73,8 +73,8 @@ A API sobe em `http://localhost:3333`.
 Se não tiver um Postgres à mão, sobe um em um comando:
 
 ```bash
-docker run -d --name menuclick-db \
-  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=menuclick \
+docker run -d --name capstone-db \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=capstone \
   -p 5432:5432 postgres:16
 ```
 
@@ -87,7 +87,7 @@ Ficam em `apps/api/.env` e são carregadas pelo próprio Node (`--env-file-if-ex
 | `DATABASE_URL`              | —           | URL completa do Postgres; tem prioridade sobre `DB_*` |
 | `DB_HOST` / `DB_PORT`       | `localhost` / `5432` | Host e porta do banco                       |
 | `DB_USER` / `DB_PASSWORD`   | `postgres` / `postgres` | Credenciais                              |
-| `DB_NAME`                   | `menuclick` | Nome do banco                                        |
+| `DB_NAME`                   | `capstone`  | Nome do banco (o de teste é `capstone_test`)         |
 | `DB_POOL_MAX`               | `10`        | Máximo de conexões no pool                           |
 | `PORT` / `HOST`             | `3333` / `0.0.0.0` | Onde a API escuta                             |
 
