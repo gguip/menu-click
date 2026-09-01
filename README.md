@@ -296,6 +296,32 @@ curl -X POST -H "authorization: Bearer $TOKEN" .../orders/$OID/ready      # só 
 curl -X POST -H "authorization: Bearer $TOKEN" .../orders/$OID/complete
 ```
 
+## Acompanhar o pedido em tempo real
+
+Quem pede **entrega** ou **retirada** recebe um `trackingToken` na resposta da criação, e com ele acompanha o pedido por WebSocket:
+
+```js
+const { id, trackingToken } = await criarPedido();
+
+const ws = new WebSocket(
+  `ws://localhost:3333/orders/${id}/track?token=${trackingToken}`
+);
+
+ws.onmessage = ({ data }) => {
+  const { type, order } = JSON.parse(data);
+  // type: "snapshot" na conexão, "status" a cada mudança
+  mostrar(order.status);  // confirmed → preparing → ready_for_pickup → completed
+};
+```
+
+A **primeira mensagem é sempre o estado atual** (`snapshot`), então uma conexão que caia e volte já sabe onde o pedido está. O servidor fecha a conexão com código **1000** quando o pedido chega a `completed` ou `cancelled` — não há mais o que transmitir, e 1000 diz ao cliente que ele não deve reconectar.
+
+**Pedido de salão não é acompanhável**, e não por uma checagem: ele não recebe token. Quem está sentado no restaurante não tem o que acompanhar.
+
+O token aparece **só** na resposta que criou o pedido — nunca na listagem ou no detalhe, que são rotas do restaurante. E o banco guarda apenas o hash dele.
+
+> Com mais de uma instância da API, o acompanhamento para de funcionar em silêncio: o evento nasce no processo que atendeu a transição. Resolver é trocar o emissor por pub/sub no Redis.
+
 ## Estoque
 
 Todo produto tem `stock` (inteiro, default 0). Ele é devolvido em toda resposta de produto, aceito no `POST` (estoque inicial) e no `PATCH` (reposição):
@@ -350,12 +376,11 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 
 ## Próximos passos
 
-- [ ] Acompanhamento do pedido em tempo real (WebSocket), para retirada e entrega
 - [ ] Recuperação de senha e papéis dentro do restaurante (dono vs. garçom)
 - [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
 - [ ] Histórico do cliente (`GET /customers/:id/orders`) e CRUD próprio de clientes
 - [ ] `packages/` compartilhados (tipos, config) — quando o front existir
 - [ ] App do cliente (cardápio via QR code) e painel admin — a API já está pronta para os dois
-- [ ] Contador de rate limit compartilhado (Redis), quando houver mais de uma instância
+- [ ] Redis: contador de rate limit e emissor de eventos compartilhados, quando houver mais de uma instância
 # menu-click
 # menu-click
