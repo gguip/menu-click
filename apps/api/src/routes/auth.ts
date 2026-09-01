@@ -140,6 +140,11 @@ export async function authRoutes(app: FastifyInstance) {
       // sem conta ainda não há como se autenticar
       config: { public: true },
       schema: {
+        tags: ["Autenticação"],
+        operationId: "register",
+        summary: "Cadastra restaurante e primeiro usuário",
+        description:
+          "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`.",
         body: registerBodySchema,
         response: {
           201: registerResponseSchema,
@@ -164,6 +169,11 @@ export async function authRoutes(app: FastifyInstance) {
         rateLimit: { max: LOGIN_RATE_LIMIT_MAX, timeWindow: RATE_LIMIT_WINDOW },
       },
       schema: {
+        tags: ["Autenticação"],
+        operationId: "login",
+        summary: "Entra e recebe um token de sessão",
+        description:
+          "Senha errada e e-mail inexistente respondem a MESMA coisa, no mesmo tempo: distinguir os dois entregaria quais endereços estão cadastrados. Limite de 5 requisições por minuto por IP (429 ao estourar), porque a rota é anônima e cara de propósito.",
         body: loginBodySchema,
         response: {
           200: loginResponseSchema,
@@ -183,6 +193,11 @@ export async function authRoutes(app: FastifyInstance) {
     {
       // sem `config.public`: o hook de raiz já exige sessão
       schema: {
+        tags: ["Autenticação"],
+        operationId: "logout",
+        summary: "Revoga a sessão atual",
+        description:
+          "Só a sessão do token usado. As outras sessões do mesmo usuário (outro aparelho) continuam valendo.",
         response: { 204: { type: "null" }, 401: errorResponseSchema },
       },
     },
@@ -196,6 +211,11 @@ export async function authRoutes(app: FastifyInstance) {
     "/auth/me",
     {
       schema: {
+        tags: ["Autenticação"],
+        operationId: "getCurrentUser",
+        summary: "Quem é o dono da sessão",
+        description:
+          "Devolve o usuário e o restaurante a que ele pertence — é como o front descobre o `restaurantId` para montar as demais chamadas.",
         response: { 200: userResponseSchema, 401: errorResponseSchema },
       },
     },

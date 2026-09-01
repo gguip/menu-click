@@ -33,6 +33,26 @@ const ROTAS_PUBLICAS = new Set([
   "POST /restaurants/:restaurantId/orders",
 ]);
 
+/**
+ * Subárvores públicas inteiras.
+ *
+ * O `/docs` é servido pelo `@fastify/swagger-ui`, que cria sete rotas próprias
+ * (a página, os estáticos, o curinga, o JSON e o YAML). Listá-las uma a uma
+ * seria copiar detalhe interno de um plugin para dentro do teste — e quebraria
+ * na próxima versão dele. O prefixo é UMA decisão consciente, que é o que este
+ * teste existe para forçar: a documentação é a superfície aberta da API em
+ * ambiente que não é produção (em produção ela nem sobe).
+ */
+const PREFIXOS_PUBLICOS = ["/docs"];
+
+function ehPublica(rota: string): boolean {
+  if (ROTAS_PUBLICAS.has(rota)) return true;
+  const caminho = rota.split(" ")[1];
+  return PREFIXOS_PUBLICOS.some(
+    (prefixo) => caminho === prefixo || caminho.startsWith(`${prefixo}/`),
+  );
+}
+
 /** Métodos que o Fastify não gera sozinho (HEAD vem de brinde com GET). */
 const METODOS = ["GET", "POST", "PATCH", "DELETE"];
 
@@ -97,7 +117,7 @@ describe("autorização: fechado por padrão", () => {
   });
 
   it("toda rota não declarada pública responde 401 sem credencial", async () => {
-    const protegidas = rotas.filter((rota) => !ROTAS_PUBLICAS.has(rota));
+    const protegidas = rotas.filter((rota) => !ehPublica(rota));
     expect(protegidas.length).toBeGreaterThan(0);
 
     for (const rota of protegidas) {
@@ -115,6 +135,21 @@ describe("autorização: fechado por padrão", () => {
       });
 
       expect(response.statusCode, `${rota} deveria exigir sessão`).toBe(401);
+
+      // O corpo importa tanto quanto o status. Rota registrada por um plugin
+      // cujo contexto nasceu antes do `setErrorHandler` fica com o handler
+      // PADRÃO do Fastify, que responde 500 com a mensagem interna no corpo
+      // (S11). O sintoma é exatamente este: status e formato errados numa rota
+      // que passa despercebida. Aconteceu com o `/docs`.
+      expect(response.json(), `${rota} devolveu um corpo de erro fora do padrão`)
+        .toMatchObject({ statusCode: 401, error: "Unauthorized" });
+    }
+  });
+
+  it("a documentação é servida sem exigir sessão", async () => {
+    for (const url of ["/docs", "/docs/json"]) {
+      const response = await app.inject({ method: "GET", url });
+      expect(response.statusCode, `${url} deveria estar aberto`).toBe(200);
     }
   });
 

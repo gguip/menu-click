@@ -131,6 +131,7 @@ Específicos da API (rode com `pnpm --filter @menuclick/api <script>`):
 | `migrate:down`   | Desfaz a última migration                                        |
 | `migrate:create` | Cria um arquivo de migration SQL novo (com timestamp e template) |
 | `db:seed`        | Popula dados de exemplo — idempotente, não duplica               |
+| `openapi:generate` | Regera o `openapi.json` versionado a partir das rotas          |
 | `test`           | Suíte de integração no Vitest (precisa do Postgres de pé)        |
 
 ### Migrations
@@ -163,6 +164,18 @@ curl "http://localhost:3333/restaurants?limit=2&offset=0"
 ```
 
 `limit` vai de 1 a 100 (default 20) e `offset` é >= 0 (default 0). Valor fora da faixa responde **400** em vez de ser ajustado em silêncio — um `limit=500` atendido como 100 mentiria sobre o que foi devolvido. `total` conta só os registros vivos (soft delete não entra).
+
+## Documentação da API
+
+Com a API no ar, `http://localhost:3333/docs` abre o Swagger UI — a lista completa de rotas, com o corpo esperado, o formato da resposta e quais exigem sessão.
+
+O documento é **gerado a partir das rotas**, não escrito à parte: ele sai dos mesmos JSON Schemas que validam a requisição e serializam a resposta, então não tem como divergir do que a API faz. A versão em arquivo fica em [`apps/api/openapi.json`](apps/api/openapi.json), commitada — dá para gerar os tipos do front a partir dela sem subir nada.
+
+```bash
+pnpm --filter @menuclick/api openapi:generate   # depois de mexer em qualquer rota
+```
+
+O `/docs` **não sobe em produção** (`NODE_ENV=production`): é um mapa completo da superfície da API, o que ajuda tanto quem constrói quanto quem sonda.
 
 ## Duas superfícies
 

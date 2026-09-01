@@ -136,6 +136,11 @@ export async function productRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/products",
     {
       schema: {
+        tags: ["Produtos"],
+        operationId: "createProduct",
+        summary: "Adiciona um produto ao cardápio",
+        description:
+          "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0).",
         params: restaurantIdParamsSchema,
         body: createProductBodySchema,
         response: { 201: productResponseSchema, 404: errorResponseSchema },
@@ -156,6 +161,11 @@ export async function productRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/products",
     {
       schema: {
+        tags: ["Produtos"],
+        operationId: "listProducts",
+        summary: "Cardápio, do lado de quem edita",
+        description:
+          "Ao contrário do cardápio público, esta listagem traz o `stock` exato.",
         params: restaurantIdParamsSchema,
         querystring: paginationQuerystringSchema,
         response: {
@@ -177,6 +187,11 @@ export async function productRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/products/:id",
     {
       schema: {
+        tags: ["Produtos"],
+        operationId: "getProduct",
+        summary: "Detalhe do produto",
+        description:
+          "Escopado pelo restaurante da URL: produto de outro restaurante é 404, mesmo com o id certo.",
         params: productParamsSchema,
         response: { 200: productResponseSchema, 404: errorResponseSchema },
       },
@@ -195,6 +210,11 @@ export async function productRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/products/:id",
     {
       schema: {
+        tags: ["Produtos"],
+        operationId: "updateProduct",
+        summary: "Edita o produto",
+        description:
+          "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade.",
         params: productParamsSchema,
         body: updateProductBodySchema,
         response: { 200: productResponseSchema, 404: errorResponseSchema },
@@ -211,6 +231,11 @@ export async function productRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/products/:id",
     {
       schema: {
+        tags: ["Produtos"],
+        operationId: "deleteProduct",
+        summary: "Tira o produto do cardápio",
+        description:
+          "Soft delete. Pedidos que já continham o produto seguem intactos, porque eles guardam uma cópia do nome e do preço.",
         params: productParamsSchema,
         response: { 404: errorResponseSchema },
       },
