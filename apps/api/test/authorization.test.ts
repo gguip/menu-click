@@ -31,6 +31,9 @@ const ROTAS_PUBLICAS = new Set([
   "POST /auth/register",
   "POST /auth/login",
   "POST /restaurants/:restaurantId/orders",
+  // o acompanhamento: quem pediu não tem conta, e quem autoriza é o token
+  // devolvido na criação do pedido — não a sessão
+  "GET /orders/:orderId/track",
 ]);
 
 /**

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug, CRUD de restaurantes e de produtos no Postgres, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug, CRUD de restaurantes e de produtos no Postgres, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -188,6 +188,28 @@ A marcação de "exige sessão" no documento **não se escreve**: um `transform`
 O `/docs` (Swagger UI) só sobe quando `NODE_ENV` **não** é `production` — é um mapa completo da superfície da API. As rotas dele são criadas pelo plugin, então são marcadas como públicas em bloco por um `onRoute` num escopo próprio.
 
 ⚠️ **O `setErrorHandler()` é registrado antes de qualquer plugin, e precisa continuar assim.** Contexto encapsulado herda o error handler que existia quando ele foi criado; plugin registrado antes ficaria com o handler padrão do Fastify, que responde 500 com a mensagem interna no corpo (S11). Aconteceu com o `/docs`: um 401 saía como `500 {"message":"Autenticação obrigatória"}`.
+
+### Acompanhamento em tempo real (WebSocket)
+
+`GET /orders/:orderId/track?token=…` faz upgrade para WebSocket e transmite as mudanças de status do pedido. É a **única** rota WebSocket da API e é só de leitura — nada que o cliente mande pelo socket é interpretado.
+
+**Quem acompanha é quem recebeu token, e só `takeaway` e `delivery` recebem.** Pedido de salão não ganha credencial na criação, então não existe com o que conectar. Isso é decisão de desenho: "quem está no salão não acompanha" é consequência do modelo, não um `if` que alguém possa remover.
+
+O `trackingToken` sai **uma vez**, na resposta do `POST` que criou o pedido — nunca na listagem nem no detalhe, que são rotas do restaurante e entregariam a credencial de todos os clientes ao painel. O schema da criação é separado justamente por isso (S10). O banco guarda o **hash**, como em `sessions`; os dois usam `src/tokens.ts`.
+
+Três regras para mexer aqui:
+
+- ⚠️ **Publicar só DEPOIS do commit.** `transitionAndPublish()` chama `orderEvents.publish()` fora do `withTransaction` — de dentro dele, um rollback deixaria o cliente vendo um estado que não aconteceu.
+- ⚠️ **A primeira mensagem é sempre `snapshot`.** Sem ela, uma conexão que caia no meio do preparo e volte fica em branco esperando um evento que pode não vir tão cedo. Há teste que falha se o snapshot sair.
+- ⚠️ **Cancelar a inscrição no `close`.** O `subscribe` devolve a função de cancelamento; sem chamá-la, o emissor segura a referência do socket morto para sempre.
+
+O roteamento é **por id de pedido** (o nome do evento é o id), e não um evento global com filtro: fosse um só, a separação viraria um `if` dentro de cada listener — e um `if` esquecido ali vaza o pedido de um cliente para todos os conectados. Há teste para isso.
+
+A autorização roda em **`preHandler`, não `preValidation`**. Rota WebSocket passa pelos hooks antes do upgrade, mas `preValidation` roda **antes** da validação do schema — lá o `token` ainda pode ser `undefined`, e o hash dele estoura 500 em vez de responder 400. Os exemplos do plugin usam `preValidation` porque leem um header, que não passa por schema; credencial em querystring, não.
+
+⚠️ **O emissor é do processo.** Com duas instâncias, o cliente conectado na A não recebe o evento publicado na B, e a falha é silenciosa — a tela só não atualiza. Mesma limitação do contador de rate limit, mesma solução (pub/sub no Redis).
+
+**Teste de WebSocket não usa `app.inject()`** — ele não faz upgrade. `test/orders-tracking.test.ts` sobe o servidor em porta efêmera (`listen({ port: 0 })`) e conecta com um cliente real; é a exceção documentada ao F21. E o cliente de teste enfileira as mensagens desde antes do `open`: o servidor manda o `snapshot` assim que a conexão abre, e um listener registrado depois do `open` chega tarde demais.
 
 ### Limites de exposição
 

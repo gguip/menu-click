@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { withTransaction } from "../db/pool.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
 import type {
+  CreatedOrder,
   CreateOrderInput,
   Order,
   OrderStatus,
@@ -12,12 +13,15 @@ import {
   canTransition,
   cancellingReturnsStock,
   isReachable,
+  issuesTrackingToken,
 } from "../domain/order.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as customersRepository from "../repositories/customers.ts";
 import * as ordersRepository from "../repositories/orders.ts";
 import * as productsRepository from "../repositories/products.ts";
+import { generateToken, hashToken } from "../tokens.ts";
+import * as orderEvents from "../events/orders.ts";
 import * as restaurantsService from "./restaurants.ts";
 
 /**
@@ -102,7 +106,7 @@ function assertEnderecoCoerente(input: CreateOrderInput): void {
 export async function create(
   restaurantId: string,
   input: CreateOrderInput,
-): Promise<Order> {
+): Promise<CreatedOrder> {
   const restaurant = await restaurantsService.getById(restaurantId);
   assertRestauranteAceita(restaurant, input.type);
   assertEnderecoCoerente(input);
@@ -119,6 +123,11 @@ export async function create(
   }
 
   const productIds = [...quantityByProduct.keys()];
+
+  // Quem acompanha o pedido recebe um token; quem está no salão, não. É por
+  // não existir credencial que o pedido de mesa não tem como ser acompanhado —
+  // e não por uma checagem que alguém possa remover.
+  const trackingToken = issuesTrackingToken(input.type) ? generateToken() : null;
 
   return withTransaction(async (client) => {
     const products = await productsRepository.findManyByIds(
@@ -160,6 +169,8 @@ export async function create(
         type: input.type,
         totalInCents,
         deliveryAddress: input.deliveryAddress,
+        trackingTokenHash:
+          trackingToken === null ? null : hashToken(trackingToken),
       },
       client,
     );
@@ -168,7 +179,12 @@ export async function create(
     // relido pela mesma conexão da transação, então enxerga o que acabou de ser
     // gravado (e sai já no formato da resposta, com cliente e itens)
     const order = await ordersRepository.findById(restaurantId, orderId, client);
-    return order as Order;
+
+    // única vez que o token existe fora do cliente; o banco só tem o hash
+    return {
+      ...(order as Order),
+      ...(trackingToken === null ? {} : { trackingToken }),
+    };
   });
 }
 
@@ -185,6 +201,24 @@ export async function listByRestaurant(
     status,
   );
   return { data: rows, ...pagination, total };
+}
+
+/**
+ * Resolve um token de acompanhamento no pedido correspondente, ou `null`.
+ *
+ * Não recebe `restaurantId`: quem acompanha é o cliente, que não sabe (nem
+ * precisa saber) em qual restaurante pediu. Quem escopa é o token — ele vale
+ * para um pedido e só um.
+ */
+export async function findByTrackingToken(
+  token: string,
+): Promise<Order | null> {
+  const found = await ordersRepository.findByTrackingTokenHash(
+    hashToken(token),
+  );
+  if (found === null) return null;
+
+  return ordersRepository.findById(found.restaurantId, found.id);
 }
 
 export async function getById(
@@ -325,6 +359,23 @@ async function transitionTo(
 }
 
 /**
+ * Aplica a transição e anuncia o novo estado.
+ *
+ * O `publish` acontece **fora** do `withTransaction`, e isso não é estilo: de
+ * dentro dele o evento sairia antes do commit, e um rollback deixaria o cliente
+ * vendo um estado que não aconteceu.
+ */
+async function transitionAndPublish(
+  restaurantId: string,
+  orderId: string,
+  to: OrderStatus,
+): Promise<Order> {
+  const order = await transitionTo(restaurantId, orderId, to);
+  orderEvents.publish(order);
+  return order;
+}
+
+/**
  * Aceita o pedido e debita o estoque — o único ponto do sistema que tira
  * unidade de `products.stock`.
  *
@@ -337,7 +388,7 @@ export async function confirm(
   restaurantId: string,
   orderId: string,
 ): Promise<Order> {
-  return transitionTo(restaurantId, orderId, "confirmed");
+  return transitionAndPublish(restaurantId, orderId, "confirmed");
 }
 
 /** Manda o pedido para a cozinha. Não mexe em estoque. */
@@ -345,7 +396,7 @@ export async function startPreparing(
   restaurantId: string,
   orderId: string,
 ): Promise<Order> {
-  return transitionTo(restaurantId, orderId, "preparing");
+  return transitionAndPublish(restaurantId, orderId, "preparing");
 }
 
 /** Saiu para entrega. Só existe na trilha de `delivery`. */
@@ -353,7 +404,7 @@ export async function dispatch(
   restaurantId: string,
   orderId: string,
 ): Promise<Order> {
-  return transitionTo(restaurantId, orderId, "out_for_delivery");
+  return transitionAndPublish(restaurantId, orderId, "out_for_delivery");
 }
 
 /** Pronto no balcão. Só existe na trilha de `takeaway`. */
@@ -361,7 +412,7 @@ export async function markReady(
   restaurantId: string,
   orderId: string,
 ): Promise<Order> {
-  return transitionTo(restaurantId, orderId, "ready_for_pickup");
+  return transitionAndPublish(restaurantId, orderId, "ready_for_pickup");
 }
 
 /** Fim do ciclo: entregue, retirado ou servido, conforme a modalidade. */
@@ -369,7 +420,7 @@ export async function complete(
   restaurantId: string,
   orderId: string,
 ): Promise<Order> {
-  return transitionTo(restaurantId, orderId, "completed");
+  return transitionAndPublish(restaurantId, orderId, "completed");
 }
 
 /**
@@ -384,5 +435,5 @@ export async function cancel(
   restaurantId: string,
   orderId: string,
 ): Promise<Order> {
-  return transitionTo(restaurantId, orderId, "cancelled");
+  return transitionAndPublish(restaurantId, orderId, "cancelled");
 }

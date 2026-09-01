@@ -1085,7 +1085,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Quem escaneia o QR code pede sem ter conta. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome e preço do produto, então reajuste de cardápio não muda pedido já feito. Duas linhas do mesmo produto viram uma, com a quantidade somada. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
+        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome e preço do produto, então reajuste de cardápio não muda pedido já feito. Duas linhas do mesmo produto viram uma, com a quantidade somada. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1302,6 +1302,9 @@
                           }
                         }
                       }
+                    },
+                    "trackingToken": {
+                      "type": "string"
                     }
                   }
                 }

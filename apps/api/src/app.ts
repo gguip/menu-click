@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import websocket from "@fastify/websocket";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import rateLimit from "@fastify/rate-limit";
@@ -25,6 +26,7 @@ import { restaurantRoutes } from "./routes/restaurants.ts";
 import { productRoutes } from "./routes/products.ts";
 import { orderRoutes } from "./routes/orders.ts";
 import { menuRoutes } from "./routes/menu.ts";
+import { trackingRoutes } from "./routes/tracking.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { installAuth } from "./routes/authenticate.ts";
 import { openapiOptions } from "./openapi.ts";
@@ -125,6 +127,17 @@ export async function buildApp() {
       message: "Erro interno no servidor",
     });
   });
+
+  /**
+   * WebSocket. Precisa vir antes das rotas que o usam, como todo plugin que
+   * decora a instância (F5).
+   *
+   * Rota WebSocket passa pelos hooks `onRequest`/`preValidation` do Fastify
+   * antes do upgrade — o que significa que o hook de negação por padrão vale
+   * para ela também. A rota de acompanhamento é pública por declaração
+   * explícita, como qualquer outra.
+   */
+  await app.register(websocket);
 
   /**
    * OpenAPI. Precisa vir antes das rotas: o plugin coleta cada uma via
@@ -245,6 +258,7 @@ export async function buildApp() {
   await app.register(productRoutes);
   await app.register(orderRoutes);
   await app.register(menuRoutes);
+  await app.register(trackingRoutes);
   await app.register(authRoutes);
 
   return app;

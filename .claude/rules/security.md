@@ -82,6 +82,10 @@ Existe desde o commit que adicionou `restaurant_users` e `sessions`. As regras a
 
 - **S22 — Falha de login é sempre a mesma resposta, no mesmo tempo.** Mensagem única para e-mail inexistente e senha errada, e o bcrypt roda mesmo sem usuário (contra um hash descartável): sem isso, o tempo de resposta diz quais e-mails estão cadastrados.
 
+- **S27 — Credencial em URL é sempre token descartável, nunca identificador.** O acompanhamento do pedido é por WebSocket, e navegador não manda header no handshake — a credencial vai na querystring, que entra em log de acesso, de proxy e no histórico. Por isso o `trackingToken` existe em vez de o UUID do pedido fazer esse papel: um token dá para revogar e expirar, e **não existe** onde não deve haver acesso (pedido de salão não recebe token). Segredo que também é identificador não tem como ser revogado.
+
+- **S28 — Autorização de rota WebSocket vai em `preHandler`, não em `preValidation`.** Os dois rodam antes do upgrade, mas `preValidation` roda **antes** da validação do schema: um parâmetro obrigatório ainda pode ser `undefined` ali, e o que deveria ser 400 vira 500. Só use `preValidation` para credencial que não passa por schema (header).
+
 - **S23 — Autorização é checada no banco, na mesma query** (`where id = $1 and restaurant_id = $2`, como as rotas de produto já fazem) — nunca só no cliente, nunca só no hook.
 
 Ainda **não** existe, e ao implementar vale desde o primeiro commit: recuperação de senha, papéis dentro do restaurante (a tabela comporta, a checagem não existe) e **rate limit no `/auth/login`**, que é o alvo óbvio de força bruta.
