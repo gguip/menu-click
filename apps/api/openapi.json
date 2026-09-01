@@ -1918,7 +1918,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Sem os itens (use a rota de detalhe para eles) e em ordem de criação crescente — o mais antigo primeiro, que é a ordem em que a cozinha os atende. Filtro opcional por `status`.",
+        "description": "Sem os itens — use a rota de detalhe para eles. Filtros opcionais: `status`, e o recorte de tempo por `period` (`today`, `yesterday`, `last7days`, `thisMonth`) **ou** por `from`/`to` (datas `YYYY-MM-DD`, intervalo fechado nos dois lados). Mandar os dois juntos é 400. O recorte é resolvido no **fuso do restaurante**, então \"hoje\" é o dia de quem está no salão, não o do servidor. Os filtros valem também para o `total`.",
         "parameters": [
           {
             "schema": {
@@ -1956,6 +1956,38 @@
             },
             "in": "query",
             "name": "status",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "today",
+                "yesterday",
+                "last7days",
+                "thisMonth"
+              ]
+            },
+            "in": "query",
+            "name": "period",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "to",
             "required": false
           },
           {

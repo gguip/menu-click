@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { withTransaction } from "../db/pool.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
+import type { OrderPeriod, PeriodFilter } from "../domain/period.ts";
 import type {
   CreatedOrder,
   CreateOrderInput,
@@ -189,16 +190,69 @@ export async function create(
 }
 
 /** Pedidos de um restaurante, opcionalmente filtrados por status. */
+/** O que a querystring do painel pode trazer além da paginação. */
+export type OrderListFilters = {
+  status?: OrderStatus;
+  period?: OrderPeriod;
+  from?: string;
+  to?: string;
+};
+
+/**
+ * Traduz a querystring no recorte de tempo, ou recusa a combinação com 400.
+ *
+ * As duas formas atendem controles diferentes na tela (os botões e o seletor
+ * de datas), e mandar as duas juntas não tem resposta certa: não existe "hoje,
+ * de 1 a 5 de agosto". Aceitar em silêncio, ignorando uma delas, devolveria um
+ * número que não é o que ninguém pediu — e num painel de faturamento isso é
+ * pior do que um erro.
+ */
+export function resolvePeriodFilter({
+  period,
+  from,
+  to,
+}: Pick<OrderListFilters, "period" | "from" | "to">): PeriodFilter | undefined {
+  const temIntervalo = from !== undefined || to !== undefined;
+
+  if (period !== undefined && temIntervalo) {
+    throw new ValidationError(
+      'Use "period" ou "from"/"to", não os dois na mesma requisição',
+    );
+  }
+
+  if (period !== undefined) return { kind: "named", name: period };
+  if (!temIntervalo) return undefined;
+
+  // Comparação de string funciona aqui porque o formato é YYYY-MM-DD, validado
+  // por `format: "date"` no schema — nele, ordem lexicográfica é ordem
+  // cronológica. Não vale para data em qualquer outro formato.
+  if (from !== undefined && to !== undefined && from > to) {
+    throw new ValidationError(`O período começa depois de terminar: ${from} > ${to}`);
+  }
+
+  return { kind: "range", from, to };
+}
+
+/**
+ * Pedidos do restaurante, com os filtros do painel.
+ *
+ * Carrega o restaurante inteiro (e não só confirma que ele existe) porque o
+ * recorte de tempo é resolvido **no fuso dele**: sem o fuso, "hoje" seria o do
+ * servidor, e um restaurante em Manaus veria o dia trocar uma hora antes.
+ */
 export async function listByRestaurant(
   restaurantId: string,
   pagination: Pagination,
-  status?: OrderStatus,
+  filters: OrderListFilters = {},
 ): Promise<Page<OrderSummary>> {
-  await restaurantsService.ensureExists(restaurantId);
+  const period = resolvePeriodFilter(filters);
+  const restaurant = await restaurantsService.getById(restaurantId);
+
   const { rows, total } = await ordersRepository.findByRestaurant(
     restaurantId,
     pagination,
-    status,
+    { status: filters.status, period },
+    restaurant.timezone,
   );
   return { data: rows, ...pagination, total };
 }

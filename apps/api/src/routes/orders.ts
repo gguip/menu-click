@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import type { CreateOrderInput, OrderStatus } from "../domain/order.ts";
 import { ORDER_STATUSES, ORDER_TYPES } from "../domain/order.ts";
+import { ORDER_PERIODS } from "../domain/period.ts";
+import type { OrderPeriod } from "../domain/period.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import * as ordersService from "../services/orders.ts";
 import { installRouteValidators } from "./validators.ts";
@@ -133,7 +135,7 @@ const createdOrderResponseSchema = {
 
 const orderPageResponseSchema = pageResponseSchema(orderSummaryResponseSchema);
 
-/** Paginação mais o filtro por status (o painel do restaurante usa `pending`). */
+/** Paginação mais os filtros do painel: status e recorte de tempo. */
 const orderListQuerystringSchema = {
   ...paginationQuerystringSchema,
   properties: {
@@ -141,6 +143,13 @@ const orderListQuerystringSchema = {
     // enum fechado: o valor chega ao SQL como `$n` comparado a uma coluna,
     // nunca como identificador — e mesmo assim só passa o que está na lista
     status: { type: "string", enum: [...ORDER_STATUSES] },
+    // os atalhos do painel; o recorte é resolvido no fuso do restaurante
+    period: { type: "string", enum: [...ORDER_PERIODS] },
+    // datas locais do seletor, não instantes: `format: "date"` é YYYY-MM-DD.
+    // Mandar `period` junto com estas é 400 — quem recusa é o serviço, porque
+    // "um ou outro" não cabe num JSON Schema sem `oneOf` ilegível.
+    from: { type: "string", format: "date" },
+    to: { type: "string", format: "date" },
   },
 };
 
@@ -159,7 +168,12 @@ const orderParamsSchema = {
   },
 };
 
-type OrderListQuery = Pagination & { status?: OrderStatus };
+type OrderListQuery = Pagination & {
+  status?: OrderStatus;
+  period?: OrderPeriod;
+  from?: string;
+  to?: string;
+};
 
 // ===================== Rotas =====================
 
@@ -210,18 +224,18 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "listOrders",
         summary: "Pedidos do restaurante",
         description:
-          "Sem os itens (use a rota de detalhe para eles) e em ordem de criação crescente — o mais antigo primeiro, que é a ordem em que a cozinha os atende. Filtro opcional por `status`.",
+          "Sem os itens — use a rota de detalhe para eles. Filtros opcionais: `status`, e o recorte de tempo por `period` (`today`, `yesterday`, `last7days`, `thisMonth`) **ou** por `from`/`to` (datas `YYYY-MM-DD`, intervalo fechado nos dois lados). Mandar os dois juntos é 400. O recorte é resolvido no **fuso do restaurante**, então \"hoje\" é o dia de quem está no salão, não o do servidor. Os filtros valem também para o `total`.",
         params: restaurantIdParamsSchema,
         querystring: orderListQuerystringSchema,
         response: { 200: orderPageResponseSchema, 404: errorResponseSchema },
       },
     },
     async (request) => {
-      const { limit, offset, status } = request.query;
+      const { limit, offset, status, period, from, to } = request.query;
       return ordersService.listByRestaurant(
         request.params.restaurantId,
         { limit, offset },
-        status,
+        { status, period, from, to },
       );
     },
   );

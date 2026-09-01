@@ -4,6 +4,7 @@ import type { PoolClient } from "pg";
 import type { CustomerRow } from "./customers.ts";
 import { toCustomer } from "./customers.ts";
 import type { Pagination } from "../domain/pagination.ts";
+import type { OrderPeriod, PeriodFilter } from "../domain/period.ts";
 import type {
   Order,
   OrderItem,
@@ -279,11 +280,84 @@ export async function updateStatus(
 }
 
 /**
- * Uma página de pedidos vivos do restaurante, mais o total.
+ * O começo de cada período nomeado, como expressão SQL.
  *
- * `status` é filtro opcional. Ele entra como parâmetro `$n` comparado a uma
- * coluna — não é identificador dinâmico — e o valor já veio validado contra o
- * `enum` do JSON Schema na rota.
+ * As contas são feitas **no Postgres**, não no Node, e por um motivo concreto:
+ * "meia-noite de hoje em America/Sao_Paulo" depende do banco de fusos (horário
+ * de verão inclusive), e o Postgres já o consulta no `at time zone`. Refazer
+ * isso em JavaScript seria manter uma segunda implementação da mesma regra,
+ * que discordaria da primeira exatamente nos dias de virada.
+ *
+ * Cada expressão devolve um `timestamp` **local** (sem fuso); quem a usa a
+ * converte de volta para `timestamptz` com `at time zone`. `%TZ%` é
+ * substituído pelo número do parâmetro que carrega o fuso — o fuso é VALOR,
+ * então vai como `$n` (S1), nunca interpolado.
+ */
+const PERIOD_START: Record<OrderPeriod, string> = {
+  today: "date_trunc('day', now() at time zone %TZ%)",
+  yesterday: "date_trunc('day', now() at time zone %TZ%) - interval '1 day'",
+  // 7 dias contando hoje — "últimos 7 dias" incluindo o dia em curso
+  last7days: "date_trunc('day', now() at time zone %TZ%) - interval '6 days'",
+  thisMonth: "date_trunc('month', now() at time zone %TZ%)",
+};
+
+/** O fim, quando o período tem um. Os demais vão até agora. */
+const PERIOD_END: Partial<Record<OrderPeriod, string>> = {
+  yesterday: "date_trunc('day', now() at time zone %TZ%)",
+};
+
+/**
+ * Monta as condições de período e empurra os valores em `values`.
+ *
+ * Devolve os pedaços de `where` já prontos. O que se concatena aqui são
+ * strings fixas escritas neste arquivo; data e fuso vão como parâmetro (S2).
+ */
+function periodConditions(
+  filter: PeriodFilter | undefined,
+  timezone: string,
+  coluna: string,
+  values: unknown[],
+): string[] {
+  if (filter === undefined) return [];
+
+  values.push(timezone);
+  const tz = `$${values.length}`;
+  const emFuso = (expressao: string) =>
+    `(${expressao.split("%TZ%").join(tz)}) at time zone ${tz}`;
+
+  if (filter.kind === "named") {
+    const conditions = [`${coluna} >= ${emFuso(PERIOD_START[filter.name])}`];
+    const fim = PERIOD_END[filter.name];
+    if (fim !== undefined) conditions.push(`${coluna} < ${emFuso(fim)}`);
+    return conditions;
+  }
+
+  const conditions: string[] = [];
+  if (filter.from !== undefined) {
+    values.push(filter.from);
+    conditions.push(`${coluna} >= ${emFuso(`($${values.length}::date)::timestamp`)}`);
+  }
+  if (filter.to !== undefined) {
+    values.push(filter.to);
+    // `+ 1` porque o intervalo é fechado: o dia do `to` entra inteiro, e o
+    // corte fica na meia-noite seguinte
+    conditions.push(
+      `${coluna} < ${emFuso(`($${values.length}::date + 1)::timestamp`)}`,
+    );
+  }
+  return conditions;
+}
+
+/** Os filtros da listagem de pedidos, além da paginação. */
+export type OrderFilters = {
+  status?: OrderStatus;
+  period?: PeriodFilter;
+};
+
+/**
+ * Uma página de pedidos vivos do restaurante, mais o total — já considerando
+ * os filtros, que valem também para o `total`: filtrar e continuar reportando
+ * o total do restaurante inteiro faria a paginação mentir.
  *
  * Duas queries, pelo mesmo motivo de `restaurants.findAll`: `count(*) over ()`
  * devolveria zero linhas numa página vazia.
@@ -291,29 +365,38 @@ export async function updateStatus(
 export async function findByRestaurant(
   restaurantId: string,
   { limit, offset }: Pagination,
-  status: OrderStatus | undefined,
+  filters: OrderFilters,
+  timezone: string,
   db: Queryable = pool,
 ): Promise<{ rows: OrderSummary[]; total: number }> {
-  const filter = status === undefined ? "" : " and o.status = $4";
-  const params: unknown[] = [restaurantId, limit, offset];
-  if (status !== undefined) params.push(status);
+  /** Monta as condições para um prefixo de coluna (a listagem usa alias, o count não). */
+  const condicoes = (prefixo: string, values: unknown[]) => {
+    const lista = [`${prefixo}restaurant_id = $1`, `${prefixo}deleted_at is null`];
+    if (filters.status !== undefined) {
+      values.push(filters.status);
+      lista.push(`${prefixo}status = $${values.length}`);
+    }
+    lista.push(
+      ...periodConditions(filters.period, timezone, `${prefixo}created_at`, values),
+    );
+    return lista.join(" and ");
+  };
+
+  const values: unknown[] = [restaurantId];
+  const where = condicoes("o.", values);
 
   const { rows } = await db.query<OrderWithCustomerRow>(
     `${selectOrderWithCustomer}
-      where o.restaurant_id = $1 and o.deleted_at is null${filter}
+      where ${where}
       order by o.created_at, o.id
-      limit $2 offset $3`,
-    params,
+      limit $${values.length + 1} offset $${values.length + 2}`,
+    [...values, limit, offset],
   );
 
-  const countParams: unknown[] = [restaurantId];
-  if (status !== undefined) countParams.push(status);
+  const countValues: unknown[] = [restaurantId];
   const { rows: countRows } = await db.query<{ total: string }>(
-    `select count(*) as total from orders
-      where restaurant_id = $1 and deleted_at is null${
-        status === undefined ? "" : " and status = $2"
-      }`,
-    countParams,
+    `select count(*) as total from orders where ${condicoes("", countValues)}`,
+    countValues,
   );
 
   return { rows: rows.map(toOrderSummary), total: Number(countRows[0].total) };
