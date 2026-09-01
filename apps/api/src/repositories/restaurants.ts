@@ -34,6 +34,7 @@ type RestaurantRow = {
   state: string;
   zip_code: string;
   is_delivery: boolean;
+  is_takeaway: boolean;
   is_qrcode: boolean;
   created_at: Date;
   updated_at: Date;
@@ -57,6 +58,7 @@ function toRestaurant(row: RestaurantRow): Restaurant {
       zipCode: row.zip_code,
     },
     isDelivery: row.is_delivery,
+    isTakeaway: row.is_takeaway,
     isQrcode: row.is_qrcode,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
@@ -69,6 +71,7 @@ const restaurantColumns = {
   cuisineType: "cuisine_type",
   logoUrl: "logo_url",
   isDelivery: "is_delivery",
+  isTakeaway: "is_takeaway",
   isQrcode: "is_qrcode",
 } as const;
 
@@ -106,8 +109,8 @@ export async function insert(
       `insert into restaurants
          (name, slug, cuisine_type, logo_url,
           street, number, neighborhood, city, state, zip_code,
-          is_delivery, is_qrcode)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          is_delivery, is_takeaway, is_qrcode)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        returning *`,
       [
         input.name,
@@ -121,6 +124,7 @@ export async function insert(
         input.address.state,
         input.address.zipCode,
         input.isDelivery,
+        input.isTakeaway,
         input.isQrcode,
       ],
     );

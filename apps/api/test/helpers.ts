@@ -31,7 +31,8 @@ export const validRestaurantBody = {
     zipCode: "01310-300",
   },
   isDelivery: true,
-  isQrcode: false,
+  isTakeaway: true,
+  isQrcode: true,
 };
 
 /**
@@ -87,7 +88,13 @@ export const validCustomerBody = {
   phone: "11999990000",
 };
 
-/** Cria um pedido via API e devolve o corpo já em camelCase. */
+/**
+ * Cria um pedido via API e devolve o corpo já em camelCase.
+ *
+ * O default é `dine_in` por ser a modalidade sem endereço nem pré-requisito —
+ * quem quer exercitar entrega ou retirada passa `type` no `overrides` (e o
+ * endereço junto, no caso da entrega).
+ */
 export async function createOrder(
   app: FastifyInstance,
   restaurantId: string,
@@ -97,10 +104,20 @@ export async function createOrder(
   const response = await app.inject({
     method: "POST",
     url: `/restaurants/${restaurantId}/orders`,
-    payload: { customer: validCustomerBody, items, ...overrides },
+    payload: { type: "dine_in", customer: validCustomerBody, items, ...overrides },
   });
   return response.json();
 }
+
+/** Endereço de entrega de exemplo, para os testes de `type: "delivery"`. */
+export const validDeliveryAddress = {
+  street: "Rua Augusta",
+  number: "1500",
+  neighborhood: "Consolação",
+  city: "São Paulo",
+  state: "SP",
+  zipCode: "01304-001",
+};
 
 export const validUserBody = {
   name: "Guilherme Dono",

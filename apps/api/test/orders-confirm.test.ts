@@ -237,7 +237,12 @@ describe("confirmação e cancelamento de pedido", () => {
       expect(await stockOf(product.id)).toBe(10);
     });
 
-    it("409 ao cancelar pedido já confirmado", async () => {
+    /**
+     * Antes `confirmed` era terminal e isto era 409. Com a máquina estendida,
+     * cancelar um pedido aceito passou a ser caso real — e devolve o estoque,
+     * porque ninguém encostou na comida ainda.
+     */
+    it("cancelar pedido confirmado devolve o estoque", async () => {
       const restaurant = await createRestaurant(app);
       const product = await createProduct(app, restaurant, { stock: 10 });
       const order = await createOrder(app, restaurant.id, [
@@ -245,9 +250,10 @@ describe("confirmação e cancelamento de pedido", () => {
       ]);
 
       expect((await confirm(restaurant, order.id)).statusCode).toBe(200);
-      expect((await cancel(restaurant, order.id)).statusCode).toBe(409);
-      // continua debitado: cancelar confirmado não devolve estoque (nem cancela)
       expect(await stockOf(product.id)).toBe(7);
+
+      expect((await cancel(restaurant, order.id)).statusCode).toBe(200);
+      expect(await stockOf(product.id)).toBe(10);
     });
 
     it("409 ao cancelar duas vezes", async () => {

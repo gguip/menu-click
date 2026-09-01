@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { withTransaction } from "../db/pool.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
 import type {
@@ -5,9 +6,15 @@ import type {
   Order,
   OrderStatus,
   OrderSummary,
+  OrderType,
+} from "../domain/order.ts";
+import {
+  canTransition,
+  cancellingReturnsStock,
+  isReachable,
 } from "../domain/order.ts";
 import { isUuid } from "../domain/uuid.ts";
-import { ConflictError, NotFoundError } from "../errors.ts";
+import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as customersRepository from "../repositories/customers.ts";
 import * as ordersRepository from "../repositories/orders.ts";
 import * as productsRepository from "../repositories/products.ts";
@@ -37,6 +44,56 @@ function productNotFound(id: string): NotFoundError {
   return new NotFoundError(`Produto com id "${id}" não encontrado`);
 }
 
+/** Como cada modalidade se chama para quem lê a mensagem de erro. */
+const NOME_DA_MODALIDADE: Record<OrderType, string> = {
+  dine_in: "pedido no salão",
+  takeaway: "retirada",
+  delivery: "entrega",
+};
+
+/**
+ * O restaurante aceita essa modalidade?
+ *
+ * As três flags são simétricas de propósito: sem `isTakeaway`, um restaurante
+ * que só entrega passaria a aceitar retirada por omissão.
+ */
+function assertRestauranteAceita(
+  restaurant: { isDelivery: boolean; isQrcode: boolean; isTakeaway: boolean },
+  type: OrderType,
+): void {
+  const aceita: Record<OrderType, boolean> = {
+    dine_in: restaurant.isQrcode,
+    takeaway: restaurant.isTakeaway,
+    delivery: restaurant.isDelivery,
+  };
+
+  if (!aceita[type]) {
+    throw new ConflictError(
+      `Este restaurante não aceita ${NOME_DA_MODALIDADE[type]}`,
+    );
+  }
+}
+
+/**
+ * Endereço é obrigatório na entrega e proibido nas outras duas.
+ *
+ * É 400 e não 409: não é o estado do sistema que impede, é o corpo da
+ * requisição que não faz sentido. O banco tem o mesmo check — aqui a checagem
+ * existe para o cliente receber uma mensagem em vez de um 500 de constraint.
+ */
+function assertEnderecoCoerente(input: CreateOrderInput): void {
+  const temEndereco = input.deliveryAddress !== undefined;
+
+  if (input.type === "delivery" && !temEndereco) {
+    throw new ValidationError("Pedido de entrega exige `deliveryAddress`");
+  }
+  if (input.type !== "delivery" && temEndereco) {
+    throw new ValidationError(
+      `Pedido de ${NOME_DA_MODALIDADE[input.type]} não leva \`deliveryAddress\``,
+    );
+  }
+}
+
 /**
  * Cria o pedido inteiro numa transação: cliente, pedido e itens valem juntos ou
  * nenhum vale. Sem ela, um erro na gravação dos itens deixaria um pedido órfão
@@ -47,12 +104,8 @@ export async function create(
   input: CreateOrderInput,
 ): Promise<Order> {
   const restaurant = await restaurantsService.getById(restaurantId);
-
-  if (input.deliveryAddress !== undefined && !restaurant.isDelivery) {
-    throw new ConflictError(
-      "Este restaurante não faz entrega; peça sem endereço de entrega",
-    );
-  }
+  assertRestauranteAceita(restaurant, input.type);
+  assertEnderecoCoerente(input);
 
   // Duas linhas do mesmo produto viram uma com a quantidade somada. É o que um
   // carrinho faz, e apaga de vez o caso em que a confirmação teria que travar e
@@ -104,6 +157,7 @@ export async function create(
       restaurantId,
       {
         customerId: customer.id,
+        type: input.type,
         totalInCents,
         deliveryAddress: input.deliveryAddress,
       },
@@ -146,19 +200,133 @@ export async function getById(
 }
 
 /**
- * Confirma o pedido e debita o estoque — o único ponto do sistema que tira
+ * Debita o estoque de todos os itens do pedido. Só a confirmação chama.
+ *
+ * Confere TODOS antes de debitar QUALQUER um: o rollback resolveria de
+ * qualquer jeito, mas conferir antes deixa a regra explícita em vez de
+ * depender do desfazer.
+ */
+async function debitarEstoque(
+  orderId: string,
+  client: PoolClient,
+): Promise<void> {
+  const items = await ordersRepository.findItems(orderId, client);
+  const stocks = await productsRepository.selectStocksForUpdate(
+    items.map((item) => item.productId),
+    client,
+  );
+  const stockById = new Map(stocks.map((row) => [row.id, row.stock]));
+
+  for (const item of items) {
+    const stock = stockById.get(item.productId);
+    // produto removido do cardápio entre o pedido e a confirmação
+    if (stock === undefined) {
+      throw new ConflictError(
+        `O produto "${item.name}" saiu do cardápio e o pedido não pode ser confirmado`,
+      );
+    }
+    if (stock < item.quantity) {
+      throw new ConflictError(
+        `Estoque insuficiente de "${item.name}": ${item.quantity} pedidos, ${stock} disponíveis`,
+      );
+    }
+  }
+
+  for (const item of items) {
+    await productsRepository.decrementStock(
+      item.productId,
+      item.quantity,
+      client,
+    );
+  }
+}
+
+/**
+ * Devolve ao estoque o que o pedido tinha debitado.
+ *
+ * Trava as mesmas linhas, na mesma ordem por id, pelo mesmo motivo do débito —
+ * sem o lock, dois cancelamentos concorrentes do mesmo pedido devolveriam as
+ * unidades duas vezes.
+ *
+ * Produto que saiu do cardápio no meio do caminho é ignorado em silêncio: não
+ * há linha viva para devolver, e barrar o cancelamento por isso deixaria o
+ * pedido preso num estado que ninguém pediu.
+ */
+async function devolverEstoque(
+  orderId: string,
+  client: PoolClient,
+): Promise<void> {
+  const items = await ordersRepository.findItems(orderId, client);
+  const stocks = await productsRepository.selectStocksForUpdate(
+    items.map((item) => item.productId),
+    client,
+  );
+  const vivos = new Set(stocks.map((row) => row.id));
+
+  for (const item of items) {
+    if (!vivos.has(item.productId)) continue;
+    await productsRepository.incrementStock(
+      item.productId,
+      item.quantity,
+      client,
+    );
+  }
+}
+
+/**
+ * A transição de status, e o único caminho por onde o pedido muda de estado.
+ *
+ * Tudo numa transação, com o pedido travado desde a leitura: sem isso duas
+ * transições simultâneas leem o mesmo estado, as duas se acham legais, e as
+ * duas gravam — o que na confirmação significaria debitar estoque duas vezes.
+ *
+ * As regras de quem pode ir para onde moram no mapa de `domain/order.ts`. Aqui
+ * só se aplica o mapa e se decide o efeito colateral de cada destino.
+ */
+async function transitionTo(
+  restaurantId: string,
+  orderId: string,
+  to: OrderStatus,
+): Promise<Order> {
+  await restaurantsService.ensureExists(restaurantId);
+  if (!isUuid(orderId)) throw orderNotFound(orderId);
+
+  return withTransaction(async (client) => {
+    const atual = await ordersRepository.selectForUpdate(
+      restaurantId,
+      orderId,
+      client,
+    );
+    if (atual === null) throw orderNotFound(orderId);
+
+    if (!canTransition(atual.type, atual.status, to)) {
+      // duas mensagens diferentes porque as causas são diferentes, e dizer
+      // "não pode ir de preparing para out_for_delivery" num pedido de
+      // retirada esconderia que o problema é a modalidade, não o estado
+      throw new ConflictError(
+        isReachable(atual.type, to)
+          ? `Pedido não pode ir para "${to}": está em "${atual.status}"`
+          : `Pedido de ${NOME_DA_MODALIDADE[atual.type]} não passa por "${to}"`,
+      );
+    }
+
+    if (to === "confirmed") {
+      await debitarEstoque(orderId, client);
+    }
+    if (to === "cancelled" && cancellingReturnsStock(atual.status)) {
+      await devolverEstoque(orderId, client);
+    }
+
+    await ordersRepository.updateStatus(orderId, to, client);
+
+    const order = await ordersRepository.findById(restaurantId, orderId, client);
+    return order as Order;
+  });
+}
+
+/**
+ * Aceita o pedido e debita o estoque — o único ponto do sistema que tira
  * unidade de `products.stock`.
- *
- * A transação faz três coisas que precisam valer juntas: travar o pedido,
- * travar os produtos e gravar. A ordem importa:
- *
- *  1. `selectStatusForUpdate` trava o PEDIDO. Duas confirmações simultâneas do
- *     mesmo pedido se serializam aqui — a segunda acorda vendo `confirmed`.
- *  2. `selectStocksForUpdate` trava os PRODUTOS, sempre na mesma ordem (por
- *     id), senão dois pedidos com produtos em comum entrariam em deadlock.
- *  3. Só depois de conferir TODOS os itens é que algum é debitado. O rollback
- *     resolveria de qualquer jeito, mas conferir antes deixa a regra explícita
- *     em vez de depender do desfazer.
  *
  * Consequência de debitar só aqui: pedido `pending` não é reserva. Dois pedidos
  * podem existir para a última unidade — o primeiro a confirmar leva, o segundo
@@ -169,89 +337,52 @@ export async function confirm(
   restaurantId: string,
   orderId: string,
 ): Promise<Order> {
-  await restaurantsService.ensureExists(restaurantId);
-  if (!isUuid(orderId)) throw orderNotFound(orderId);
+  return transitionTo(restaurantId, orderId, "confirmed");
+}
 
-  return withTransaction(async (client) => {
-    const status = await ordersRepository.selectStatusForUpdate(
-      restaurantId,
-      orderId,
-      client,
-    );
-    if (status === null) throw orderNotFound(orderId);
-    if (status !== "pending") {
-      throw new ConflictError(
-        `Pedido não pode ser confirmado: já está "${status}"`,
-      );
-    }
+/** Manda o pedido para a cozinha. Não mexe em estoque. */
+export async function startPreparing(
+  restaurantId: string,
+  orderId: string,
+): Promise<Order> {
+  return transitionTo(restaurantId, orderId, "preparing");
+}
 
-    const items = await ordersRepository.findItems(orderId, client);
-    const stocks = await productsRepository.selectStocksForUpdate(
-      items.map((item) => item.productId),
-      client,
-    );
-    const stockById = new Map(stocks.map((row) => [row.id, row.stock]));
+/** Saiu para entrega. Só existe na trilha de `delivery`. */
+export async function dispatch(
+  restaurantId: string,
+  orderId: string,
+): Promise<Order> {
+  return transitionTo(restaurantId, orderId, "out_for_delivery");
+}
 
-    for (const item of items) {
-      const stock = stockById.get(item.productId);
-      // produto removido do cardápio entre o pedido e a confirmação
-      if (stock === undefined) {
-        throw new ConflictError(
-          `O produto "${item.name}" saiu do cardápio e o pedido não pode ser confirmado`,
-        );
-      }
-      if (stock < item.quantity) {
-        throw new ConflictError(
-          `Estoque insuficiente de "${item.name}": ${item.quantity} pedidos, ${stock} disponíveis`,
-        );
-      }
-    }
+/** Pronto no balcão. Só existe na trilha de `takeaway`. */
+export async function markReady(
+  restaurantId: string,
+  orderId: string,
+): Promise<Order> {
+  return transitionTo(restaurantId, orderId, "ready_for_pickup");
+}
 
-    for (const item of items) {
-      await productsRepository.decrementStock(
-        item.productId,
-        item.quantity,
-        client,
-      );
-    }
-    await ordersRepository.updateStatus(orderId, "confirmed", client);
-
-    const order = await ordersRepository.findById(restaurantId, orderId, client);
-    return order as Order;
-  });
+/** Fim do ciclo: entregue, retirado ou servido, conforme a modalidade. */
+export async function complete(
+  restaurantId: string,
+  orderId: string,
+): Promise<Order> {
+  return transitionTo(restaurantId, orderId, "completed");
 }
 
 /**
- * Cancela um pedido pendente. Não mexe em estoque, porque pedido pendente nunca
- * chegou a debitar nada.
+ * Cancela o pedido, devolvendo o estoque quando ainda faz sentido.
  *
- * Pedido já confirmado não é cancelável: devolver estoque é uma operação
- * própria (e uma decisão de negócio — devolve sempre? só antes de sair para
- * entrega?), e fazer isso por tabela aqui seria adivinhar.
+ * O corte é "a comida já existe": em `confirmed` e `preparing` as unidades
+ * voltam, em `out_for_delivery` e `ready_for_pickup` não — o prato foi feito, e
+ * devolvê-lo ao estoque seria mentir sobre o que há na cozinha. A regra mora em
+ * `cancellingReturnsStock`, no domínio.
  */
 export async function cancel(
   restaurantId: string,
   orderId: string,
 ): Promise<Order> {
-  await restaurantsService.ensureExists(restaurantId);
-  if (!isUuid(orderId)) throw orderNotFound(orderId);
-
-  return withTransaction(async (client) => {
-    const status = await ordersRepository.selectStatusForUpdate(
-      restaurantId,
-      orderId,
-      client,
-    );
-    if (status === null) throw orderNotFound(orderId);
-    if (status !== "pending") {
-      throw new ConflictError(
-        `Pedido não pode ser cancelado: já está "${status}"`,
-      );
-    }
-
-    await ordersRepository.updateStatus(orderId, "cancelled", client);
-
-    const order = await ordersRepository.findById(restaurantId, orderId, client);
-    return order as Order;
-  });
+  return transitionTo(restaurantId, orderId, "cancelled");
 }

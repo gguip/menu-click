@@ -6,7 +6,7 @@ import {
   createProduct,
   createRestaurant,
   validCustomerBody,
-  validRestaurantBody,
+  validDeliveryAddress,
 } from "./helpers.ts";
 
 /**
@@ -40,6 +40,7 @@ describe("pedidos", () => {
         method: "POST",
         url: `/restaurants/${restaurant.id}/orders`,
         payload: {
+          type: "dine_in",
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: 2 }],
         },
@@ -162,7 +163,7 @@ describe("pedidos", () => {
       expect(response.json().stock).toBe(10);
     });
 
-    it("aceita endereço de entrega em restaurante que entrega", async () => {
+    it("pedido de entrega leva o endereço", async () => {
       const restaurant = await createRestaurant(app, { isDelivery: true });
       const product = await createProduct(app, restaurant);
 
@@ -170,17 +171,105 @@ describe("pedidos", () => {
         app,
         restaurant.id,
         [{ productId: product.id, quantity: 1 }],
-        { deliveryAddress: validRestaurantBody.address },
+        { type: "delivery", deliveryAddress: validDeliveryAddress },
       );
 
+      expect(order.type).toBe("delivery");
       expect(order.deliveryAddress).toMatchObject({
-        street: "Avenida Paulista",
+        street: "Rua Augusta",
         city: "São Paulo",
       });
     });
 
-    it("409 ao pedir entrega em restaurante que não entrega", async () => {
-      const restaurant = await createRestaurant(app, { isDelivery: false });
+    it("pedido de retirada não leva endereço e nasce takeaway", async () => {
+      const restaurant = await createRestaurant(app, { isTakeaway: true });
+      const product = await createProduct(app, restaurant);
+
+      const order = await createOrder(
+        app,
+        restaurant.id,
+        [{ productId: product.id, quantity: 1 }],
+        { type: "takeaway" },
+      );
+
+      expect(order.type).toBe("takeaway");
+      expect(order.deliveryAddress).toBeNull();
+    });
+
+    /**
+     * As três flags do restaurante são simétricas: sem `isTakeaway`, um
+     * restaurante que só entrega aceitaria retirada por omissão.
+     */
+    const modalidadesRecusadas: [string, string, Record<string, unknown>][] = [
+      ["entrega", "delivery", { isDelivery: false }],
+      ["retirada", "takeaway", { isTakeaway: false }],
+      ["salão", "dine_in", { isQrcode: false }],
+    ];
+
+    it.each(modalidadesRecusadas)(
+      "409 ao pedir %s em restaurante que não aceita",
+      async (_nome, type, flags) => {
+        const restaurant = await createRestaurant(app, flags);
+        const product = await createProduct(app, restaurant);
+
+        const response = await app.inject({
+          method: "POST",
+          url: `/restaurants/${restaurant.id}/orders`,
+          payload: {
+            type,
+            customer: validCustomerBody,
+            items: [{ productId: product.id, quantity: 1 }],
+            ...(type === "delivery"
+              ? { deliveryAddress: validDeliveryAddress }
+              : {}),
+          },
+        });
+
+        expect(response.statusCode).toBe(409);
+      },
+    );
+
+    it("400 em pedido de entrega sem endereço", async () => {
+      const restaurant = await createRestaurant(app);
+      const product = await createProduct(app, restaurant);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "delivery",
+          customer: validCustomerBody,
+          items: [{ productId: product.id, quantity: 1 }],
+        },
+      });
+
+      // 400 e não 409: o corpo é que não faz sentido, não o estado do sistema
+      expect(response.statusCode).toBe(400);
+    });
+
+    it.each(["dine_in", "takeaway"])(
+      "400 ao mandar endereço num pedido de %s",
+      async (type) => {
+        const restaurant = await createRestaurant(app);
+        const product = await createProduct(app, restaurant);
+
+        const response = await app.inject({
+          method: "POST",
+          url: `/restaurants/${restaurant.id}/orders`,
+          payload: {
+            type,
+            customer: validCustomerBody,
+            items: [{ productId: product.id, quantity: 1 }],
+            deliveryAddress: validDeliveryAddress,
+          },
+        });
+
+        expect(response.statusCode).toBe(400);
+      },
+    );
+
+    it("400 sem `type`", async () => {
+      const restaurant = await createRestaurant(app);
       const product = await createProduct(app, restaurant);
 
       const response = await app.inject({
@@ -189,11 +278,10 @@ describe("pedidos", () => {
         payload: {
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: 1 }],
-          deliveryAddress: validRestaurantBody.address,
         },
       });
 
-      expect(response.statusCode).toBe(409);
+      expect(response.statusCode).toBe(400);
     });
 
     it("404 com produto de outro restaurante", async () => {
@@ -205,6 +293,7 @@ describe("pedidos", () => {
         method: "POST",
         url: `/restaurants/${restaurantA.id}/orders`,
         payload: {
+          type: "dine_in",
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: 1 }],
         },
@@ -226,6 +315,7 @@ describe("pedidos", () => {
         method: "POST",
         url: `/restaurants/${restaurant.id}/orders`,
         payload: {
+          type: "dine_in",
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: 1 }],
         },
@@ -239,6 +329,7 @@ describe("pedidos", () => {
         method: "POST",
         url: "/restaurants/00000000-0000-0000-0000-000000000000/orders",
         payload: {
+          type: "dine_in",
           customer: validCustomerBody,
           items: [
             {
@@ -272,7 +363,7 @@ describe("pedidos", () => {
       const response = await app.inject({
         method: "POST",
         url: `/restaurants/${restaurant.id}/orders`,
-        payload: { customer: validCustomerBody, items: [] },
+        payload: { type: "dine_in", customer: validCustomerBody, items: [] },
       });
 
       expect(response.statusCode).toBe(400);
@@ -286,6 +377,7 @@ describe("pedidos", () => {
         method: "POST",
         url: `/restaurants/${restaurant.id}/orders`,
         payload: {
+          type: "dine_in",
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: "2" }],
         },
@@ -302,6 +394,7 @@ describe("pedidos", () => {
         method: "POST",
         url: `/restaurants/${restaurant.id}/orders`,
         payload: {
+          type: "dine_in",
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: 0 }],
         },
@@ -317,7 +410,10 @@ describe("pedidos", () => {
       const response = await app.inject({
         method: "POST",
         url: `/restaurants/${restaurant.id}/orders`,
-        payload: { items: [{ productId: product.id, quantity: 1 }] },
+        payload: {
+          type: "dine_in",
+          items: [{ productId: product.id, quantity: 1 }],
+        },
       });
 
       expect(response.statusCode).toBe(400);

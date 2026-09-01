@@ -19,12 +19,20 @@
 -- sendo o que o backfill da migration gerou (`tokyo-ramen-house-cb95db58`).
 -- Isso é o certo: o seed não sobrescreve dado que já está lá.
 insert into restaurants
-  (id, name, slug, cuisine_type, street, number, neighborhood, city, state, zip_code, is_delivery, is_qrcode)
+  (id, name, slug, cuisine_type, street, number, neighborhood, city, state, zip_code,
+   is_delivery, is_takeaway, is_qrcode)
 values
+  -- O Tokyo aceita as três modalidades (dá para exercitar as três trilhas de
+  -- status sem cadastrar nada) e a Cantina recusa retirada (dá para ver o 409
+  -- de modalidade). Como o slug, isso vale para banco NOVO: num banco que já
+  -- tinha estes restaurantes, o `on conflict do nothing` não toca na linha
+  -- existente, e `is_takeaway` fica com o `false` que o backfill da migration
+  -- deixou. É o certo — o seed não sobrescreve dado que já está lá.
   ('cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Tokyo Ramen House', 'tokyo-ramen-house', 'Japonesa',
-   'Avenida Paulista', '2300', 'Bela Vista', 'São Paulo', 'SP', '01310-300', true, false),
+   'Avenida Paulista', '2300', 'Bela Vista', 'São Paulo', 'SP', '01310-300', true, true, true),
+  -- a Cantina não faz retirada: serve para ver o 409 de modalidade recusada
   ('d05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Cantina da Nona', 'cantina-da-nona', 'Italiana',
-   'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, true)
+   'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, false, true)
 on conflict (id) do nothing;
 
 insert into products
@@ -69,8 +77,10 @@ values
    '$2b$12$AVy5NxxvXd1kfy09F8jRSednE5STi1tPr3Ddsy4CDwIY7e6YW.a8u')
 on conflict (id) do nothing;
 
--- Um cliente e dois pedidos: um pendente (para testar a confirmação e ver o
--- estoque cair) e um já confirmado (para a listagem ter os dois status).
+-- Um cliente e três pedidos, um por modalidade: um delivery pendente (para
+-- testar a confirmação e ver o estoque cair), um de salão já confirmado, e uma
+-- retirada em preparo (para o estado "disponível para retirada" ter de onde
+-- sair).
 --
 -- O pedido confirmado NÃO é descontado do `stock` acima: o seed grava estado
 -- final, não replay de operações. Quem quiser ver o débito acontecer confirma
@@ -82,16 +92,20 @@ values
 on conflict (id) do nothing;
 
 insert into orders
-  (id, restaurant_id, customer_id, status, total_in_cents,
+  (id, restaurant_id, customer_id, type, status, total_in_cents,
    street, number, neighborhood, city, state, zip_code)
 values
-  -- pendente, com entrega (o Tokyo Ramen House tem is_delivery = true)
+  -- entrega pendente: só ela leva endereço (ver orders_address_check)
   ('3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'pending', 12270,
+   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'delivery', 'pending', 12270,
    'Rua Augusta', '1500', 'Consolação', 'São Paulo', 'SP', '01304-001'),
-  -- confirmado, de mesa (endereço nulo: tudo-ou-nada, ver orders_address_check)
+  -- salão, já aceito
   ('b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'confirmed', 890,
+   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'dine_in', 'confirmed', 890,
+   null, null, null, null, null, null),
+  -- retirada em preparo: o próximo passo dela é `ready_for_pickup`
+  ('5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'takeaway', 'preparing', 2490,
    null, null, null, null, null, null)
 on conflict (id) do nothing;
 
@@ -105,5 +119,7 @@ values
   ('7d3c8b12-4e95-4a07-b6f3-9c1a5d0e8b74', '3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83',
    '23755745-45ac-47f5-bbed-ad4af525c04a', 'Guioza', 2490, 1),
   ('1a6f4d90-3b78-4c52-8e01-5d9b7a2c6f38', 'b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12',
-   'a48d8d89-bdd9-44dd-98b7-d47472930b7a', 'Chá Verde Gelado', 890, 1)
+   'a48d8d89-bdd9-44dd-98b7-d47472930b7a', 'Chá Verde Gelado', 890, 1),
+  ('e0b7c352-9d41-4a86-b3f7-2c5e8a1d094b', '5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42',
+   '23755745-45ac-47f5-bbed-ad4af525c04a', 'Guioza', 2490, 1)
 on conflict (id) do nothing;

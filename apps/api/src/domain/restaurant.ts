@@ -33,6 +33,8 @@ export type CreateRestaurantInput = {
   logoUrl?: string;
   address: Address;
   isDelivery: boolean;
+  /** Aceita retirada no balcão. Sem esta flag, todo restaurante aceitaria. */
+  isTakeaway: boolean;
   isQrcode: boolean;
 };
 

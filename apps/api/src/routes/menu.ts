@@ -36,7 +36,9 @@ const menuRestaurantResponseSchema = {
     cuisineType: { type: "string" },
     logoUrl: { type: "string" },
     address: { type: "object", properties: addressProperties },
+    // o cliente precisa saber o que dá para pedir antes de montar o carrinho
     isDelivery: { type: "boolean" },
+    isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
   },
 };

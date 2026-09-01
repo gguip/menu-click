@@ -95,7 +95,14 @@ export const addressSchema = {
 export const createRestaurantBodySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["name", "cuisineType", "address", "isDelivery", "isQrcode"],
+  required: [
+    "name",
+    "cuisineType",
+    "address",
+    "isDelivery",
+    "isTakeaway",
+    "isQrcode",
+  ],
   properties: {
     name: { type: "string", minLength: 1 },
     // opcional: sem ele o serviço deriva do nome. O `pattern` é o mesmo do
@@ -109,6 +116,8 @@ export const createRestaurantBodySchema = {
     logoUrl: { type: "string", format: "uri" },
     address: addressSchema,
     isDelivery: { type: "boolean" },
+    // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada
+    isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
   },
 };
@@ -123,6 +132,8 @@ export const updateRestaurantBodySchema = {
     logoUrl: { type: "string", format: "uri" },
     address: addressSchema,
     isDelivery: { type: "boolean" },
+    // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada
+    isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
   },
 };
@@ -137,6 +148,8 @@ export const restaurantResponseSchema = {
     logoUrl: { type: "string" },
     address: { type: "object", properties: addressProperties },
     isDelivery: { type: "boolean" },
+    // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada
+    isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
