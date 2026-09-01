@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { withTransaction } from "../db/pool.ts";
 import type { CreateRestaurantInput, Restaurant } from "../domain/restaurant.ts";
 import type {
@@ -15,6 +15,7 @@ import {
 } from "../errors.ts";
 import * as restaurantUsersRepository from "../repositories/restaurant-users.ts";
 import * as sessionsRepository from "../repositories/sessions.ts";
+import { generateToken, hashToken } from "../tokens.ts";
 import * as restaurantsService from "./restaurants.ts";
 
 /**
@@ -40,20 +41,8 @@ const BCRYPT_ROUNDS = Math.min(
   Math.max(4, Number(process.env.BCRYPT_ROUNDS ?? 12) || 12),
 );
 
-/** Bytes de aleatoriedade do token de sessão. 32 bytes = 256 bits. */
-const TOKEN_BYTES = 32;
-
 /** Validade da sessão. */
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-
-/**
- * Hash de token. SHA-256 puro é o certo AQUI (e só aqui): o token são 256 bits
- * sorteados, sem dicionário nem rainbow table a que seja vulnerável. Senha, que
- * é escolhida por gente, continua exigindo KDF caro — é o bcrypt acima.
- */
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
 
 /**
  * Hash descartável usado quando o e-mail não existe.
@@ -146,7 +135,7 @@ export async function login(
     throw new UnauthorizedError("E-mail ou senha inválidos");
   }
 
-  const token = randomBytes(TOKEN_BYTES).toString("base64url");
+  const token = generateToken();
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
   await sessionsRepository.insert(user.id, hashToken(token), expiresAt);
 

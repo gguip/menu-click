@@ -139,6 +139,26 @@ const orderResponseSchema = {
   },
 };
 
+/**
+ * A resposta da CRIAÇÃO, e só dela, carrega o token de acompanhamento.
+ *
+ * É schema separado de propósito. O `fast-json-stringify` só serializa o que
+ * está declarado, então o token não tem como escapar para a listagem nem para
+ * o detalhe do pedido — que são rotas do restaurante, e entregariam a
+ * credencial de todos os clientes ao painel (S10).
+ *
+ * Ausente em `dine_in`: quem está no salão não acompanha, e por isso não recebe
+ * credencial nenhuma.
+ */
+const createdOrderResponseSchema = {
+  type: "object",
+  properties: {
+    ...orderSummaryProperties,
+    items: { type: "array", items: orderItemResponseSchema },
+    trackingToken: { type: "string" },
+  },
+};
+
 const orderPageResponseSchema = pageResponseSchema(orderSummaryResponseSchema);
 
 /** Paginação mais o filtro por status (o painel do restaurante usa `pending`). */
@@ -190,11 +210,11 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "createOrder",
         summary: "Cria um pedido (público)",
         description:
-          "Quem escaneia o QR code pede sem ter conta. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome e preço do produto, então reajuste de cardápio não muda pedido já feito. Duas linhas do mesmo produto viram uma, com a quantidade somada. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
+          "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome e preço do produto, então reajuste de cardápio não muda pedido já feito. Duas linhas do mesmo produto viram uma, com a quantidade somada. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
         params: restaurantIdParamsSchema,
         body: createOrderBodySchema,
         response: {
-          201: orderResponseSchema,
+          201: createdOrderResponseSchema,
           400: errorResponseSchema,
           404: errorResponseSchema,
           409: errorResponseSchema,

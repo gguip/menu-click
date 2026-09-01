@@ -78,6 +78,14 @@ const TRANSITIONS: Record<
   },
 };
 
+/**
+ * Estado do qual não se sai. É o que diz ao canal de acompanhamento que não há
+ * mais nada a transmitir e a conexão pode fechar.
+ */
+export function isTerminalStatus(status: OrderStatus): boolean {
+  return status === "completed" || status === "cancelled";
+}
+
 /** O pedido pode sair de `from` para `to`? */
 export function canTransition(
   type: OrderType,
@@ -166,3 +174,23 @@ export type OrderSummary = {
 export type Order = OrderSummary & {
   items: OrderItem[];
 };
+
+/**
+ * O que a criação devolve: o pedido mais o token de acompanhamento.
+ *
+ * É um tipo separado de `Order` de propósito. O token existe **uma vez**, na
+ * resposta do POST que criou o pedido — nunca na listagem do restaurante, nunca
+ * no detalhe. Se ele estivesse em `Order`, bastaria alguém acrescentá-lo a um
+ * `schema.response` para vazar a credencial de todos os clientes para o painel.
+ *
+ * Ausente em `dine_in`: quem está no salão não acompanha nada, e a forma de
+ * garantir isso é não emitir credencial.
+ */
+export type CreatedOrder = Order & {
+  trackingToken?: string;
+};
+
+/** As modalidades que acompanham o pedido — e portanto recebem token. */
+export function issuesTrackingToken(type: OrderType): boolean {
+  return type !== "dine_in";
+}

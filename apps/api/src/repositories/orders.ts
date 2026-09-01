@@ -129,6 +129,8 @@ export type InsertOrderData = {
   type: OrderType;
   totalInCents: number;
   deliveryAddress?: Address;
+  /** Hash do token de acompanhamento. `null` em `dine_in`. */
+  trackingTokenHash: string | null;
 };
 
 /** Uma linha de `order_items` pronta para gravar, com os valores congelados. */
@@ -153,15 +155,16 @@ export async function insertOrder(
   const address = data.deliveryAddress;
   const { rows } = await db.query<{ id: string }>(
     `insert into orders
-       (restaurant_id, customer_id, type, total_in_cents,
+       (restaurant_id, customer_id, type, total_in_cents, tracking_token_hash,
         street, number, neighborhood, city, state, zip_code)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      returning id`,
     [
       restaurantId,
       data.customerId,
       data.type,
       data.totalInCents,
+      data.trackingTokenHash,
       // o check do banco garante a coerência com `type`: as seis colunas vêm
       // preenchidas em delivery e NULL nas outras duas modalidades
       address?.street ?? null,
@@ -314,4 +317,24 @@ export async function findByRestaurant(
   );
 
   return { rows: rows.map(toOrderSummary), total: Number(countRows[0].total) };
+}
+
+/**
+ * Resolve o hash de um token de acompanhamento no pedido correspondente.
+ *
+ * É a consulta do handshake do WebSocket. Devolve o restaurante junto porque o
+ * `findById` é escopado por ele — e o cliente que está acompanhando não sabe
+ * (nem precisa saber) em qual restaurante pediu.
+ */
+export async function findByTrackingTokenHash(
+  tokenHash: string,
+  db: Queryable = pool,
+): Promise<{ id: string; restaurantId: string } | null> {
+  const { rows } = await db.query<{ id: string; restaurant_id: string }>(
+    `select id, restaurant_id from orders
+      where tracking_token_hash = $1 and deleted_at is null`,
+    [tokenHash],
+  );
+  if (rows.length === 0) return null;
+  return { id: rows[0].id, restaurantId: rows[0].restaurant_id };
 }
