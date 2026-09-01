@@ -19,6 +19,22 @@ import type { Address } from "./restaurant.ts";
  * É ela que decide **três** coisas: por quais estados o pedido passa, se ele
  * exige endereço, e se o cliente recebe token de acompanhamento.
  */
+/**
+ * Por quais campos a listagem de pedidos pode ser ordenada.
+ *
+ * É uma **allowlist** (S3), e ela existe porque `order by` não aceita `$n`:
+ * nome de coluna é identificador, não valor. O que o cliente manda é comparado
+ * com esta lista e traduzido por um mapa fixo no repositório — o texto dele
+ * nunca chega perto do SQL.
+ */
+export const ORDER_SORT_FIELDS = ["createdAt", "totalInCents"] as const;
+
+export type OrderSortField = (typeof ORDER_SORT_FIELDS)[number];
+
+export const SORT_DIRECTIONS = ["asc", "desc"] as const;
+
+export type SortDirection = (typeof SORT_DIRECTIONS)[number];
+
 export const ORDER_TYPES = ["dine_in", "takeaway", "delivery"] as const;
 export type OrderType = (typeof ORDER_TYPES)[number];
 

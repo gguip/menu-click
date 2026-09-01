@@ -5,6 +5,7 @@ import type { CustomerRow } from "./customers.ts";
 import { toCustomer } from "./customers.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import type { OrderPeriod, PeriodFilter } from "../domain/period.ts";
+import type { OrderSortField, SortDirection } from "../domain/order.ts";
 import type {
   Order,
   OrderItem,
@@ -355,6 +356,42 @@ export type OrderFilters = {
 };
 
 /**
+ * Campo pedido pelo cliente → coluna real. O mapa é a fronteira: o que não
+ * está aqui não existe, e o texto da querystring nunca vira SQL (S3).
+ */
+const ORDER_SORT_COLUMNS: Record<OrderSortField, string> = {
+  createdAt: "created_at",
+  totalInCents: "total_in_cents",
+};
+
+/** Como a listagem é ordenada. */
+export type OrderSort = { field: OrderSortField; direction: SortDirection };
+
+/**
+ * O `order by` da listagem, montado só a partir de constantes deste arquivo.
+ *
+ * A direção sai de um ternário, não do input: mesmo com o valor já validado
+ * pelo `enum` do schema, interpolar a string recebida deixaria a proteção
+ * dependendo de um schema que alguém pode afrouxar depois.
+ *
+ * O `id` desempata **na mesma direção** do campo pedido. Dois pedidos com o
+ * mesmo total não têm ordem definida sem ele, e aí eles poderiam trocar de
+ * lugar entre uma página e a seguinte — um apareceria duas vezes e o outro
+ * sumiria.
+ *
+ * Como o `order by id` do lock de estoque, isto é proteção contra um plano de
+ * execução futuro, **não** contra um bug observável hoje: com a tabela pequena
+ * o Postgres devolve as linhas empatadas sempre na mesma ordem, e nenhum teste
+ * falha se esta parte sair (verificado). O que garante é o `order by`, não a
+ * sorte do plano.
+ */
+function orderByClause(sort: OrderSort, prefixo: string): string {
+  const coluna = ORDER_SORT_COLUMNS[sort.field];
+  const direcao = sort.direction === "desc" ? "desc" : "asc";
+  return `order by ${prefixo}${coluna} ${direcao}, ${prefixo}id ${direcao}`;
+}
+
+/**
  * Uma página de pedidos vivos do restaurante, mais o total — já considerando
  * os filtros, que valem também para o `total`: filtrar e continuar reportando
  * o total do restaurante inteiro faria a paginação mentir.
@@ -366,6 +403,7 @@ export async function findByRestaurant(
   restaurantId: string,
   { limit, offset }: Pagination,
   filters: OrderFilters,
+  sort: OrderSort,
   timezone: string,
   db: Queryable = pool,
 ): Promise<{ rows: OrderSummary[]; total: number }> {
@@ -388,7 +426,7 @@ export async function findByRestaurant(
   const { rows } = await db.query<OrderWithCustomerRow>(
     `${selectOrderWithCustomer}
       where ${where}
-      order by o.created_at, o.id
+      ${orderByClause(sort, "o.")}
       limit $${values.length + 1} offset $${values.length + 2}`,
     [...values, limit, offset],
   );

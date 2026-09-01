@@ -2,6 +2,8 @@ import type { PoolClient } from "pg";
 import { withTransaction } from "../db/pool.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
 import type { OrderPeriod, PeriodFilter } from "../domain/period.ts";
+import type { OrderSortField, SortDirection } from "../domain/order.ts";
+import type { OrderSort } from "../repositories/orders.ts";
 import type {
   CreatedOrder,
   CreateOrderInput,
@@ -196,7 +198,18 @@ export type OrderListFilters = {
   period?: OrderPeriod;
   from?: string;
   to?: string;
+  sort?: OrderSortField;
+  order?: SortDirection;
 };
+
+/**
+ * A ordenação padrão: **o mais novo primeiro**.
+ *
+ * Inverteu o que era antes, e por causa do painel: ele existe para ver o
+ * pedido que acabou de chegar, e na ordem crescente ele estava na última
+ * página. Quem quer a ordem da cozinha pede `?order=asc`.
+ */
+const DEFAULT_SORT: OrderSort = { field: "createdAt", direction: "desc" };
 
 /**
  * Traduz a querystring no recorte de tempo, ou recusa a combinação com 400.
@@ -252,6 +265,10 @@ export async function listByRestaurant(
     restaurantId,
     pagination,
     { status: filters.status, period },
+    {
+      field: filters.sort ?? DEFAULT_SORT.field,
+      direction: filters.order ?? DEFAULT_SORT.direction,
+    },
     restaurant.timezone,
   );
   return { data: rows, ...pagination, total };

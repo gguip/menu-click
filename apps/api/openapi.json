@@ -1918,7 +1918,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Sem os itens — use a rota de detalhe para eles. Filtros opcionais: `status`, e o recorte de tempo por `period` (`today`, `yesterday`, `last7days`, `thisMonth`) **ou** por `from`/`to` (datas `YYYY-MM-DD`, intervalo fechado nos dois lados). Mandar os dois juntos é 400. O recorte é resolvido no **fuso do restaurante**, então \"hoje\" é o dia de quem está no salão, não o do servidor. Os filtros valem também para o `total`.",
+        "description": "Sem os itens — use a rota de detalhe para eles. Filtros opcionais: `status`, e o recorte de tempo por `period` (`today`, `yesterday`, `last7days`, `thisMonth`) **ou** por `from`/`to` (datas `YYYY-MM-DD`, intervalo fechado nos dois lados). Mandar os dois juntos é 400. O recorte é resolvido no **fuso do restaurante**, então \"hoje\" é o dia de quem está no salão, não o do servidor. Os filtros valem também para o `total`. A ordem padrão é **do mais novo para o mais antigo** — o painel existe para ver o pedido que acabou de chegar; `?sort=createdAt|totalInCents` e `?order=asc|desc` mudam isso.",
         "parameters": [
           {
             "schema": {
@@ -1988,6 +1988,32 @@
             },
             "in": "query",
             "name": "to",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "totalInCents"
+              ],
+              "default": "createdAt"
+            },
+            "in": "query",
+            "name": "sort",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "in": "query",
+            "name": "order",
             "required": false
           },
           {
