@@ -36,6 +36,13 @@ export const OPENAPI_TAGS = [
   },
   { name: "Produtos", description: "O cardápio, do lado de quem o edita." },
   {
+    name: "Usuários",
+    description:
+      "Quem tem acesso ao painel. Restrito ao dono: administrar usuários é " +
+      "uma das duas ações que o papel restringe — a outra é remover o " +
+      "restaurante.",
+  },
+  {
     name: "Categorias",
     description:
       "As seções do cardápio. A ordem é a que o restaurante definir em " +
