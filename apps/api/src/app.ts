@@ -1,5 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
 import rateLimit from "@fastify/rate-limit";
 import {
   BODY_LIMIT_BYTES,
@@ -25,6 +27,7 @@ import { orderRoutes } from "./routes/orders.ts";
 import { menuRoutes } from "./routes/menu.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { installAuth } from "./routes/authenticate.ts";
+import { openapiOptions } from "./openapi.ts";
 
 /**
  * Monta a instância do Fastify sem escutar (F1): registra plugins, rotas e o
@@ -64,7 +67,8 @@ export async function buildApp() {
   // registra rotas cria um contexto encapsulado, e esse contexto herda o error
   // handler que existia no momento em que foi criado. Plugin registrado antes
   // desta linha fica com o handler PADRÃO do Fastify — que responde 500 com a
-  // mensagem interna no corpo, violando S11.
+  // mensagem interna no corpo, violando S11. Aconteceu de verdade com o
+  // `/docs`: um 401 saía como `500 {"message":"Autenticação obrigatória"}`.
   app.setErrorHandler(function (error: FastifyError, request, reply) {
     if (error instanceof NotFoundError) {
       return reply.code(404).send({
@@ -121,6 +125,45 @@ export async function buildApp() {
       message: "Erro interno no servidor",
     });
   });
+
+  /**
+   * OpenAPI. Precisa vir antes das rotas: o plugin coleta cada uma via
+   * `onRoute`, e rota registrada antes dele simplesmente não entra no
+   * documento — sem erro nenhum, só ausente.
+   */
+  await app.register(swagger, openapiOptions);
+
+  /**
+   * A interface do `/docs` fica fora de produção.
+   *
+   * Ela é um mapa completo da superfície da API: toda rota, todo parâmetro,
+   * todo formato. Isso é exatamente o que ajuda quem constrói — e quem sonda.
+   * A decisão é falhar fechado: só sobe quando `NODE_ENV` **não** é
+   * `production`. O documento em si continua sendo gerado sempre (o
+   * `openapi.json` versionado sai dele), o que muda é a página estar no ar.
+   */
+  if (process.env.NODE_ENV !== "production") {
+    await app.register(async (escopo) => {
+      /**
+       * As rotas do `/docs` são criadas pelo plugin, não por nós — não há onde
+       * escrever `config: { public: true }` nelas. Este `onRoute` marca todas
+       * as que nascerem neste escopo, que é exatamente o conjunto do
+       * swagger-ui (a página, os estáticos, o JSON e o YAML).
+       *
+       * Sem isso o hook de negação por padrão responde 401 à própria
+       * documentação — o que é o desenho funcionando, não um bug: rota que não
+       * se declara pública nasce fechada, inclusive esta.
+       */
+      escopo.addHook("onRoute", (routeOptions) => {
+        routeOptions.config = { ...routeOptions.config, public: true };
+      });
+
+      await escopo.register(swaggerUi, {
+        routePrefix: "/docs",
+        uiConfig: { docExpansion: "list", deepLinking: true },
+      });
+    });
+  }
 
   /**
    * CORS, registrado **antes** do `installAuth()`.
@@ -182,6 +225,7 @@ export async function buildApp() {
 
   // `request.auth` precisa existir antes de qualquer rota ser registrada (F5).
   installAuth(app);
+
 
   // Erro em cliente ocioso do pool (ex.: banco reiniciou) derruba o processo
   // se ninguém escutar — o pool descarta a conexão sozinho, aqui só registramos.

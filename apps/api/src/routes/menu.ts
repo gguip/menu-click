@@ -66,6 +66,11 @@ export async function menuRoutes(app: FastifyInstance) {
       // o cardápio é a superfície aberta: quem escaneia o QR não tem conta
       config: { public: true },
       schema: {
+        tags: ["Cardápio público"],
+        operationId: "getPublicMenu",
+        summary: "Restaurante pelo slug público",
+        description:
+          "O endereço para onde o QR code aponta. O `slug` entra no lugar do id porque um UUID não é endereço que alguém digita ou imprime num cartaz.",
         params: slugParamsSchema,
         response: {
           200: menuRestaurantResponseSchema,
@@ -83,6 +88,11 @@ export async function menuRoutes(app: FastifyInstance) {
     {
       config: { public: true },
       schema: {
+        tags: ["Cardápio público"],
+        operationId: "listPublicMenuProducts",
+        summary: "Cardápio do restaurante",
+        description:
+          "Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir.",
         params: slugParamsSchema,
         querystring: paginationQuerystringSchema,
         response: {

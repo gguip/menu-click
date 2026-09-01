@@ -183,6 +183,11 @@ export async function orderRoutes(app: FastifyInstance) {
       // de pedido (listar, confirmar, cancelar) são do restaurante.
       config: { public: true },
       schema: {
+        tags: ["Pedidos"],
+        operationId: "createOrder",
+        summary: "Cria um pedido (público)",
+        description:
+          "Quem escaneia o QR code pede sem ter conta. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome e preço do produto, então reajuste de cardápio não muda pedido já feito. Duas linhas do mesmo produto viram uma, com a quantidade somada. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
         params: restaurantIdParamsSchema,
         body: createOrderBodySchema,
         response: {
@@ -207,6 +212,11 @@ export async function orderRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/orders",
     {
       schema: {
+        tags: ["Pedidos"],
+        operationId: "listOrders",
+        summary: "Pedidos do restaurante",
+        description:
+          "Sem os itens (use a rota de detalhe para eles) e em ordem de criação crescente — o mais antigo primeiro, que é a ordem em que a cozinha os atende. Filtro opcional por `status`.",
         params: restaurantIdParamsSchema,
         querystring: orderListQuerystringSchema,
         response: { 200: orderPageResponseSchema, 404: errorResponseSchema },
@@ -227,6 +237,11 @@ export async function orderRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/orders/:orderId/confirm",
     {
       schema: {
+        tags: ["Pedidos"],
+        operationId: "confirmOrder",
+        summary: "Confirma o pedido e debita o estoque",
+        description:
+          "O ÚNICO ponto do sistema que tira unidade de `products.stock`. Todos os itens são conferidos antes de qualquer débito; faltando estoque de um só, nada é debitado e a resposta é 409. Só pedido `pending` pode ser confirmado. Pedido pendente não é reserva: dois pedidos podem existir para a última unidade, e o primeiro a confirmar leva.",
         params: orderParamsSchema,
         response: {
           200: orderResponseSchema,
@@ -246,6 +261,11 @@ export async function orderRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/orders/:orderId/cancel",
     {
       schema: {
+        tags: ["Pedidos"],
+        operationId: "cancelOrder",
+        summary: "Cancela um pedido pendente",
+        description:
+          "Não mexe em estoque, porque pedido pendente nunca chegou a debitar. Pedido já confirmado NÃO é cancelável: devolver estoque é operação própria, ainda não implementada.",
         params: orderParamsSchema,
         response: {
           200: orderResponseSchema,
@@ -265,6 +285,11 @@ export async function orderRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId/orders/:orderId",
     {
       schema: {
+        tags: ["Pedidos"],
+        operationId: "getOrder",
+        summary: "Detalhe do pedido, com os itens",
+        description:
+          "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual.",
         params: orderParamsSchema,
         response: { 200: orderResponseSchema, 404: errorResponseSchema },
       },

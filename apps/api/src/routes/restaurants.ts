@@ -52,6 +52,11 @@ export async function restaurantRoutes(app: FastifyInstance) {
     "/restaurants",
     {
       schema: {
+        tags: ["Restaurantes"],
+        operationId: "listRestaurants",
+        summary: "Os restaurantes da sessão",
+        description:
+          "Devolve o restaurante do usuário logado, não todos: uma listagem geral entregaria o cadastro dos concorrentes. Hoje é sempre um, mas o contrato é de lista.",
         querystring: paginationQuerystringSchema,
         response: { 200: restaurantPageResponseSchema },
       },
@@ -69,6 +74,11 @@ export async function restaurantRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId",
     {
       schema: {
+        tags: ["Restaurantes"],
+        operationId: "getRestaurant",
+        summary: "Detalhe do restaurante",
+        description:
+          "Pedir um restaurante que não é o da sessão responde 404, e não 403: 'proibido' confirmaria que ele existe.",
         params: restaurantIdParamsSchema,
         response: { 200: restaurantResponseSchema, 404: errorResponseSchema },
       },
@@ -83,6 +93,11 @@ export async function restaurantRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId",
     {
       schema: {
+        tags: ["Restaurantes"],
+        operationId: "updateRestaurant",
+        summary: "Edita o restaurante",
+        description:
+          "Edição parcial. O `slug` NÃO é editável por aqui: mudar a URL pública quebraria QR code já impresso, então isso precisa ser operação explícita.",
         params: restaurantIdParamsSchema,
         body: updateRestaurantBodySchema,
         response: { 200: restaurantResponseSchema, 404: errorResponseSchema },
@@ -98,6 +113,11 @@ export async function restaurantRoutes(app: FastifyInstance) {
     "/restaurants/:restaurantId",
     {
       schema: {
+        tags: ["Restaurantes"],
+        operationId: "deleteRestaurant",
+        summary: "Remove o restaurante",
+        description:
+          "Soft delete: nada sai do banco. O restaurante e os produtos dele passam a se comportar como se nunca tivessem existido (404 em tudo, fora das listagens), na mesma transação. Pedidos NÃO são afetados — eles são histórico, não catálogo.",
         params: restaurantIdParamsSchema,
         response: { 404: errorResponseSchema },
       },
