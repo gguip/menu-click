@@ -1,25 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.ts";
-import { buildTestApp, createRestaurant } from "./helpers.ts";
-import type { TestRestaurant } from "./helpers.ts";
+import { buildTestApp, createCategory, createRestaurant } from "./helpers.ts";
 
 const NONEXISTENT_ID = "00000000-0000-0000-0000-000000000000";
-
-/** Cria uma categoria via API e devolve o corpo. */
-async function createCategory(
-  app: FastifyInstance,
-  restaurant: TestRestaurant,
-  body: Record<string, unknown>,
-) {
-  const response = await app.inject({
-    method: "POST",
-    url: `/restaurants/${restaurant.id}/categories`,
-    headers: restaurant.headers,
-    payload: body,
-  });
-  return response.json();
-}
 
 describe("CRUD /restaurants/:restaurantId/categories", () => {
   let app: FastifyInstance;

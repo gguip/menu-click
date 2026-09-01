@@ -61,9 +61,26 @@ export type TestRestaurant = { id: string; slug: string } & Record<
 
 export const validProductBody = {
   name: "Ramen Shoyu",
-  category: "Pratos principais",
   priceInCents: 4890,
 };
+
+/**
+ * Cria uma categoria via API. Como `createProduct`, recebe o restaurante
+ * inteiro porque é rota de gestão e precisa do `headers`.
+ */
+export async function createCategory(
+  app: FastifyInstance,
+  restaurant: TestRestaurant,
+  overrides: Record<string, unknown> = {},
+) {
+  const response = await app.inject({
+    method: "POST",
+    url: `/restaurants/${restaurant.id}/categories`,
+    headers: restaurant.headers,
+    payload: { name: "Pratos principais", ...overrides },
+  });
+  return response.json();
+}
 
 /**
  * Cria um produto via API. Recebe o restaurante inteiro (não só o id) porque

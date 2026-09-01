@@ -5,6 +5,7 @@ import type { Pagination } from "../domain/pagination.ts";
 import type {
   CreateProductInput,
   Product,
+  ProductFilters,
   UpdateProductInput,
 } from "../domain/product.ts";
 
@@ -23,7 +24,7 @@ type ProductRow = {
   id: string;
   restaurant_id: string;
   name: string;
-  category: string;
+  category_id: string | null;
   price_in_cents: number;
   description: string | null;
   photo_url: string | null;
@@ -38,9 +39,9 @@ function toProduct(row: ProductRow): Product {
     id: row.id,
     restaurantId: row.restaurant_id,
     name: row.name,
-    category: row.category,
     priceInCents: row.price_in_cents,
     // opcionais: quando são NULL no banco, a chave nem entra na resposta.
+    ...(row.category_id === null ? {} : { categoryId: row.category_id }),
     ...(row.description === null ? {} : { description: row.description }),
     ...(row.photo_url === null ? {} : { photoUrl: row.photo_url }),
     stock: row.stock,
@@ -52,7 +53,7 @@ function toProduct(row: ProductRow): Product {
 /** Campos editáveis via PATCH → coluna correspondente na tabela. */
 const productColumns = {
   name: "name",
-  category: "category",
+  categoryId: "category_id",
   priceInCents: "price_in_cents",
   description: "description",
   photoUrl: "photo_url",
@@ -67,13 +68,13 @@ export async function insert(
 ): Promise<Product> {
   const { rows } = await db.query<ProductRow>(
     `insert into products
-       (restaurant_id, name, category, price_in_cents, description, photo_url, stock)
+       (restaurant_id, name, category_id, price_in_cents, description, photo_url, stock)
      values ($1, $2, $3, $4, $5, $6, $7)
      returning *`,
     [
       restaurantId,
       input.name,
-      input.category,
+      input.categoryId ?? null,
       input.priceInCents,
       input.description ?? null,
       input.photoUrl ?? null,
@@ -87,33 +88,135 @@ export async function insert(
 }
 
 /**
- * Uma página de produtos vivos do restaurante (D11), mais o total de vivos
- * daquele restaurante — não da tabela inteira.
+ * Escapa os curingas do `LIKE` vindos do cliente (S5).
  *
- * O `order by`/`limit` casa exatamente com o índice parcial
+ * `%` e `_` não são injection — o termo continua indo como parâmetro —, mas
+ * são operadores: buscar por "%" sem escapar casa com o cardápio inteiro, e
+ * "_" casaria com qualquer caractere. Escapados, valem como o texto que a
+ * pessoa digitou. A barra invertida entra na lista porque ela é o próprio
+ * caractere de escape do Postgres.
+ */
+function escapeLikeWildcards(termo: string): string {
+  return termo.replace(/[\\%_]/g, (curinga) => `\\${curinga}`);
+}
+
+/**
+ * Uma página de produtos vivos do restaurante (D11), mais o total de vivos
+ * daquele restaurante — não da tabela inteira — **já considerando os filtros**.
+ *
+ * Sem filtro, o `order by`/`limit` casa exatamente com o índice parcial
  * `products_active_by_restaurant_idx (restaurant_id, created_at, id)`.
  * Duas queries pelo mesmo motivo do repositório de restaurantes.
+ *
+ * As condições são montadas aqui, mas todo valor continua indo como `$n`: o
+ * que a lista abaixo concatena são pedaços fixos de SQL escritos neste arquivo,
+ * nunca algo vindo da requisição (S2).
  */
 export async function findByRestaurant(
   restaurantId: string,
   { limit, offset }: Pagination,
+  filters: ProductFilters = {},
   db: Queryable = pool,
 ): Promise<{ rows: Product[]; total: number }> {
+  const conditions = ["restaurant_id = $1", "deleted_at is null"];
+  const filterValues: unknown[] = [restaurantId];
+
+  if (filters.categoryId !== undefined) {
+    filterValues.push(filters.categoryId);
+    conditions.push(`category_id = $${filterValues.length}`);
+  }
+
+  if (filters.search !== undefined) {
+    filterValues.push(`%${escapeLikeWildcards(filters.search)}%`);
+    // ilike: quem procura "coca" espera achar "Coca-Cola"
+    conditions.push(`name ilike $${filterValues.length}`);
+  }
+
+  const where = conditions.join(" and ");
+
   const { rows } = await db.query<ProductRow>(
     `select * from products
-      where restaurant_id = $1 and deleted_at is null
+      where ${where}
       order by created_at, id
-      limit $2 offset $3`,
-    [restaurantId, limit, offset],
+      limit $${filterValues.length + 1} offset $${filterValues.length + 2}`,
+    [...filterValues, limit, offset],
   );
 
   const { rows: countRows } = await db.query<{ total: string }>(
-    `select count(*) as total from products
-      where restaurant_id = $1 and deleted_at is null`,
-    [restaurantId],
+    `select count(*) as total from products where ${where}`,
+    filterValues,
   );
 
   return { rows: rows.map(toProduct), total: Number(countRows[0].total) };
+}
+
+/**
+ * Todos os produtos vivos das categorias informadas, em uma query só.
+ *
+ * É a segunda metade do cardápio público: a primeira busca a página de
+ * categorias, esta traz os produtos de todas elas de uma vez, em vez de uma
+ * consulta por seção. Quem agrupa é o serviço — repositório não monta formato
+ * de resposta.
+ *
+ * Sem `limit`, e não por esquecimento: a paginação existe para impedir que um
+ * **cliente** peça uma resposta sem fim, e o cliente não escolhe quantos
+ * produtos cabem numa seção — quem escolhe é o restaurante, montando o próprio
+ * cardápio. Cortar em N esconderia prato do cardápio, que é pior do que a
+ * resposta grande.
+ */
+export async function findByCategoryIds(
+  restaurantId: string,
+  categoryIds: string[],
+  db: Queryable = pool,
+): Promise<Product[]> {
+  const { rows } = await db.query<ProductRow>(
+    `select * from products
+      where restaurant_id = $1
+        and category_id = any($2::uuid[])
+        and deleted_at is null
+      order by created_at, id`,
+    [restaurantId, categoryIds],
+  );
+  return rows.map(toProduct);
+}
+
+/**
+ * Os produtos vivos que não estão em seção nenhuma — o grupo "Sem categoria"
+ * do cardápio. Existem porque a seção deles foi removida, ou porque nunca
+ * receberam uma.
+ */
+export async function findUncategorized(
+  restaurantId: string,
+  db: Queryable = pool,
+): Promise<Product[]> {
+  const { rows } = await db.query<ProductRow>(
+    `select * from products
+      where restaurant_id = $1
+        and category_id is null
+        and deleted_at is null
+      order by created_at, id`,
+    [restaurantId],
+  );
+  return rows.map(toProduct);
+}
+
+/**
+ * Tira os produtos de uma categoria (`category_id = null`), sem removê-los.
+ *
+ * É o que acontece quando a seção é apagada: o produto continua no cardápio,
+ * agrupado em "Sem categoria". Recebe o `client` porque só faz sentido junto
+ * com a remoção da categoria, na mesma transação (D3).
+ */
+export async function clearCategory(
+  restaurantId: string,
+  categoryId: string,
+  db: Queryable,
+): Promise<void> {
+  await db.query(
+    `update products set category_id = null, updated_at = now()
+      where restaurant_id = $1 and category_id = $2 and deleted_at is null`,
+    [restaurantId, categoryId],
+  );
 }
 
 /**

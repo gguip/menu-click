@@ -5,8 +5,10 @@ import type {
 } from "../domain/category.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
 import { isUuid } from "../domain/uuid.ts";
+import { withTransaction } from "../db/pool.ts";
 import { ConflictError, NotFoundError } from "../errors.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
+import * as productsRepository from "../repositories/products.ts";
 import * as restaurantsService from "./restaurants.ts";
 
 /**
@@ -84,12 +86,33 @@ export async function update(
   return result.category;
 }
 
+/**
+ * Remove a seção e **solta os produtos dela**, na mesma transação (D3).
+ *
+ * Os produtos não são removidos junto: continuam no cardápio, agrupados no fim
+ * em "Sem categoria". É a diferença entre apagar uma seção e apagar a comida —
+ * e é o que permite corrigir um nome digitado errado sem recategorizar o
+ * cardápio inteiro à mão.
+ *
+ * A cascata é explícita porque não há `on delete cascade` no projeto: nada é
+ * apagado de verdade, então o gatilho do banco nunca dispararia. Lançar o
+ * `NotFoundError` de dentro da transação também dispara rollback, o que é
+ * correto — nada foi marcado.
+ */
 export async function remove(restaurantId: string, id: string): Promise<void> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(id)) throw categoryNotFound(id);
 
-  const removed = await categoriesRepository.softDelete(restaurantId, id);
-  if (!removed) throw categoryNotFound(id);
+  await withTransaction(async (client) => {
+    const removed = await categoriesRepository.softDelete(
+      restaurantId,
+      id,
+      client,
+    );
+    if (!removed) throw categoryNotFound(id);
+
+    await productsRepository.clearCategory(restaurantId, id, client);
+  });
 }
 
 /**

@@ -8,7 +8,15 @@
  */
 export type CreateProductInput = {
   name: string;
-  category: string;
+  /**
+   * A seção do cardápio. Opcional: produto sem categoria é estado legítimo —
+   * ele aparece no cardápio, agrupado no fim, em "Sem categoria".
+   *
+   * É o que permite remover uma seção sem travar quem a usava. A alternativa
+   * (recusar a remoção enquanto houver produto) obrigaria a recategorizar o
+   * cardápio inteiro à mão só para corrigir um nome digitado errado.
+   */
+  categoryId?: string;
   priceInCents: number; // inteiro (centavos) — nunca float
   description?: string;
   photoUrl?: string;
@@ -16,8 +24,17 @@ export type CreateProductInput = {
   stock?: number;
 };
 
-/** Edição parcial de produto. */
-export type UpdateProductInput = Partial<CreateProductInput>;
+/**
+ * Edição parcial de produto.
+ *
+ * `categoryId` aceita `null` de propósito, e é a diferença entre os dois: não
+ * mandar o campo é "não mexe na categoria", mandar `null` é "tira daquela
+ * seção". Sem o `null` explícito, tirar a categoria de um produto não teria
+ * como ser dito.
+ */
+export type UpdateProductInput = Partial<Omit<CreateProductInput, "categoryId">> & {
+  categoryId?: string | null;
+};
 
 /** Produto completo, como é guardado e devolvido na resposta. */
 export type Product = CreateProductInput & {
@@ -27,4 +44,17 @@ export type Product = CreateProductInput & {
   stock: number;
   createdAt: string;
   updatedAt: string;
+};
+
+/**
+ * Filtros da listagem de produtos do restaurante, além da paginação.
+ *
+ * Os dois servem à mesma tela — a grade de gestão do cardápio — e por isso vêm
+ * juntos: filtrar pela seção e procurar pelo nome.
+ */
+export type ProductFilters = {
+  /** Só os produtos desta categoria. */
+  categoryId?: string;
+  /** Busca por parte do nome, sem diferenciar maiúscula. */
+  search?: string;
 };

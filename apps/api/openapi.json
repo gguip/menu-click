@@ -543,7 +543,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0).",
+        "description": "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404.",
         "requestBody": {
           "required": true,
           "content": {
@@ -553,7 +553,6 @@
                 "additionalProperties": false,
                 "required": [
                   "name",
-                  "category",
                   "priceInCents"
                 ],
                 "properties": {
@@ -561,9 +560,8 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "category": {
-                    "type": "string",
-                    "minLength": 1
+                  "categoryId": {
+                    "type": "string"
                   },
                   "priceInCents": {
                     "type": "integer",
@@ -617,7 +615,7 @@
                     "name": {
                       "type": "string"
                     },
-                    "category": {
+                    "categoryId": {
                       "type": "string"
                     },
                     "priceInCents": {
@@ -672,7 +670,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "Ao contrário do cardápio público, esta listagem traz o `stock` exato.",
+        "description": "Lista plana e paginada — é a grade de edição, não a tela do cliente (o cardápio público é que vem agrupado por seção). Ao contrário dele, esta listagem traz o `stock` exato. `categoryId` recorta por seção e `search` procura por parte do nome, sem diferenciar maiúscula; os dois valem também para o `total`.",
         "parameters": [
           {
             "schema": {
@@ -693,6 +691,24 @@
             },
             "in": "query",
             "name": "offset",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "categoryId",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "in": "query",
+            "name": "search",
             "required": false
           },
           {
@@ -731,7 +747,7 @@
                           "name": {
                             "type": "string"
                           },
-                          "category": {
+                          "categoryId": {
                             "type": "string"
                           },
                           "priceInCents": {
@@ -841,7 +857,7 @@
                     "name": {
                       "type": "string"
                     },
-                    "category": {
+                    "categoryId": {
                       "type": "string"
                     },
                     "priceInCents": {
@@ -896,7 +912,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade.",
+        "description": "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio.",
         "requestBody": {
           "required": true,
           "content": {
@@ -910,9 +926,9 @@
                     "type": "string",
                     "minLength": 1
                   },
-                  "category": {
+                  "categoryId": {
                     "type": "string",
-                    "minLength": 1
+                    "nullable": true
                   },
                   "priceInCents": {
                     "type": "integer",
@@ -974,7 +990,7 @@
                     "name": {
                       "type": "string"
                     },
-                    "category": {
+                    "categoryId": {
                       "type": "string"
                     },
                     "priceInCents": {
@@ -3440,11 +3456,11 @@
     "/menu/{slug}/products": {
       "get": {
         "operationId": "listPublicMenuProducts",
-        "summary": "Cardápio do restaurante",
+        "summary": "Cardápio do restaurante, por seção",
         "tags": [
           "Cardápio público"
         ],
-        "description": "Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir.",
+        "description": "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir.",
         "parameters": [
           {
             "schema": {
@@ -3497,20 +3513,31 @@
                           "name": {
                             "type": "string"
                           },
-                          "category": {
-                            "type": "string"
-                          },
-                          "priceInCents": {
-                            "type": "integer"
-                          },
-                          "description": {
-                            "type": "string"
-                          },
-                          "photoUrl": {
-                            "type": "string"
-                          },
-                          "available": {
-                            "type": "boolean"
+                          "products": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "photoUrl": {
+                                  "type": "string"
+                                },
+                                "available": {
+                                  "type": "boolean"
+                                }
+                              }
+                            }
                           }
                         }
                       }

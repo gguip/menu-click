@@ -48,7 +48,6 @@ const menuProductResponseSchema = {
   properties: {
     id: { type: "string" },
     name: { type: "string" },
-    category: { type: "string" },
     priceInCents: { type: "integer" },
     description: { type: "string" },
     photoUrl: { type: "string" },
@@ -57,8 +56,23 @@ const menuProductResponseSchema = {
   },
 };
 
-const menuProductPageResponseSchema = pageResponseSchema(
-  menuProductResponseSchema,
+/**
+ * Uma seção do cardápio. `categoryId` não aparece nos produtos daqui: eles já
+ * estão **dentro** da seção, e repetir o vínculo em cada item seria dizer duas
+ * vezes a mesma coisa.
+ */
+const menuSectionResponseSchema = {
+  type: "object",
+  properties: {
+    // ausente no grupo "Sem categoria", que não é uma categoria de verdade
+    id: { type: "string" },
+    name: { type: "string" },
+    products: { type: "array", items: menuProductResponseSchema },
+  },
+};
+
+const menuSectionPageResponseSchema = pageResponseSchema(
+  menuSectionResponseSchema,
 );
 
 export async function menuRoutes(app: FastifyInstance) {
@@ -92,13 +106,13 @@ export async function menuRoutes(app: FastifyInstance) {
       schema: {
         tags: ["Cardápio público"],
         operationId: "listPublicMenuProducts",
-        summary: "Cardápio do restaurante",
+        summary: "Cardápio do restaurante, por seção",
         description:
-          "Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir.",
+          "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir.",
         params: slugParamsSchema,
         querystring: paginationQuerystringSchema,
         response: {
-          200: menuProductPageResponseSchema,
+          200: menuSectionPageResponseSchema,
           404: errorResponseSchema,
         },
       },

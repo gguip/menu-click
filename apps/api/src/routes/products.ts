@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type {
   CreateProductInput,
+  ProductFilters,
   UpdateProductInput,
 } from "../domain/product.ts";
 import type { Pagination } from "../domain/pagination.ts";
@@ -25,10 +26,11 @@ import {
 const createProductBodySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["name", "category", "priceInCents"],
+  required: ["name", "priceInCents"],
   properties: {
     name: { type: "string", minLength: 1 },
-    category: { type: "string", minLength: 1 },
+    // opcional: produto sem seção é estado legítimo, e cai em "Sem categoria"
+    categoryId: { type: "string" },
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
     photoUrl: { type: "string", format: "uri" },
@@ -42,7 +44,9 @@ const updateProductBodySchema = {
   minProperties: 1,
   properties: {
     name: { type: "string", minLength: 1 },
-    category: { type: "string", minLength: 1 },
+    // `nullable` (não `anyOf`, F12): mandar null é tirar o produto da seção,
+    // que é diferente de não mandar o campo — este não mexe na categoria
+    categoryId: { type: "string", nullable: true },
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
     photoUrl: { type: "string", format: "uri" },
@@ -56,7 +60,7 @@ const productResponseSchema = {
     id: { type: "string" },
     restaurantId: { type: "string" },
     name: { type: "string" },
-    category: { type: "string" },
+    categoryId: { type: "string" },
     priceInCents: { type: "integer" },
     description: { type: "string" },
     photoUrl: { type: "string" },
@@ -67,6 +71,22 @@ const productResponseSchema = {
 };
 
 const productPageResponseSchema = pageResponseSchema(productResponseSchema);
+
+/**
+ * A paginação mais os filtros da grade de gestão do cardápio.
+ *
+ * `search` é limitado porque ele vira um `ilike '%...%'`: um termo enorme não
+ * traz mais resultado, só trabalho. Os curingas que a pessoa digitar são
+ * escapados no repositório (S5) — aqui eles são texto, não operador.
+ */
+const productListQuerystringSchema = {
+  ...paginationQuerystringSchema,
+  properties: {
+    ...paginationQuerystringSchema.properties,
+    categoryId: { type: "string" },
+    search: { type: "string", minLength: 1, maxLength: 100 },
+  },
+};
 
 const restaurantIdParamsSchema = {
   type: "object",
@@ -98,7 +118,7 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "createProduct",
         summary: "Adiciona um produto ao cardápio",
         description:
-          "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0).",
+          "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404.",
         params: restaurantIdParamsSchema,
         body: createProductBodySchema,
         response: { 201: productResponseSchema, 404: errorResponseSchema },
@@ -115,7 +135,10 @@ export async function productRoutes(app: FastifyInstance) {
   );
 
   // Listar produtos do restaurante (sem produtos → 200 com data vazia)
-  app.get<{ Params: { restaurantId: string }; Querystring: Pagination }>(
+  app.get<{
+    Params: { restaurantId: string };
+    Querystring: Pagination & ProductFilters;
+  }>(
     "/restaurants/:restaurantId/products",
     {
       schema: {
@@ -123,9 +146,9 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "listProducts",
         summary: "Cardápio, do lado de quem edita",
         description:
-          "Ao contrário do cardápio público, esta listagem traz o `stock` exato.",
+          "Lista plana e paginada — é a grade de edição, não a tela do cliente (o cardápio público é que vem agrupado por seção). Ao contrário dele, esta listagem traz o `stock` exato. `categoryId` recorta por seção e `search` procura por parte do nome, sem diferenciar maiúscula; os dois valem também para o `total`.",
         params: restaurantIdParamsSchema,
-        querystring: paginationQuerystringSchema,
+        querystring: productListQuerystringSchema,
         response: {
           200: productPageResponseSchema,
           404: errorResponseSchema,
@@ -133,9 +156,11 @@ export async function productRoutes(app: FastifyInstance) {
       },
     },
     async (request) => {
+      const { limit, offset, categoryId, search } = request.query;
       return productsService.listByRestaurant(
         request.params.restaurantId,
-        request.query,
+        { limit, offset },
+        { categoryId, search },
       );
     },
   );
@@ -172,7 +197,7 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "updateProduct",
         summary: "Edita o produto",
         description:
-          "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade.",
+          "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio.",
         params: productParamsSchema,
         body: updateProductBodySchema,
         response: { 200: productResponseSchema, 404: errorResponseSchema },

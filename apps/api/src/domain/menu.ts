@@ -23,7 +23,22 @@ export type MenuRestaurant = Omit<Restaurant, "createdAt" | "updatedAt">;
  */
 export type MenuProduct = Omit<
   Product,
-  "stock" | "restaurantId" | "createdAt" | "updatedAt"
+  "stock" | "restaurantId" | "createdAt" | "updatedAt" | "categoryId"
 > & {
   available: boolean;
+};
+
+/**
+ * Uma seção do cardápio: a categoria e os produtos dela.
+ *
+ * `id` é opcional por um caso só, e ele é real: o grupo dos produtos que não
+ * estão em seção nenhuma. Ele não é uma categoria — não tem id, não tem
+ * posição, e não sai da tabela `categories` —, então dar a ele um id
+ * inventado faria a tela tratar como editável algo que não existe no banco.
+ */
+export type MenuSection = {
+  /** Ausente no grupo "Sem categoria", que não é uma categoria de verdade. */
+  id?: string;
+  name: string;
+  products: MenuProduct[];
 };
