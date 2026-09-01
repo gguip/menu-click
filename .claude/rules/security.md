@@ -86,6 +86,8 @@ Existe desde o commit que adicionou `restaurant_users` e `sessions`. As regras a
 
 - **S28 — Autorização de rota WebSocket vai em `preHandler`, não em `preValidation`.** Os dois rodam antes do upgrade, mas `preValidation` roda **antes** da validação do schema: um parâmetro obrigatório ainda pode ser `undefined` ali, e o que deveria ser 400 vira 500. Só use `preValidation` para credencial que não passa por schema (header).
 
+- **S29 — Ordenação e filtro dinâmicos passam por allowlist, sempre.** É o S3 aplicado onde ele mais aparece: `?sort=` e `?order=` da listagem de pedidos. `order by` não aceita `$n` (nome de coluna é identificador, não valor), então o que protege não é o driver — é o mapa fixo campo→coluna no repositório, mais um ternário para a direção. Validar por `enum` no JSON Schema é a primeira barreira, não a última: interpolar a string recebida deixaria a proteção dependendo de um schema que alguém pode afrouxar depois.
+
 - **S23 — Autorização é checada no banco, na mesma query** (`where id = $1 and restaurant_id = $2`, como as rotas de produto já fazem) — nunca só no cliente, nunca só no hook.
 
 Ainda **não** existe, e ao implementar vale desde o primeiro commit: recuperação de senha, papéis dentro do restaurante (a tabela comporta, a checagem não existe) e **rate limit no `/auth/login`**, que é o alvo óbvio de força bruta.

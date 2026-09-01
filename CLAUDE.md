@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias e de produtos no Postgres, busca no cardápio, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias e de produtos no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -199,6 +199,26 @@ Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-s
 🚨 **Teste de concorrência precisa aquecer o pool antes da corrida** (`warmPool()` em `test/orders-confirm.test.ts`). Com o pool frio, cada requisição espera o handshake de uma conexão nova, e isso é lento o bastante para a primeira transação inteira terminar antes de a segunda começar: o teste passa mesmo com o lock removido. Ao escrever um teste de corrida, **remova o lock e confirme que ele falha** — senão ele não está testando nada.
 
 **Erro de negócio nunca vira status code na rota.** O serviço lança `NotFoundError`/`ConflictError` e o `setErrorHandler()` do `app.ts` traduz para **404**/**409**, com o corpo `{ statusCode, error, message }`. Nenhuma rota monta corpo de erro na mão.
+
+### O painel: fuso, período e ordenação
+
+Três coisas do painel do restaurante andam juntas, e a primeira sustenta as outras duas.
+
+**`restaurants.timezone` decide onde o dia começa.** É nome IANA (`America/Sao_Paulo`, o default), não offset fixo: offset não sabe de horário de verão, e o Brasil já mudou o dele por município. Sem a coluna, "pedidos de hoje" não tem resposta — o dia de Manaus começa uma hora depois do de São Paulo, e o painel precisa que "hoje" signifique a mesma coisa para o dono em casa e para o gerente no salão. É editável por PATCH (ao contrário do slug, mudá-lo não quebra QR code impresso) e **não** sai no cardápio público (S10).
+
+A validação é construir um `Intl.DateTimeFormat` e ver se ele reclama, **não** comparar com `Intl.supportedValuesOf("timeZone")`: aquela lista traz só nomes canônicos e recusaria apelidos como `Brazil/East`, que o Postgres aceita — e aí a API e o banco discordariam sobre o que existe.
+
+⚠️ **As contas de "meia-noite de hoje" ficam no Postgres, não no Node.** Elas dependem do banco de fusos, que o `at time zone` já consulta; refazê-las em JavaScript seria uma segunda implementação da mesma regra, discordando da primeira exatamente nos dias de virada. As expressões vivem num mapa fixo em `repositories/orders.ts` e o fuso vai como `$n` — ele é valor, não identificador.
+
+**O recorte de tempo tem duas formas, e elas não se misturam:** `?period=today|yesterday|last7days|thisMonth` (os botões) **ou** `?from=&to=` (`YYYY-MM-DD`, intervalo fechado nos dois lados, o seletor de datas). Mandar as duas é **400** — não existe "hoje, de 1 a 5 de agosto", e ignorar uma em silêncio devolveria um número que ninguém pediu.
+
+**A listagem de pedidos vem do mais novo primeiro** (mudou: era crescente). O painel existe para ver o pedido que acabou de chegar; quem quer a ordem da cozinha pede `?order=asc`. `?sort=` aceita `createdAt` e `totalInCents`, e é **allowlist** (S3): `order by` não aceita `$n`, então um mapa fixo traduz o campo para a coluna e a direção sai de um ternário, nunca da string recebida.
+
+**`GET /restaurants/:restaurantId/orders/summary`** devolve os contadores por status (todos, zerados ou não), o faturamento, quantos pedidos o compõem e o ticket médio. Rota separada da listagem porque o painel troca de página e de filtro o tempo todo, e porque `total` (da consulta paginada) e os contadores (do período inteiro) são duas noções de "quantos" que não devem morar no mesmo corpo.
+
+**Faturamento é o que o restaurante ACEITOU vender:** de `confirmed` em diante, sem `pending` (ainda não é venda) nem `cancelled` (deixou de ser). Contar só `completed` mostraria quase zero no pico do almoço, que é quando alguém abre o painel. A lista vive em `REVENUE_STATUSES` no domínio, **não no SQL**: o repositório agrupa por status e devolve o cru, e a regra é aplicada no serviço — se estivesse na query, mudá-la sumiria de onde alguém a procura. ⚠️ Status novo na máquina **não** entra ali sozinho.
+
+A resposta traz em `period` os instantes que o servidor usou. Sem eles, "por que o faturamento de hoje está zerado?" não tem como ser respondido sem abrir o banco.
 
 ### Documentação: OpenAPI derivado das rotas
 
