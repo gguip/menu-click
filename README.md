@@ -238,11 +238,12 @@ O slug é gerado do nome (sem acento) ou enviado no cadastro, e **não muda por 
 Um pedido nasce `pending`, e daí vai para `confirmed` ou `cancelled`. Não há `DELETE`: pedido não se apaga, se cancela.
 
 ```bash
-# criar — PÚBLICO: quem escaneia o QR pede sem ter conta
-# (endereço de entrega é opcional: sem ele, é pedido de mesa)
+# criar — PÚBLICO: quem pede não precisa ter conta
+# `type` decide a trilha; endereço só em delivery
 curl -X POST http://localhost:3333/restaurants/$RID/orders \
   -H 'content-type: application/json' \
   -d '{
+        "type": "takeaway",
         "customer": { "name": "Ana Souza", "phone": "11999990000" },
         "items": [ { "productId": "'$PID'", "quantity": 2 } ]
       }'
@@ -267,6 +268,34 @@ O que o pedido garante:
 - **Cliente identificado pelo telefone.** Não há login: o mesmo telefone reaproveita o cliente (e atualiza o nome).
 - **Pedido é histórico, não catálogo.** Remover um cliente ou um restaurante não apaga os pedidos deles.
 
+## Modalidades e status do pedido
+
+Todo pedido nasce com uma modalidade, e é ela que define o caminho:
+
+| Modalidade | `type` | Trilha | Endereço |
+| --- | --- | --- | --- |
+| Salão (QR) | `dine_in` | preparo → **servido** | não leva |
+| Retirada | `takeaway` | preparo → **disponível para retirada** → retirado | não leva |
+| Entrega | `delivery` | preparo → **saiu para entrega** → entregue | obrigatório |
+
+```
+pending → confirmed → preparing → [out_for_delivery | ready_for_pickup] → completed
+                                cancelled, de qualquer estado não terminal
+```
+
+O banco guarda `completed` nas três; a palavra na tela — Servido, Retirado, Entregue — vem da modalidade. Pedir uma transição que não existe na trilha responde **409** dizendo justamente isso ("Pedido de retirada não passa por `out_for_delivery`").
+
+O restaurante declara o que aceita em `isDelivery`, `isTakeaway` e `isQrcode`; pedido de modalidade recusada é 409.
+
+```bash
+# aceitar, preparar, despachar e concluir (todas exigem sessão)
+curl -X POST -H "authorization: Bearer $TOKEN" .../orders/$OID/confirm
+curl -X POST -H "authorization: Bearer $TOKEN" .../orders/$OID/start-preparing
+curl -X POST -H "authorization: Bearer $TOKEN" .../orders/$OID/dispatch   # só delivery
+curl -X POST -H "authorization: Bearer $TOKEN" .../orders/$OID/ready      # só takeaway
+curl -X POST -H "authorization: Bearer $TOKEN" .../orders/$OID/complete
+```
+
 ## Estoque
 
 Todo produto tem `stock` (inteiro, default 0). Ele é devolvido em toda resposta de produto, aceito no `POST` (estoque inicial) e no `PATCH` (reposição):
@@ -283,6 +312,8 @@ curl -X PATCH http://localhost:3333/restaurants/$RID/products/$PID \
 ```
 
 **A única coisa que tira unidade do estoque é a confirmação de pedido.** Ela roda numa transação que trava primeiro o pedido (para duas confirmações do mesmo pedido não debitarem duas vezes) e depois os produtos, em ordem fixa de id (para pedidos diferentes que disputam o mesmo item se serializarem). Todos os itens são conferidos antes de qualquer débito.
+
+**Cancelar devolve o estoque até a comida ficar pronta.** Em `confirmed` e `preparing` as unidades voltam; depois que o pedido saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha.
 
 O efeito colateral aceito: **pedido pendente não é reserva.** Dois pedidos podem existir para a última unidade — o primeiro a confirmar leva, o segundo recebe 409. `test/orders-confirm.test.ts` cobre os dois casos.
 
@@ -319,8 +350,8 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 
 ## Próximos passos
 
+- [ ] Acompanhamento do pedido em tempo real (WebSocket), para retirada e entrega
 - [ ] Recuperação de senha e papéis dentro do restaurante (dono vs. garçom)
-- [ ] Cancelar pedido já confirmado, devolvendo estoque (hoje `confirmed` é terminal)
 - [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
 - [ ] Histórico do cliente (`GET /customers/:id/orders`) e CRUD próprio de clientes
 - [ ] `packages/` compartilhados (tipos, config) — quando o front existir

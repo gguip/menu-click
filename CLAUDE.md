@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug, CRUD de restaurantes e de produtos no Postgres, controle de estoque e o fluxo de pedidos: criar, listar, confirmar e cancelar). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug, CRUD de restaurantes e de produtos no Postgres, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -133,6 +133,29 @@ Cliente é contato, não conta: sem login, o telefone é a identidade (índice �
 
 Duas linhas do mesmo produto no corpo viram **uma** com a quantidade somada — é o que um carrinho faz, e apaga o caso em que a confirmação teria que travar e debitar o mesmo produto duas vezes na mesma transação.
 
+### Modalidade do pedido
+
+Todo pedido tem `type`: **`dine_in`** (QR na mesa), **`takeaway`** (retirada) ou **`delivery`**. Ela decide três coisas: por quais estados o pedido passa, se exige endereço, e — no futuro — se o cliente recebe token de acompanhamento.
+
+⚠️ **A modalidade não se infere.** Até a migration `add-order-type-and-status` ela era deduzida do endereço (com `street` = entrega, sem = mesa). Retirada quebrou isso: também não tem endereço e não é mesa. Se você se pegar escrevendo `if (deliveryAddress)` para decidir qualquer coisa, é o campo `type` que você quer.
+
+O endereço acompanha: **obrigatório em `delivery`, recusado nas outras duas** — no serviço (400, com mensagem) e no `check` do banco (a rede de segurança). O restaurante declara o que aceita em `isDelivery`/`isTakeaway`/`isQrcode`, e pedido de modalidade recusada é **409**.
+
+### Máquina de status
+
+```
+delivery   pending → confirmed → preparing → out_for_delivery → completed
+takeaway   pending → confirmed → preparing → ready_for_pickup → completed
+dine_in    pending → confirmed → preparing →                    completed
+                          cancelled, de qualquer estado não terminal
+```
+
+**As transições legais vivem num mapa só**, `TRANSITIONS` em `domain/order.ts`, e **toda** mudança de estado passa pelo `transitionTo()` de `services/orders.ts` — um lugar para travar o pedido, aplicar o mapa e decidir o efeito colateral. Rota nova de transição chama `transitionTo`, nunca grava status direto.
+
+`completed` e não `delivered`: é o fim das três trilhas, e "entregue" obrigaria o painel a dizer isso de um prato servido na mesa. O banco guarda um estado; a palavra na tela vem da modalidade.
+
+Transição ilegal é 409 com **duas mensagens diferentes**, de propósito: quando o estado não existe naquela trilha a mensagem culpa a modalidade, e não o estado atual. Dizer "não pode ir de `preparing` para `out_for_delivery`" num pedido de retirada esconderia a causa real.
+
 ### Estoque e a confirmação
 
 `products.stock` é `not null default 0`. É **legível** em toda resposta de produto, **definível** no POST (estoque inicial) e **editável** no PATCH (reposição). Quem dá baixa é **só** a confirmação de pedido — um caminho único, para a disciplina de lock existir num lugar só.
@@ -145,6 +168,8 @@ A transação de `confirm` trava duas coisas, nessa ordem:
 Todos os itens são conferidos **antes** de qualquer débito: o rollback resolveria de qualquer jeito, mas conferir antes deixa a regra explícita.
 
 Consequência assumida de debitar só na confirmação: **pedido `pending` não é reserva.** Dois pedidos podem existir para a última unidade; o primeiro a confirmar leva, o segundo recebe 409.
+
+**Cancelar devolve estoque — até a comida ficar pronta.** O corte é "o prato já existe": em `confirmed` e `preparing` as unidades voltam; em `out_for_delivery` e `ready_for_pickup`, não. A regra mora em `cancellingReturnsStock()` no domínio, e a devolução usa o mesmo `select ... for update` ordenado por id do débito — sem o lock na leitura do pedido, cancelamentos simultâneos devolvem as unidades várias vezes (verificado).
 
 Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-stock-to-products`): a constraint transformaria a race condition num erro do Postgres e esconderia o sintoma que o teste precisa enxergar.
 
