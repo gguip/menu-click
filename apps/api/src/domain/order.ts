@@ -27,6 +27,40 @@ import type { Address } from "./restaurant.ts";
  * com esta lista e traduzido por um mapa fixo no repositório — o texto dele
  * nunca chega perto do SQL.
  */
+/**
+ * Os status que contam como **faturamento**.
+ *
+ * É o que o restaurante aceitou vender: a entrega que está na rua já é
+ * dinheiro, e o estoque dela já foi debitado. `pending` fica de fora porque
+ * ainda não é venda, e `cancelled` porque deixou de ser.
+ *
+ * Contar só `completed` mostraria quase zero no pico do almoço, que é
+ * justamente quando alguém abre o painel.
+ *
+ * ⚠️ A lista é explícita de propósito. Status novo na máquina não entra aqui
+ * sozinho — se ele conta como venda é decisão a tomar, não default.
+ */
+export const REVENUE_STATUSES = [
+  "confirmed",
+  "preparing",
+  "ready_for_pickup",
+  "out_for_delivery",
+  "completed",
+] as const;
+
+/** O resumo do painel para um período. */
+export type OrderSummaryTotals = {
+  /** Os limites efetivamente usados, para o número ser conferível. */
+  period: { from?: string; to?: string };
+  /** Quantos pedidos em cada status. Todos os status aparecem, zerados ou não. */
+  counts: Record<OrderStatus, number>;
+  revenueInCents: number;
+  /** Quantos pedidos entraram no faturamento — o denominador do ticket. */
+  revenueOrderCount: number;
+  /** Faturamento dividido pelos pedidos que o compõem. Zero quando não há. */
+  averageTicketInCents: number;
+};
+
 export const ORDER_SORT_FIELDS = ["createdAt", "totalInCents"] as const;
 
 export type OrderSortField = (typeof ORDER_SORT_FIELDS)[number];

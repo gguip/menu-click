@@ -2155,6 +2155,165 @@
         }
       }
     },
+    "/restaurants/{restaurantId}/orders/summary": {
+      "get": {
+        "operationId": "getOrdersSummary",
+        "summary": "Resumo do período para o painel",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "Contadores por status, faturamento e ticket médio. Faturamento é o que o restaurante **aceitou vender**: de `confirmed` em diante, sem `pending` (ainda não é venda) nem `cancelled` (deixou de ser) — contar só `completed` mostraria quase zero no pico do almoço. Aceita o mesmo recorte da listagem (`period` **ou** `from`/`to`), resolvido no fuso do restaurante, e devolve em `period` os instantes que usou.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "today",
+                "yesterday",
+                "last7days",
+                "thisMonth"
+              ]
+            },
+            "in": "query",
+            "name": "period",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "period": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "pending": {
+                          "type": "integer"
+                        },
+                        "confirmed": {
+                          "type": "integer"
+                        },
+                        "preparing": {
+                          "type": "integer"
+                        },
+                        "ready_for_pickup": {
+                          "type": "integer"
+                        },
+                        "out_for_delivery": {
+                          "type": "integer"
+                        },
+                        "completed": {
+                          "type": "integer"
+                        },
+                        "cancelled": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "revenueInCents": {
+                      "type": "integer"
+                    },
+                    "revenueOrderCount": {
+                      "type": "integer"
+                    },
+                    "averageTicketInCents": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/restaurants/{restaurantId}/orders/{orderId}/confirm": {
       "post": {
         "operationId": "confirmOrder",

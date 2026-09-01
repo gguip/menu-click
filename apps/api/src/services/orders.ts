@@ -12,7 +12,10 @@ import type {
   OrderSummary,
   OrderType,
 } from "../domain/order.ts";
+import type { OrderSummaryTotals } from "../domain/order.ts";
 import {
+  ORDER_STATUSES,
+  REVENUE_STATUSES,
   canTransition,
   cancellingReturnsStock,
   isReachable,
@@ -272,6 +275,61 @@ export async function listByRestaurant(
     restaurant.timezone,
   );
   return { data: rows, ...pagination, total };
+}
+
+/**
+ * O resumo do painel: quantos pedidos em cada status, o faturamento e o ticket
+ * médio do período.
+ *
+ * É rota separada da listagem de propósito. O painel troca de página e de
+ * filtro o tempo todo, e recalcular os contadores a cada virada de página é
+ * trabalho jogado fora; além disso, os contadores falam do **período inteiro**
+ * enquanto o `total` da listagem fala da consulta paginada — duas noções de
+ * "quantos" no mesmo corpo, com nomes parecidos, é convite a somar errado.
+ *
+ * Quem decide o que é faturamento é o domínio (`REVENUE_STATUSES`), não o SQL:
+ * o repositório devolve a contagem crua por status e a regra é aplicada aqui.
+ */
+export async function summary(
+  restaurantId: string,
+  filters: Pick<OrderListFilters, "period" | "from" | "to"> = {},
+): Promise<OrderSummaryTotals> {
+  const period = resolvePeriodFilter(filters);
+  const restaurant = await restaurantsService.getById(restaurantId);
+
+  const [tallies, bounds] = await Promise.all([
+    ordersRepository.tallyByStatus(restaurantId, period, restaurant.timezone),
+    ordersRepository.selectPeriodBounds(period, restaurant.timezone),
+  ]);
+
+  // Todos os status aparecem, zerados ou não: uma tela que só recebe as chaves
+  // presentes teria que saber a lista para desenhar os zeros — e ela ficaria
+  // desatualizada no dia em que a máquina de status ganhasse um estado.
+  const counts = Object.fromEntries(
+    ORDER_STATUSES.map((status) => [status, 0]),
+  ) as Record<OrderStatus, number>;
+  for (const tally of tallies) counts[tally.status] = tally.count;
+
+  const faturamento = tallies.filter((tally) =>
+    (REVENUE_STATUSES as readonly OrderStatus[]).includes(tally.status),
+  );
+  const revenueInCents = faturamento.reduce((soma, t) => soma + t.totalInCents, 0);
+  const revenueOrderCount = faturamento.reduce((soma, t) => soma + t.count, 0);
+
+  return {
+    period: {
+      ...(bounds.from === null ? {} : { from: bounds.from.toISOString() }),
+      ...(bounds.to === null ? {} : { to: bounds.to.toISOString() }),
+    },
+    counts,
+    revenueInCents,
+    revenueOrderCount,
+    // divisão por zero viraria NaN, que o serializador transformaria em null
+    averageTicketInCents:
+      revenueOrderCount === 0
+        ? 0
+        : Math.round(revenueInCents / revenueOrderCount),
+  };
 }
 
 /**

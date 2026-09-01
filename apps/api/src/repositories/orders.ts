@@ -308,11 +308,50 @@ const PERIOD_END: Partial<Record<OrderPeriod, string>> = {
 };
 
 /**
- * Monta as condições de período e empurra os valores em `values`.
+ * Os dois limites do período, como **expressões SQL** já prontas, e os valores
+ * empurrados em `values`.
  *
- * Devolve os pedaços de `where` já prontos. O que se concatena aqui são
- * strings fixas escritas neste arquivo; data e fuso vão como parâmetro (S2).
+ * Devolver as expressões (em vez das condições montadas) é o que permite o
+ * mesmo cálculo servir a dois usos: o `where` da listagem e o `select` que o
+ * resumo usa para dizer quais instantes ele considerou. Uma segunda conta em
+ * JavaScript discordaria desta nos dias de virada de horário de verão.
+ *
+ * O que se concatena aqui são strings fixas deste arquivo; data e fuso vão como
+ * parâmetro (S2).
  */
+function periodBounds(
+  filter: PeriodFilter,
+  timezone: string,
+  values: unknown[],
+): { from?: string; to?: string } {
+  values.push(timezone);
+  const tz = `$${values.length}`;
+  const emFuso = (expressao: string) =>
+    `(${expressao.split("%TZ%").join(tz)}) at time zone ${tz}`;
+
+  if (filter.kind === "named") {
+    const fim = PERIOD_END[filter.name];
+    return {
+      from: emFuso(PERIOD_START[filter.name]),
+      ...(fim === undefined ? {} : { to: emFuso(fim) }),
+    };
+  }
+
+  const bounds: { from?: string; to?: string } = {};
+  if (filter.from !== undefined) {
+    values.push(filter.from);
+    bounds.from = emFuso(`($${values.length}::date)::timestamp`);
+  }
+  if (filter.to !== undefined) {
+    values.push(filter.to);
+    // `+ 1` porque o intervalo é fechado: o dia do `to` entra inteiro, e o
+    // corte fica na meia-noite seguinte
+    bounds.to = emFuso(`($${values.length}::date + 1)::timestamp`);
+  }
+  return bounds;
+}
+
+/** As condições de `where` do período, para a coluna informada. */
 function periodConditions(
   filter: PeriodFilter | undefined,
   timezone: string,
@@ -321,31 +360,10 @@ function periodConditions(
 ): string[] {
   if (filter === undefined) return [];
 
-  values.push(timezone);
-  const tz = `$${values.length}`;
-  const emFuso = (expressao: string) =>
-    `(${expressao.split("%TZ%").join(tz)}) at time zone ${tz}`;
-
-  if (filter.kind === "named") {
-    const conditions = [`${coluna} >= ${emFuso(PERIOD_START[filter.name])}`];
-    const fim = PERIOD_END[filter.name];
-    if (fim !== undefined) conditions.push(`${coluna} < ${emFuso(fim)}`);
-    return conditions;
-  }
-
+  const { from, to } = periodBounds(filter, timezone, values);
   const conditions: string[] = [];
-  if (filter.from !== undefined) {
-    values.push(filter.from);
-    conditions.push(`${coluna} >= ${emFuso(`($${values.length}::date)::timestamp`)}`);
-  }
-  if (filter.to !== undefined) {
-    values.push(filter.to);
-    // `+ 1` porque o intervalo é fechado: o dia do `to` entra inteiro, e o
-    // corte fica na meia-noite seguinte
-    conditions.push(
-      `${coluna} < ${emFuso(`($${values.length}::date + 1)::timestamp`)}`,
-    );
-  }
+  if (from !== undefined) conditions.push(`${coluna} >= ${from}`);
+  if (to !== undefined) conditions.push(`${coluna} < ${to}`);
   return conditions;
 }
 
@@ -438,6 +456,80 @@ export async function findByRestaurant(
   );
 
   return { rows: rows.map(toOrderSummary), total: Number(countRows[0].total) };
+}
+
+/** Uma linha do agrupamento por status: quantos, e quanto somam. */
+export type StatusTally = {
+  status: OrderStatus;
+  count: number;
+  totalInCents: number;
+};
+
+/**
+ * Agrupa os pedidos vivos do período **por status**, com a contagem e a soma.
+ *
+ * Devolve o cru e nada mais: quais status contam como faturamento é regra de
+ * negócio e mora no domínio (`REVENUE_STATUSES`), não neste SQL. Se estivesse
+ * aqui, mudar a regra viraria mudar uma query — e a regra sumiria de onde
+ * alguém a procura.
+ */
+export async function tallyByStatus(
+  restaurantId: string,
+  period: PeriodFilter | undefined,
+  timezone: string,
+  db: Queryable = pool,
+): Promise<StatusTally[]> {
+  const values: unknown[] = [restaurantId];
+  const conditions = [
+    "restaurant_id = $1",
+    "deleted_at is null",
+    ...periodConditions(period, timezone, "created_at", values),
+  ];
+
+  const { rows } = await db.query<{
+    status: OrderStatus;
+    count: string;
+    total: string;
+  }>(
+    `select status, count(*) as count, coalesce(sum(total_in_cents), 0) as total
+       from orders
+      where ${conditions.join(" and ")}
+      group by status`,
+    values,
+  );
+
+  return rows.map((row) => ({
+    status: row.status,
+    count: Number(row.count),
+    totalInCents: Number(row.total),
+  }));
+}
+
+/**
+ * Os instantes em que o período pedido realmente começa e termina.
+ *
+ * Existe para o resumo poder devolvê-los: sem isso, "por que o faturamento de
+ * hoje está zerado?" não tem como ser respondido sem abrir o banco. `null` de
+ * um lado é intervalo aberto daquele lado.
+ *
+ * Usa as mesmas expressões do filtro — é o mesmo cálculo, no mesmo lugar.
+ */
+export async function selectPeriodBounds(
+  period: PeriodFilter | undefined,
+  timezone: string,
+  db: Queryable = pool,
+): Promise<{ from: Date | null; to: Date | null }> {
+  if (period === undefined) return { from: null, to: null };
+
+  const values: unknown[] = [];
+  const { from, to } = periodBounds(period, timezone, values);
+
+  const { rows } = await db.query<{ from: Date | null; to: Date | null }>(
+    `select ${from ?? "null::timestamptz"} as from,
+            ${to ?? "null::timestamptz"} as to`,
+    values,
+  );
+  return rows[0];
 }
 
 /**

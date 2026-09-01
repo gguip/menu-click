@@ -163,6 +163,39 @@ const orderListQuerystringSchema = {
   },
 };
 
+/** O resumo aceita o mesmo recorte de tempo da listagem, e nada além dele. */
+const orderSummaryQuerystringSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    period: { type: "string", enum: [...ORDER_PERIODS] },
+    from: { type: "string", format: "date" },
+    to: { type: "string", format: "date" },
+  },
+};
+
+const orderSummaryTotalsResponseSchema = {
+  type: "object",
+  properties: {
+    // os instantes que o servidor realmente usou; cada lado some quando o
+    // período é aberto daquele lado. É o que torna o número conferível sem
+    // abrir o banco quando alguém estranha um faturamento zerado
+    period: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+    },
+    counts: {
+      type: "object",
+      properties: Object.fromEntries(
+        ORDER_STATUSES.map((status) => [status, { type: "integer" }]),
+      ),
+    },
+    revenueInCents: { type: "integer" },
+    revenueOrderCount: { type: "integer" },
+    averageTicketInCents: { type: "integer" },
+  },
+};
+
 const restaurantIdParamsSchema = {
   type: "object",
   required: ["restaurantId"],
@@ -250,6 +283,40 @@ export async function orderRoutes(app: FastifyInstance) {
         { limit, offset },
         { status, period, from, to, sort, order },
       );
+    },
+  );
+
+  // Resumo do painel. Rota ESTÁTICA, e por isso ela precisa conviver com
+  // `/orders/:orderId`: o roteador do Fastify prefere segmento estático a
+  // paramétrico, então "summary" nunca é lido como um id de pedido. Há teste.
+  app.get<{
+    Params: { restaurantId: string };
+    Querystring: { period?: OrderPeriod; from?: string; to?: string };
+  }>(
+    "/restaurants/:restaurantId/orders/summary",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "getOrdersSummary",
+        summary: "Resumo do período para o painel",
+        description:
+          "Contadores por status, faturamento e ticket médio. Faturamento é o que o restaurante **aceitou vender**: de `confirmed` em diante, sem `pending` (ainda não é venda) nem `cancelled` (deixou de ser) — contar só `completed` mostraria quase zero no pico do almoço. Aceita o mesmo recorte da listagem (`period` **ou** `from`/`to`), resolvido no fuso do restaurante, e devolve em `period` os instantes que usou.",
+        params: restaurantIdParamsSchema,
+        querystring: orderSummaryQuerystringSchema,
+        response: {
+          200: orderSummaryTotalsResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { period, from, to } = request.query;
+      return ordersService.summary(request.params.restaurantId, {
+        period,
+        from,
+        to,
+      });
     },
   );
 
