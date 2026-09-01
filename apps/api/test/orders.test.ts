@@ -441,7 +441,10 @@ describe("pedidos", () => {
       expect(body).toMatchObject({ limit: 20, offset: 0, total: 2 });
       expect(body.data).toHaveLength(2);
       expect(body.data[0].items).toBeUndefined();
-      expect(body.data[0].customer.phone).toBe("11999990000");
+      // o default é do mais novo para o mais antigo, então o de Bruno vem
+      // primeiro (ver orders-sort.test.ts)
+      expect(body.data[0].customer.phone).toBe("11988887777");
+      expect(body.data[1].customer.phone).toBe("11999990000");
     });
 
     it("lista só os pedidos do restaurante da URL", async () => {

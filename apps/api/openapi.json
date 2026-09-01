@@ -155,6 +155,9 @@
                           "isQrcode": {
                             "type": "boolean"
                           },
+                          "timezone": {
+                            "type": "string"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -265,6 +268,9 @@
                     "isQrcode": {
                       "type": "boolean"
                     },
+                    "timezone": {
+                      "type": "string"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -373,6 +379,11 @@
                   },
                   "isQrcode": {
                     "type": "boolean"
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9+_-]*(?:/[A-Za-z0-9+_-]+)*$",
+                    "maxLength": 64
                   }
                 }
               }
@@ -454,6 +465,9 @@
                     },
                     "isQrcode": {
                       "type": "boolean"
+                    },
+                    "timezone": {
+                      "type": "string"
                     },
                     "createdAt": {
                       "type": "string"
@@ -1904,7 +1918,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Sem os itens (use a rota de detalhe para eles) e em ordem de criação crescente — o mais antigo primeiro, que é a ordem em que a cozinha os atende. Filtro opcional por `status`.",
+        "description": "Sem os itens — use a rota de detalhe para eles. Filtros opcionais: `status`, e o recorte de tempo por `period` (`today`, `yesterday`, `last7days`, `thisMonth`) **ou** por `from`/`to` (datas `YYYY-MM-DD`, intervalo fechado nos dois lados). Mandar os dois juntos é 400. O recorte é resolvido no **fuso do restaurante**, então \"hoje\" é o dia de quem está no salão, não o do servidor. Os filtros valem também para o `total`. A ordem padrão é **do mais novo para o mais antigo** — o painel existe para ver o pedido que acabou de chegar; `?sort=createdAt|totalInCents` e `?order=asc|desc` mudam isso.",
         "parameters": [
           {
             "schema": {
@@ -1942,6 +1956,64 @@
             },
             "in": "query",
             "name": "status",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "today",
+                "yesterday",
+                "last7days",
+                "thisMonth"
+              ]
+            },
+            "in": "query",
+            "name": "period",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "totalInCents"
+              ],
+              "default": "createdAt"
+            },
+            "in": "query",
+            "name": "sort",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "in": "query",
+            "name": "order",
             "required": false
           },
           {
@@ -2053,6 +2125,165 @@
                     },
                     "total": {
                       "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/orders/summary": {
+      "get": {
+        "operationId": "getOrdersSummary",
+        "summary": "Resumo do período para o painel",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "Contadores por status, faturamento e ticket médio. Faturamento é o que o restaurante **aceitou vender**: de `confirmed` em diante, sem `pending` (ainda não é venda) nem `cancelled` (deixou de ser) — contar só `completed` mostraria quase zero no pico do almoço. Aceita o mesmo recorte da listagem (`period` **ou** `from`/`to`), resolvido no fuso do restaurante, e devolve em `period` os instantes que usou.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "today",
+                "yesterday",
+                "last7days",
+                "thisMonth"
+              ]
+            },
+            "in": "query",
+            "name": "period",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "period": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "pending": {
+                          "type": "integer"
+                        },
+                        "confirmed": {
+                          "type": "integer"
+                        },
+                        "preparing": {
+                          "type": "integer"
+                        },
+                        "ready_for_pickup": {
+                          "type": "integer"
+                        },
+                        "out_for_delivery": {
+                          "type": "integer"
+                        },
+                        "completed": {
+                          "type": "integer"
+                        },
+                        "cancelled": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "revenueInCents": {
+                      "type": "integer"
+                    },
+                    "revenueOrderCount": {
+                      "type": "integer"
+                    },
+                    "averageTicketInCents": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -3675,6 +3906,11 @@
                       },
                       "isQrcode": {
                         "type": "boolean"
+                      },
+                      "timezone": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9+_-]*(?:/[A-Za-z0-9+_-]+)*$",
+                        "maxLength": 64
                       }
                     }
                   },
@@ -3772,6 +4008,9 @@
                         },
                         "isQrcode": {
                           "type": "boolean"
+                        },
+                        "timezone": {
+                          "type": "string"
                         },
                         "createdAt": {
                           "type": "string"

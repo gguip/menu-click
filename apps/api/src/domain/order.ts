@@ -19,6 +19,56 @@ import type { Address } from "./restaurant.ts";
  * É ela que decide **três** coisas: por quais estados o pedido passa, se ele
  * exige endereço, e se o cliente recebe token de acompanhamento.
  */
+/**
+ * Por quais campos a listagem de pedidos pode ser ordenada.
+ *
+ * É uma **allowlist** (S3), e ela existe porque `order by` não aceita `$n`:
+ * nome de coluna é identificador, não valor. O que o cliente manda é comparado
+ * com esta lista e traduzido por um mapa fixo no repositório — o texto dele
+ * nunca chega perto do SQL.
+ */
+/**
+ * Os status que contam como **faturamento**.
+ *
+ * É o que o restaurante aceitou vender: a entrega que está na rua já é
+ * dinheiro, e o estoque dela já foi debitado. `pending` fica de fora porque
+ * ainda não é venda, e `cancelled` porque deixou de ser.
+ *
+ * Contar só `completed` mostraria quase zero no pico do almoço, que é
+ * justamente quando alguém abre o painel.
+ *
+ * ⚠️ A lista é explícita de propósito. Status novo na máquina não entra aqui
+ * sozinho — se ele conta como venda é decisão a tomar, não default.
+ */
+export const REVENUE_STATUSES = [
+  "confirmed",
+  "preparing",
+  "ready_for_pickup",
+  "out_for_delivery",
+  "completed",
+] as const;
+
+/** O resumo do painel para um período. */
+export type OrderSummaryTotals = {
+  /** Os limites efetivamente usados, para o número ser conferível. */
+  period: { from?: string; to?: string };
+  /** Quantos pedidos em cada status. Todos os status aparecem, zerados ou não. */
+  counts: Record<OrderStatus, number>;
+  revenueInCents: number;
+  /** Quantos pedidos entraram no faturamento — o denominador do ticket. */
+  revenueOrderCount: number;
+  /** Faturamento dividido pelos pedidos que o compõem. Zero quando não há. */
+  averageTicketInCents: number;
+};
+
+export const ORDER_SORT_FIELDS = ["createdAt", "totalInCents"] as const;
+
+export type OrderSortField = (typeof ORDER_SORT_FIELDS)[number];
+
+export const SORT_DIRECTIONS = ["asc", "desc"] as const;
+
+export type SortDirection = (typeof SORT_DIRECTIONS)[number];
+
 export const ORDER_TYPES = ["dine_in", "takeaway", "delivery"] as const;
 export type OrderType = (typeof ORDER_TYPES)[number];
 

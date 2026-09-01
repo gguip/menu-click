@@ -1,6 +1,9 @@
 import type { PoolClient } from "pg";
 import { withTransaction } from "../db/pool.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
+import type { OrderPeriod, PeriodFilter } from "../domain/period.ts";
+import type { OrderSortField, SortDirection } from "../domain/order.ts";
+import type { OrderSort } from "../repositories/orders.ts";
 import type {
   CreatedOrder,
   CreateOrderInput,
@@ -9,7 +12,10 @@ import type {
   OrderSummary,
   OrderType,
 } from "../domain/order.ts";
+import type { OrderSummaryTotals } from "../domain/order.ts";
 import {
+  ORDER_STATUSES,
+  REVENUE_STATUSES,
   canTransition,
   cancellingReturnsStock,
   isReachable,
@@ -189,18 +195,141 @@ export async function create(
 }
 
 /** Pedidos de um restaurante, opcionalmente filtrados por status. */
+/** O que a querystring do painel pode trazer além da paginação. */
+export type OrderListFilters = {
+  status?: OrderStatus;
+  period?: OrderPeriod;
+  from?: string;
+  to?: string;
+  sort?: OrderSortField;
+  order?: SortDirection;
+};
+
+/**
+ * A ordenação padrão: **o mais novo primeiro**.
+ *
+ * Inverteu o que era antes, e por causa do painel: ele existe para ver o
+ * pedido que acabou de chegar, e na ordem crescente ele estava na última
+ * página. Quem quer a ordem da cozinha pede `?order=asc`.
+ */
+const DEFAULT_SORT: OrderSort = { field: "createdAt", direction: "desc" };
+
+/**
+ * Traduz a querystring no recorte de tempo, ou recusa a combinação com 400.
+ *
+ * As duas formas atendem controles diferentes na tela (os botões e o seletor
+ * de datas), e mandar as duas juntas não tem resposta certa: não existe "hoje,
+ * de 1 a 5 de agosto". Aceitar em silêncio, ignorando uma delas, devolveria um
+ * número que não é o que ninguém pediu — e num painel de faturamento isso é
+ * pior do que um erro.
+ */
+export function resolvePeriodFilter({
+  period,
+  from,
+  to,
+}: Pick<OrderListFilters, "period" | "from" | "to">): PeriodFilter | undefined {
+  const temIntervalo = from !== undefined || to !== undefined;
+
+  if (period !== undefined && temIntervalo) {
+    throw new ValidationError(
+      'Use "period" ou "from"/"to", não os dois na mesma requisição',
+    );
+  }
+
+  if (period !== undefined) return { kind: "named", name: period };
+  if (!temIntervalo) return undefined;
+
+  // Comparação de string funciona aqui porque o formato é YYYY-MM-DD, validado
+  // por `format: "date"` no schema — nele, ordem lexicográfica é ordem
+  // cronológica. Não vale para data em qualquer outro formato.
+  if (from !== undefined && to !== undefined && from > to) {
+    throw new ValidationError(`O período começa depois de terminar: ${from} > ${to}`);
+  }
+
+  return { kind: "range", from, to };
+}
+
+/**
+ * Pedidos do restaurante, com os filtros do painel.
+ *
+ * Carrega o restaurante inteiro (e não só confirma que ele existe) porque o
+ * recorte de tempo é resolvido **no fuso dele**: sem o fuso, "hoje" seria o do
+ * servidor, e um restaurante em Manaus veria o dia trocar uma hora antes.
+ */
 export async function listByRestaurant(
   restaurantId: string,
   pagination: Pagination,
-  status?: OrderStatus,
+  filters: OrderListFilters = {},
 ): Promise<Page<OrderSummary>> {
-  await restaurantsService.ensureExists(restaurantId);
+  const period = resolvePeriodFilter(filters);
+  const restaurant = await restaurantsService.getById(restaurantId);
+
   const { rows, total } = await ordersRepository.findByRestaurant(
     restaurantId,
     pagination,
-    status,
+    { status: filters.status, period },
+    {
+      field: filters.sort ?? DEFAULT_SORT.field,
+      direction: filters.order ?? DEFAULT_SORT.direction,
+    },
+    restaurant.timezone,
   );
   return { data: rows, ...pagination, total };
+}
+
+/**
+ * O resumo do painel: quantos pedidos em cada status, o faturamento e o ticket
+ * médio do período.
+ *
+ * É rota separada da listagem de propósito. O painel troca de página e de
+ * filtro o tempo todo, e recalcular os contadores a cada virada de página é
+ * trabalho jogado fora; além disso, os contadores falam do **período inteiro**
+ * enquanto o `total` da listagem fala da consulta paginada — duas noções de
+ * "quantos" no mesmo corpo, com nomes parecidos, é convite a somar errado.
+ *
+ * Quem decide o que é faturamento é o domínio (`REVENUE_STATUSES`), não o SQL:
+ * o repositório devolve a contagem crua por status e a regra é aplicada aqui.
+ */
+export async function summary(
+  restaurantId: string,
+  filters: Pick<OrderListFilters, "period" | "from" | "to"> = {},
+): Promise<OrderSummaryTotals> {
+  const period = resolvePeriodFilter(filters);
+  const restaurant = await restaurantsService.getById(restaurantId);
+
+  const [tallies, bounds] = await Promise.all([
+    ordersRepository.tallyByStatus(restaurantId, period, restaurant.timezone),
+    ordersRepository.selectPeriodBounds(period, restaurant.timezone),
+  ]);
+
+  // Todos os status aparecem, zerados ou não: uma tela que só recebe as chaves
+  // presentes teria que saber a lista para desenhar os zeros — e ela ficaria
+  // desatualizada no dia em que a máquina de status ganhasse um estado.
+  const counts = Object.fromEntries(
+    ORDER_STATUSES.map((status) => [status, 0]),
+  ) as Record<OrderStatus, number>;
+  for (const tally of tallies) counts[tally.status] = tally.count;
+
+  const faturamento = tallies.filter((tally) =>
+    (REVENUE_STATUSES as readonly OrderStatus[]).includes(tally.status),
+  );
+  const revenueInCents = faturamento.reduce((soma, t) => soma + t.totalInCents, 0);
+  const revenueOrderCount = faturamento.reduce((soma, t) => soma + t.count, 0);
+
+  return {
+    period: {
+      ...(bounds.from === null ? {} : { from: bounds.from.toISOString() }),
+      ...(bounds.to === null ? {} : { to: bounds.to.toISOString() }),
+    },
+    counts,
+    revenueInCents,
+    revenueOrderCount,
+    // divisão por zero viraria NaN, que o serializador transformaria em null
+    averageTicketInCents:
+      revenueOrderCount === 0
+        ? 0
+        : Math.round(revenueInCents / revenueOrderCount),
+  };
 }
 
 /**

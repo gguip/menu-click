@@ -92,6 +92,17 @@ export const addressSchema = {
 // (`POST /auth/register`) cria o restaurante junto com o primeiro usuário e
 // precisa exatamente do mesmo contrato de entrada e de saída (F11).
 
+/**
+ * Nome IANA do fuso. O `pattern` só barra o obviamente errado (espaço, caixa
+ * alta solta); saber se o fuso **existe** é com o sistema operacional, e essa
+ * checagem mora no serviço, que responde 400.
+ */
+const timezoneSchema = {
+  type: "string",
+  pattern: "^[A-Za-z][A-Za-z0-9+_-]*(?:/[A-Za-z0-9+_-]+)*$",
+  maxLength: 64,
+};
+
 export const createRestaurantBodySchema = {
   type: "object",
   additionalProperties: false,
@@ -119,6 +130,8 @@ export const createRestaurantBodySchema = {
     // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada
     isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
+    // opcional: sem ele vale o default da coluna (America/Sao_Paulo)
+    timezone: timezoneSchema,
   },
 };
 
@@ -135,6 +148,8 @@ export const updateRestaurantBodySchema = {
     // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada
     isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
+    // editável, ao contrário do slug: mudar o fuso não quebra QR code impresso
+    timezone: timezoneSchema,
   },
 };
 
@@ -151,6 +166,7 @@ export const restaurantResponseSchema = {
     // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada
     isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
+    timezone: { type: "string" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

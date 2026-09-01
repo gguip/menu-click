@@ -36,6 +36,13 @@ export type CreateRestaurantInput = {
   /** Aceita retirada no balcão. Sem esta flag, todo restaurante aceitaria. */
   isTakeaway: boolean;
   isQrcode: boolean;
+  /**
+   * Nome IANA do fuso (`America/Sao_Paulo`). Opcional na criação — sem ele,
+   * o default da coluna vale. É o que decide onde começa o "hoje" do painel,
+   * e é editável por PATCH: ao contrário do slug, mudá-lo não quebra nada que
+   * já foi impresso.
+   */
+  timezone?: string;
 };
 
 /**
@@ -51,6 +58,8 @@ export type Restaurant = CreateRestaurantInput & {
   id: string;
   /** Sempre presente na leitura, mesmo quando não foi enviado na criação. */
   slug: string;
+  /** Idem: a coluna é `not null`, então a leitura sempre traz um fuso. */
+  timezone: string;
   createdAt: string;
   updatedAt: string;
 };

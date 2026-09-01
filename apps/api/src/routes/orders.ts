@@ -1,6 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import type { CreateOrderInput, OrderStatus } from "../domain/order.ts";
-import { ORDER_STATUSES, ORDER_TYPES } from "../domain/order.ts";
+import {
+  ORDER_SORT_FIELDS,
+  ORDER_STATUSES,
+  ORDER_TYPES,
+  SORT_DIRECTIONS,
+} from "../domain/order.ts";
+import type { OrderSortField, SortDirection } from "../domain/order.ts";
+import { ORDER_PERIODS } from "../domain/period.ts";
+import type { OrderPeriod } from "../domain/period.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import * as ordersService from "../services/orders.ts";
 import { installRouteValidators } from "./validators.ts";
@@ -133,7 +141,7 @@ const createdOrderResponseSchema = {
 
 const orderPageResponseSchema = pageResponseSchema(orderSummaryResponseSchema);
 
-/** Paginação mais o filtro por status (o painel do restaurante usa `pending`). */
+/** Paginação mais os filtros do painel: status e recorte de tempo. */
 const orderListQuerystringSchema = {
   ...paginationQuerystringSchema,
   properties: {
@@ -141,6 +149,50 @@ const orderListQuerystringSchema = {
     // enum fechado: o valor chega ao SQL como `$n` comparado a uma coluna,
     // nunca como identificador — e mesmo assim só passa o que está na lista
     status: { type: "string", enum: [...ORDER_STATUSES] },
+    // os atalhos do painel; o recorte é resolvido no fuso do restaurante
+    period: { type: "string", enum: [...ORDER_PERIODS] },
+    // datas locais do seletor, não instantes: `format: "date"` é YYYY-MM-DD.
+    // Mandar `period` junto com estas é 400 — quem recusa é o serviço, porque
+    // "um ou outro" não cabe num JSON Schema sem `oneOf` ilegível.
+    from: { type: "string", format: "date" },
+    to: { type: "string", format: "date" },
+    // allowlist (S3): `order by` não aceita `$n`, então o que passa é só o que
+    // está nesta lista, traduzido por um mapa fixo no repositório
+    sort: { type: "string", enum: [...ORDER_SORT_FIELDS], default: "createdAt" },
+    order: { type: "string", enum: [...SORT_DIRECTIONS], default: "desc" },
+  },
+};
+
+/** O resumo aceita o mesmo recorte de tempo da listagem, e nada além dele. */
+const orderSummaryQuerystringSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    period: { type: "string", enum: [...ORDER_PERIODS] },
+    from: { type: "string", format: "date" },
+    to: { type: "string", format: "date" },
+  },
+};
+
+const orderSummaryTotalsResponseSchema = {
+  type: "object",
+  properties: {
+    // os instantes que o servidor realmente usou; cada lado some quando o
+    // período é aberto daquele lado. É o que torna o número conferível sem
+    // abrir o banco quando alguém estranha um faturamento zerado
+    period: {
+      type: "object",
+      properties: { from: { type: "string" }, to: { type: "string" } },
+    },
+    counts: {
+      type: "object",
+      properties: Object.fromEntries(
+        ORDER_STATUSES.map((status) => [status, { type: "integer" }]),
+      ),
+    },
+    revenueInCents: { type: "integer" },
+    revenueOrderCount: { type: "integer" },
+    averageTicketInCents: { type: "integer" },
   },
 };
 
@@ -159,7 +211,14 @@ const orderParamsSchema = {
   },
 };
 
-type OrderListQuery = Pagination & { status?: OrderStatus };
+type OrderListQuery = Pagination & {
+  status?: OrderStatus;
+  period?: OrderPeriod;
+  from?: string;
+  to?: string;
+  sort?: OrderSortField;
+  order?: SortDirection;
+};
 
 // ===================== Rotas =====================
 
@@ -210,19 +269,54 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "listOrders",
         summary: "Pedidos do restaurante",
         description:
-          "Sem os itens (use a rota de detalhe para eles) e em ordem de criação crescente — o mais antigo primeiro, que é a ordem em que a cozinha os atende. Filtro opcional por `status`.",
+          "Sem os itens — use a rota de detalhe para eles. Filtros opcionais: `status`, e o recorte de tempo por `period` (`today`, `yesterday`, `last7days`, `thisMonth`) **ou** por `from`/`to` (datas `YYYY-MM-DD`, intervalo fechado nos dois lados). Mandar os dois juntos é 400. O recorte é resolvido no **fuso do restaurante**, então \"hoje\" é o dia de quem está no salão, não o do servidor. Os filtros valem também para o `total`. A ordem padrão é **do mais novo para o mais antigo** — o painel existe para ver o pedido que acabou de chegar; `?sort=createdAt|totalInCents` e `?order=asc|desc` mudam isso.",
         params: restaurantIdParamsSchema,
         querystring: orderListQuerystringSchema,
         response: { 200: orderPageResponseSchema, 404: errorResponseSchema },
       },
     },
     async (request) => {
-      const { limit, offset, status } = request.query;
+      const { limit, offset, status, period, from, to, sort, order } =
+        request.query;
       return ordersService.listByRestaurant(
         request.params.restaurantId,
         { limit, offset },
-        status,
+        { status, period, from, to, sort, order },
       );
+    },
+  );
+
+  // Resumo do painel. Rota ESTÁTICA, e por isso ela precisa conviver com
+  // `/orders/:orderId`: o roteador do Fastify prefere segmento estático a
+  // paramétrico, então "summary" nunca é lido como um id de pedido. Há teste.
+  app.get<{
+    Params: { restaurantId: string };
+    Querystring: { period?: OrderPeriod; from?: string; to?: string };
+  }>(
+    "/restaurants/:restaurantId/orders/summary",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "getOrdersSummary",
+        summary: "Resumo do período para o painel",
+        description:
+          "Contadores por status, faturamento e ticket médio. Faturamento é o que o restaurante **aceitou vender**: de `confirmed` em diante, sem `pending` (ainda não é venda) nem `cancelled` (deixou de ser) — contar só `completed` mostraria quase zero no pico do almoço. Aceita o mesmo recorte da listagem (`period` **ou** `from`/`to`), resolvido no fuso do restaurante, e devolve em `period` os instantes que usou.",
+        params: restaurantIdParamsSchema,
+        querystring: orderSummaryQuerystringSchema,
+        response: {
+          200: orderSummaryTotalsResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { period, from, to } = request.query;
+      return ordersService.summary(request.params.restaurantId, {
+        period,
+        from,
+        to,
+      });
     },
   );
 

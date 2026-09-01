@@ -9,7 +9,8 @@ import type {
 import type { Page, Pagination } from "../domain/pagination.ts";
 import { SLUG_MAX_LENGTH, slugify } from "../domain/slug.ts";
 import { isUuid } from "../domain/uuid.ts";
-import { ConflictError, NotFoundError } from "../errors.ts";
+import { isValidTimezone } from "../domain/timezone.ts";
+import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
 import * as productsRepository from "../repositories/products.ts";
 import * as restaurantsRepository from "../repositories/restaurants.ts";
@@ -94,10 +95,29 @@ async function tryInsert(
   return created;
 }
 
+/**
+ * Recusa um fuso que o sistema não conhece, com **400**.
+ *
+ * O JSON Schema não tem como expressar isto — a lista de fusos é do sistema
+ * operacional, não do contrato —, então a checagem mora aqui, como a do limite
+ * de bytes da senha. Sem ela, um `Marte/Olympus` entraria na coluna e só
+ * apareceria depois, como erro do Postgres na primeira consulta do painel.
+ */
+function assertTimezoneValida(timezone: string | undefined): void {
+  if (timezone === undefined) return;
+  if (!isValidTimezone(timezone)) {
+    throw new ValidationError(
+      `Fuso horário "${timezone}" não existe. Use um nome IANA, como "America/Sao_Paulo"`,
+    );
+  }
+}
+
 export async function create(
   input: CreateRestaurantInput,
   db: Queryable = pool,
 ): Promise<Restaurant> {
+  assertTimezoneValida(input.timezone);
+
   if (input.slug !== undefined) {
     const created = await tryInsert(input, input.slug, db);
     if (created === null) {
@@ -164,6 +184,7 @@ export async function update(
   input: UpdateRestaurantInput,
 ): Promise<Restaurant> {
   if (!isUuid(id)) throw restaurantNotFound(id);
+  assertTimezoneValida(input.timezone);
 
   const restaurant = await restaurantsRepository.update(id, input);
   if (restaurant === null) throw restaurantNotFound(id);
