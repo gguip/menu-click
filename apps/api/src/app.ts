@@ -24,6 +24,7 @@ import {
 import { healthRoutes } from "./routes/health.ts";
 import { restaurantRoutes } from "./routes/restaurants.ts";
 import { productRoutes } from "./routes/products.ts";
+import { categoryRoutes } from "./routes/categories.ts";
 import { orderRoutes } from "./routes/orders.ts";
 import { menuRoutes } from "./routes/menu.ts";
 import { trackingRoutes } from "./routes/tracking.ts";
@@ -256,6 +257,7 @@ export async function buildApp() {
   await app.register(healthRoutes);
   await app.register(restaurantRoutes);
   await app.register(productRoutes);
+  await app.register(categoryRoutes);
   await app.register(orderRoutes);
   await app.register(menuRoutes);
   await app.register(trackingRoutes);

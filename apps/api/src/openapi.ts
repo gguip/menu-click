@@ -36,6 +36,13 @@ export const OPENAPI_TAGS = [
   },
   { name: "Produtos", description: "O cardápio, do lado de quem o edita." },
   {
+    name: "Categorias",
+    description:
+      "As seções do cardápio. A ordem é a que o restaurante definir em " +
+      "`position` — não a alfabética, porque cardápio segue a sequência da " +
+      "refeição.",
+  },
+  {
     name: "Pedidos",
     description:
       "Criar um pedido é público (o cliente do QR não tem conta); listar, " +

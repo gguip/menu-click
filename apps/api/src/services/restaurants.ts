@@ -10,6 +10,7 @@ import type { Page, Pagination } from "../domain/pagination.ts";
 import { SLUG_MAX_LENGTH, slugify } from "../domain/slug.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError } from "../errors.ts";
+import * as categoriesRepository from "../repositories/categories.ts";
 import * as productsRepository from "../repositories/products.ts";
 import * as restaurantsRepository from "../repositories/restaurants.ts";
 
@@ -170,9 +171,10 @@ export async function update(
 }
 
 /**
- * Remove o restaurante **e os produtos dele** (soft delete em cascata, D3).
+ * Remove o restaurante **e o cardápio dele** — produtos e categorias (soft
+ * delete em cascata, D3).
  *
- * Os dois updates valem juntos ou não valem: se o segundo falhar, o rollback
+ * Os updates valem juntos ou não valem: se um falhar, o rollback
  * traz o restaurante de volta. Lançar o `NotFoundError` de dentro da transação
  * também dispara rollback — o que é correto, já que nada foi marcado.
  */
@@ -184,5 +186,6 @@ export async function remove(id: string): Promise<void> {
     if (!removed) throw restaurantNotFound(id);
 
     await productsRepository.softDeleteByRestaurant(id, client);
+    await categoriesRepository.softDeleteByRestaurant(id, client);
   });
 }
