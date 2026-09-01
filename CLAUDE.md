@@ -24,6 +24,7 @@ pnpm --filter @menuclick/api migrate:up       # aplica as migrations pendentes
 pnpm --filter @menuclick/api migrate:down     # desfaz a última migration
 pnpm --filter @menuclick/api migrate:create X # cria uma migration SQL nova
 pnpm --filter @menuclick/api db:seed          # popula dados de exemplo (idempotente)
+pnpm --filter @menuclick/api openapi:generate # regera o openapi.json versionado
 pnpm --filter @menuclick/api test             # suíte de integração (precisa do Postgres de pé)
 ```
 
@@ -150,6 +151,18 @@ Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-s
 🚨 **Teste de concorrência precisa aquecer o pool antes da corrida** (`warmPool()` em `test/orders-confirm.test.ts`). Com o pool frio, cada requisição espera o handshake de uma conexão nova, e isso é lento o bastante para a primeira transação inteira terminar antes de a segunda começar: o teste passa mesmo com o lock removido. Ao escrever um teste de corrida, **remova o lock e confirme que ele falha** — senão ele não está testando nada.
 
 **Erro de negócio nunca vira status code na rota.** O serviço lança `NotFoundError`/`ConflictError` e o `setErrorHandler()` do `app.ts` traduz para **404**/**409**, com o corpo `{ statusCode, error, message }`. Nenhuma rota monta corpo de erro na mão.
+
+### Documentação: OpenAPI derivado das rotas
+
+O `openapi.json` é **gerado**, nunca editado à mão: sai dos mesmos `schema` que validam a requisição e serializam a resposta. Consequência prática — campo esquecido no `schema.response` some da documentação **e** da resposta ao mesmo tempo, então documentação errada é sintoma de contrato errado.
+
+**Ao adicionar rota, declare `tags`, `summary`, `description` e `operationId` no `schema`.** Não é opcional: `test/openapi.test.ts` falha se faltar qualquer um. E depois rode `pnpm --filter @menuclick/api openapi:generate` — o arquivo é versionado, e outro teste compara o commitado com o gerado.
+
+A marcação de "exige sessão" no documento **não se escreve**: um `transform` em `src/openapi.ts` a deriva do mesmo `config.public` que o hook de autenticação usa. Fonte única, senão a documentação mentiria sobre segurança no primeiro descuido.
+
+O `/docs` (Swagger UI) só sobe quando `NODE_ENV` **não** é `production` — é um mapa completo da superfície da API. As rotas dele são criadas pelo plugin, então são marcadas como públicas em bloco por um `onRoute` num escopo próprio.
+
+⚠️ **O `setErrorHandler()` é registrado antes de qualquer plugin, e precisa continuar assim.** Contexto encapsulado herda o error handler que existia quando ele foi criado; plugin registrado antes ficaria com o handler padrão do Fastify, que responde 500 com a mensagem interna no corpo (S11). Aconteceu com o `/docs`: um 401 saía como `500 {"message":"Autenticação obrigatória"}`.
 
 ### Limites de exposição
 
