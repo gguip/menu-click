@@ -17,6 +17,7 @@ import type { FastifyError } from "fastify";
 import { pool } from "./db/pool.ts";
 import {
   ConflictError,
+  ForbiddenError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -93,6 +94,14 @@ export async function buildApp() {
       return reply.code(400).send({
         statusCode: 400,
         error: "Bad Request",
+        message: error.message,
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return reply.code(403).send({
+        statusCode: 403,
+        error: "Forbidden",
         message: error.message,
       });
     }

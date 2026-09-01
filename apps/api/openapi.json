@@ -4035,6 +4035,9 @@
                         "email": {
                           "type": "string"
                         },
+                        "role": {
+                          "type": "string"
+                        },
                         "createdAt": {
                           "type": "string"
                         },
@@ -4264,6 +4267,9 @@
                       "type": "string"
                     },
                     "email": {
+                      "type": "string"
+                    },
+                    "role": {
                       "type": "string"
                     },
                     "createdAt": {

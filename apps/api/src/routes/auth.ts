@@ -90,6 +90,7 @@ const userResponseSchema = {
     restaurantId: { type: "string" },
     name: { type: "string" },
     email: { type: "string" },
+    role: { type: "string" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

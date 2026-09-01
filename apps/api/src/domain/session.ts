@@ -8,6 +8,8 @@
  * exatamente o estado no banco que o JWT queria evitar.
  */
 
+import type { UserRole } from "./restaurant-user.ts";
+
 /** O que o login devolve. `token` só existe neste instante; o banco só vê o hash. */
 export type IssuedSession = {
   token: string;
@@ -24,4 +26,10 @@ export type AuthContext = {
   sessionId: string;
   userId: string;
   restaurantId: string;
+  /**
+   * O papel vem junto da sessão, e não de uma consulta separada na rota: ele é
+   * lido na mesma query que já resolve o token, então checar permissão não
+   * custa nenhuma ida a mais ao banco.
+   */
+  role: UserRole;
 };

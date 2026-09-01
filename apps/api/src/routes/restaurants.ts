@@ -112,6 +112,9 @@ export async function restaurantRoutes(app: FastifyInstance) {
   app.delete<{ Params: { restaurantId: string } }>(
     "/restaurants/:restaurantId",
     {
+      // apagar o restaurante cascateia para produtos e categorias: é a ação
+      // mais destrutiva da API, e a razão de os papéis existirem
+      config: { ownerOnly: true },
       schema: {
         tags: ["Restaurantes"],
         operationId: "deleteRestaurant",

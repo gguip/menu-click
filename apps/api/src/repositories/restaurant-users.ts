@@ -1,6 +1,6 @@
 import { pool } from "../db/pool.ts";
 import type { Queryable } from "../db/pool.ts";
-import type { RestaurantUser } from "../domain/restaurant-user.ts";
+import type { RestaurantUser, UserRole } from "../domain/restaurant-user.ts";
 
 /**
  * Repositório de usuários do restaurante: **só acesso a dados**.
@@ -18,6 +18,7 @@ type RestaurantUserRow = {
   name: string;
   email: string;
   password_hash: string;
+  role: UserRole;
   created_at: Date;
   updated_at: Date;
 };
@@ -29,6 +30,7 @@ function toRestaurantUser(row: RestaurantUserRow): RestaurantUser {
     restaurantId: row.restaurant_id,
     name: row.name,
     email: row.email,
+    role: row.role,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -45,15 +47,15 @@ const UNIQUE_VIOLATION = "23505";
  */
 export async function insert(
   restaurantId: string,
-  data: { name: string; email: string; passwordHash: string },
+  data: { name: string; email: string; passwordHash: string; role: UserRole },
   db: Queryable = pool,
 ): Promise<RestaurantUser | null> {
   try {
     const { rows } = await db.query<RestaurantUserRow>(
-      `insert into restaurant_users (restaurant_id, name, email, password_hash)
-       values ($1, $2, $3, $4)
+      `insert into restaurant_users (restaurant_id, name, email, password_hash, role)
+       values ($1, $2, $3, $4, $5)
        returning *`,
-      [restaurantId, data.name, data.email, data.passwordHash],
+      [restaurantId, data.name, data.email, data.passwordHash, data.role],
     );
     return toRestaurantUser(rows[0]);
   } catch (error) {

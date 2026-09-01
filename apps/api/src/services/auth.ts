@@ -102,6 +102,10 @@ export async function register(input: {
         name: input.user.name,
         email: input.user.email,
         passwordHash,
+        // o primeiro usuário é sempre o dono: ele acabou de criar o
+        // restaurante, e um restaurante sem nenhum owner não teria como
+        // convidar ninguém nem se remover
+        role: "owner",
       },
       client,
     );

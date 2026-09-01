@@ -49,8 +49,9 @@ export async function findActiveByTokenHash(
     id: string;
     restaurant_user_id: string;
     restaurant_id: string;
+    role: AuthContext["role"];
   }>(
-    `select s.id, s.restaurant_user_id, u.restaurant_id
+    `select s.id, s.restaurant_user_id, u.restaurant_id, u.role
        from sessions s
        join restaurant_users u on u.id = s.restaurant_user_id
       where s.token_hash = $1
@@ -65,6 +66,7 @@ export async function findActiveByTokenHash(
     sessionId: rows[0].id,
     userId: rows[0].restaurant_user_id,
     restaurantId: rows[0].restaurant_id,
+    role: rows[0].role,
   };
 }
 
