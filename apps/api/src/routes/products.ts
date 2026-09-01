@@ -1,11 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import { createRequire } from "node:module";
 import type {
   CreateProductInput,
   UpdateProductInput,
 } from "../domain/product.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import * as productsService from "../services/products.ts";
+import { installRouteValidators } from "./validators.ts";
 import {
   errorResponseSchema,
   pageResponseSchema,
@@ -19,44 +19,6 @@ import {
  * "o restaurante existe?" é regra de negócio e mora no serviço; aqui ela chega
  * como `NotFoundError` e o error handler central responde 404.
  */
-
-// ajv e ajv-formats são pacotes CJS com `export default`. Sob NodeNext +
-// verbatimModuleSyntax o import default não fica construível no type-check,
-// então carregamos via require (CJS no runtime) e tipamos pelo próprio módulo.
-const nodeRequire = createRequire(import.meta.url);
-const Ajv = nodeRequire("ajv") as typeof import("ajv")["default"];
-const addFormats = nodeRequire(
-  "ajv-formats",
-) as typeof import("ajv-formats")["default"];
-
-/**
- * Validador estrito usado SÓ neste escopo de rotas.
- * Diferença para o padrão do Fastify: `coerceTypes: false`, então uma string
- * como "1500" NÃO é convertida em número — é rejeitada com 400. Isso garante
- * que `priceInCents` só aceite inteiro de verdade. Mantemos `removeAdditional`,
- * `useDefaults` e os formats (uri) para o comportamento ficar igual ao resto.
- */
-const strictAjv = new Ajv({
-  coerceTypes: false,
-  useDefaults: true,
-  removeAdditional: true,
-  allErrors: false,
-});
-addFormats(strictAjv);
-
-/**
- * Validador para params e querystring — aqui a coerção é obrigatória, não
- * opcional: tudo que vem na URL chega como string, então `?limit=20` seria
- * rejeitado por `type: "integer"` se usássemos o validador estrito. Mesmas
- * opções do default do Fastify.
- */
-const coercingAjv = new Ajv({
-  coerceTypes: "array",
-  useDefaults: true,
-  removeAdditional: true,
-  allErrors: false,
-});
-addFormats(coercingAjv);
 
 // ===================== JSON Schemas =====================
 
@@ -123,13 +85,9 @@ const productParamsSchema = {
 
 // ===================== Rotas =====================
 
-/** Plugin encapsulado: o validador estrito abaixo não vaza para as irmãs (F2). */
+/** Plugin encapsulado: os validadores não vazam para as rotas irmãs (F2). */
 export async function productRoutes(app: FastifyInstance) {
-  // O estrito vale só para o corpo (é lá que "4890" não pode virar 4890); o
-  // resto usa o coercitivo, porque URL não tem tipo.
-  app.setValidatorCompiler(({ schema, httpPart }) =>
-    (httpPart === "body" ? strictAjv : coercingAjv).compile(schema as object),
-  );
+  installRouteValidators(app);
 
   // Criar produto no restaurante
   app.post<{ Params: { restaurantId: string }; Body: CreateProductInput }>(
