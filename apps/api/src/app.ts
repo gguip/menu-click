@@ -54,6 +54,74 @@ export async function buildApp() {
     },
   });
 
+  // Tratamento centralizado de erro (F14/S11). É aqui — e só aqui — que erro de
+  // negócio vira status HTTP: o serviço lança `NotFoundError`/`ConflictError`
+  // sem saber o que é um status code, e a tradução acontece neste ponto. Erro de
+  // cliente continua sendo respondido pelo Fastify como sempre; erro de servidor
+  // tem o detalhe (mensagem do Postgres, nome de coluna, stack) só no log.
+  //
+  // Registrado ANTES de qualquer plugin, e isso não é estilo. Um plugin que
+  // registra rotas cria um contexto encapsulado, e esse contexto herda o error
+  // handler que existia no momento em que foi criado. Plugin registrado antes
+  // desta linha fica com o handler PADRÃO do Fastify — que responde 500 com a
+  // mensagem interna no corpo, violando S11.
+  app.setErrorHandler(function (error: FastifyError, request, reply) {
+    if (error instanceof NotFoundError) {
+      return reply.code(404).send({
+        statusCode: 404,
+        error: "Not Found",
+        message: error.message,
+      });
+    }
+
+    if (error instanceof UnauthorizedError) {
+      return reply.code(401).send({
+        statusCode: 401,
+        error: "Unauthorized",
+        message: error.message,
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return reply.code(400).send({
+        statusCode: 400,
+        error: "Bad Request",
+        message: error.message,
+      });
+    }
+
+    if (error instanceof ConflictError) {
+      return reply.code(409).send({
+        statusCode: 409,
+        error: "Conflict",
+        message: error.message,
+      });
+    }
+
+    const statusCode = error.statusCode ?? 500;
+
+    if (statusCode < 500) {
+      // validação, JSON malformado, rota inexistente: a mensagem fala da
+      // requisição, não das tripas do servidor. Delega pro handler padrão.
+      //
+      // O `reply.code()` explícito não é redundante. Quando o erro vem do
+      // caminho de validação do próprio Fastify, o status já está no `reply` e
+      // o `send` o preserva — mas erro lançado por um hook de plugin (o 429 do
+      // rate limit, por exemplo) chega aqui com o reply ainda em 200, e sem
+      // esta linha a resposta sai **200 com o corpo serializado pelo schema do
+      // 200**, ou seja, `{}`. Foi exatamente o que aconteceu quando o rate
+      // limit entrou.
+      return reply.code(statusCode).send(error);
+    }
+
+    request.log.error({ err: error }, "erro não tratado");
+    return reply.code(500).send({
+      statusCode: 500,
+      error: "Internal Server Error",
+      message: "Erro interno no servidor",
+    });
+  });
+
   /**
    * CORS, registrado **antes** do `installAuth()`.
    *
@@ -126,67 +194,6 @@ export async function buildApp() {
     await pool.end();
   });
 
-  // Tratamento centralizado de erro (F14/S11). É aqui — e só aqui — que erro de
-  // negócio vira status HTTP: o serviço lança `NotFoundError`/`ConflictError`
-  // sem saber o que é um status code, e a tradução acontece neste ponto. Erro de
-  // cliente continua sendo respondido pelo Fastify como sempre; erro de servidor
-  // tem o detalhe (mensagem do Postgres, nome de coluna, stack) só no log.
-  app.setErrorHandler(function (error: FastifyError, request, reply) {
-    if (error instanceof NotFoundError) {
-      return reply.code(404).send({
-        statusCode: 404,
-        error: "Not Found",
-        message: error.message,
-      });
-    }
-
-    if (error instanceof UnauthorizedError) {
-      return reply.code(401).send({
-        statusCode: 401,
-        error: "Unauthorized",
-        message: error.message,
-      });
-    }
-
-    if (error instanceof ValidationError) {
-      return reply.code(400).send({
-        statusCode: 400,
-        error: "Bad Request",
-        message: error.message,
-      });
-    }
-
-    if (error instanceof ConflictError) {
-      return reply.code(409).send({
-        statusCode: 409,
-        error: "Conflict",
-        message: error.message,
-      });
-    }
-
-    const statusCode = error.statusCode ?? 500;
-
-    if (statusCode < 500) {
-      // validação, JSON malformado, rota inexistente: a mensagem fala da
-      // requisição, não das tripas do servidor. Delega pro handler padrão.
-      //
-      // O `reply.code()` explícito não é redundante. Quando o erro vem do
-      // caminho de validação do próprio Fastify, o status já está no `reply` e
-      // o `send` o preserva — mas erro lançado por um hook de plugin (o 429 do
-      // rate limit, por exemplo) chega aqui com o reply ainda em 200, e sem
-      // esta linha a resposta sai **200 com o corpo serializado pelo schema do
-      // 200**, ou seja, `{}`. Foi exatamente o que aconteceu quando o rate
-      // limit entrou.
-      return reply.code(statusCode).send(error);
-    }
-
-    request.log.error({ err: error }, "erro não tratado");
-    return reply.code(500).send({
-      statusCode: 500,
-      error: "Internal Server Error",
-      message: "Erro interno no servidor",
-    });
-  });
 
   // Registro das rotas
   await app.register(healthRoutes);

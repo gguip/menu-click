@@ -115,6 +115,14 @@ describe("autorização: fechado por padrão", () => {
       });
 
       expect(response.statusCode, `${rota} deveria exigir sessão`).toBe(401);
+
+      // O corpo importa tanto quanto o status. Rota registrada por um plugin
+      // cujo contexto nasceu antes do `setErrorHandler` fica com o handler
+      // PADRÃO do Fastify, que responde 500 com a mensagem interna no corpo
+      // (S11). O sintoma é exatamente este: status e formato errados numa rota
+      // que passa despercebida.
+      expect(response.json(), `${rota} devolveu um corpo de erro fora do padrão`)
+        .toMatchObject({ statusCode: 401, error: "Unauthorized" });
     }
   });
 
