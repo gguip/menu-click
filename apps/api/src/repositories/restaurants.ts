@@ -36,6 +36,7 @@ type RestaurantRow = {
   is_delivery: boolean;
   is_takeaway: boolean;
   is_qrcode: boolean;
+  timezone: string;
   created_at: Date;
   updated_at: Date;
 };
@@ -60,6 +61,7 @@ function toRestaurant(row: RestaurantRow): Restaurant {
     isDelivery: row.is_delivery,
     isTakeaway: row.is_takeaway,
     isQrcode: row.is_qrcode,
+    timezone: row.timezone,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -73,6 +75,7 @@ const restaurantColumns = {
   isDelivery: "is_delivery",
   isTakeaway: "is_takeaway",
   isQrcode: "is_qrcode",
+  timezone: "timezone",
 } as const;
 
 /** O endereço mora em colunas planas: campo do value object → coluna. */
@@ -109,8 +112,9 @@ export async function insert(
       `insert into restaurants
          (name, slug, cuisine_type, logo_url,
           street, number, neighborhood, city, state, zip_code,
-          is_delivery, is_takeaway, is_qrcode)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          is_delivery, is_takeaway, is_qrcode, timezone)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+               coalesce($14, 'America/Sao_Paulo'))
        returning *`,
       [
         input.name,
@@ -126,6 +130,9 @@ export async function insert(
         input.isDelivery,
         input.isTakeaway,
         input.isQrcode,
+        // null deixa o `coalesce` cair no default da coluna: o fuso é opcional
+        // no cadastro, e repetir a constante aqui criaria um segundo default
+        input.timezone ?? null,
       ],
     );
     return toRestaurant(rows[0]);
