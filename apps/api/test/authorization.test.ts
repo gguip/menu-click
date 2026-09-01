@@ -32,8 +32,10 @@ const ROTAS_PUBLICAS = new Set([
   "POST /auth/login",
   "POST /restaurants/:restaurantId/orders",
   // o acompanhamento: quem pediu não tem conta, e quem autoriza é o token
-  // devolvido na criação do pedido — não a sessão
+  // devolvido na criação do pedido — não a sessão. A rota HTTP é o gêmeo do
+  // canal WebSocket, com a mesma credencial.
   "GET /orders/:orderId/track",
+  "GET /orders/:orderId",
 ]);
 
 /**

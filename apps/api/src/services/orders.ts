@@ -350,6 +350,27 @@ export async function findByTrackingToken(
   return ordersRepository.findById(found.restaurantId, found.id);
 }
 
+/**
+ * O pedido, autorizado pelo **token de acompanhamento** em vez de por sessão.
+ *
+ * O `orderId` da URL é conferido contra o pedido que o token resolve: sem
+ * isso, um token legítimo leria qualquer pedido, e a credencial deixaria de
+ * valer para um pedido só.
+ *
+ * A resposta é a mesma para token inexistente e token de outro pedido — a
+ * diferença entre as duas diria a quem tenta se aquele pedido existe.
+ */
+export async function getByTrackingToken(
+  orderId: string,
+  token: string,
+): Promise<Order> {
+  const order = await findByTrackingToken(token);
+  if (order === null || order.id !== orderId) {
+    throw new NotFoundError("Pedido não encontrado");
+  }
+  return order;
+}
+
 export async function getById(
   restaurantId: string,
   orderId: string,

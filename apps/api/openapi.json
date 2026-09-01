@@ -4200,6 +4200,159 @@
         }
       }
     },
+    "/orders/{orderId}": {
+      "get": {
+        "operationId": "getTrackedOrder",
+        "summary": "Lê o pedido pelo token de acompanhamento",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "in": "query",
+            "name": "token",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "orderId",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "totalInCents": {
+                      "type": "integer"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "deliveryAddress": {
+                      "type": "object",
+                      "properties": {
+                        "street": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "neighborhood": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "city": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "zipCode": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/register": {
       "post": {
         "operationId": "register",

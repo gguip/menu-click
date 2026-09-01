@@ -26,6 +26,9 @@ const OPERACOES_PUBLICAS = new Set([
   "POST /auth/register",
   "POST /auth/login",
   "POST /restaurants/{restaurantId}/orders",
+  // a leitura do pedido pelo token: quem pediu não tem conta, e quem autoriza
+  // é o token devolvido na criação — não a sessão
+  "GET /orders/{orderId}",
 ]);
 
 type Operacao = {
