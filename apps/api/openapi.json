@@ -149,6 +149,9 @@
                           "isDelivery": {
                             "type": "boolean"
                           },
+                          "isTakeaway": {
+                            "type": "boolean"
+                          },
                           "isQrcode": {
                             "type": "boolean"
                           },
@@ -254,6 +257,9 @@
                       }
                     },
                     "isDelivery": {
+                      "type": "boolean"
+                    },
+                    "isTakeaway": {
                       "type": "boolean"
                     },
                     "isQrcode": {
@@ -362,6 +368,9 @@
                   "isDelivery": {
                     "type": "boolean"
                   },
+                  "isTakeaway": {
+                    "type": "boolean"
+                  },
                   "isQrcode": {
                     "type": "boolean"
                   }
@@ -438,6 +447,9 @@
                       }
                     },
                     "isDelivery": {
+                      "type": "boolean"
+                    },
+                    "isTakeaway": {
                       "type": "boolean"
                     },
                     "isQrcode": {
@@ -1082,10 +1094,19 @@
                 "type": "object",
                 "additionalProperties": false,
                 "required": [
+                  "type",
                   "customer",
                   "items"
                 ],
                 "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "dine_in",
+                      "takeaway",
+                      "delivery"
+                    ]
+                  },
                   "customer": {
                     "type": "object",
                     "additionalProperties": false,
@@ -1214,6 +1235,9 @@
                         }
                       }
                     },
+                    "type": {
+                      "type": "string"
+                    },
                     "status": {
                       "type": "string"
                     },
@@ -1278,6 +1302,27 @@
                           }
                         }
                       }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   }
                 }
@@ -1363,6 +1408,10 @@
               "enum": [
                 "pending",
                 "confirmed",
+                "preparing",
+                "ready_for_pickup",
+                "out_for_delivery",
+                "completed",
                 "cancelled"
               ]
             },
@@ -1422,6 +1471,9 @@
                                 "type": "string"
                               }
                             }
+                          },
+                          "type": {
+                            "type": "string"
                           },
                           "status": {
                             "type": "string"
@@ -1571,6 +1623,741 @@
                         }
                       }
                     },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "totalInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryAddress": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "street": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "neighborhood": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "city": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "zipCode": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "productId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/orders/{orderId}/start-preparing": {
+      "post": {
+        "operationId": "startPreparingOrder",
+        "summary": "Manda o pedido para a cozinha",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "Transição `confirmed → preparing`, nas três modalidades. Não mexe em estoque — o débito acontece na confirmação.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "orderId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "totalInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryAddress": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "street": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "neighborhood": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "city": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "zipCode": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "productId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/orders/{orderId}/dispatch": {
+      "post": {
+        "operationId": "dispatchOrder",
+        "summary": "Saiu para entrega",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "Transição `preparing → out_for_delivery`, **só em pedido de entrega**. Em retirada ou salão responde 409, porque esses estados não existem naquelas trilhas.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "orderId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "totalInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryAddress": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "street": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "neighborhood": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "city": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "zipCode": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "productId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/orders/{orderId}/ready": {
+      "post": {
+        "operationId": "markOrderReady",
+        "summary": "Disponível para retirada",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "Transição `preparing → ready_for_pickup`, **só em pedido de retirada**. É o momento em que o cliente é avisado de que pode buscar.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "orderId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "totalInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryAddress": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "street": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "neighborhood": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "city": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "zipCode": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "productId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/orders/{orderId}/complete": {
+      "post": {
+        "operationId": "completeOrder",
+        "summary": "Conclui o pedido",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "Último passo de cada trilha: entregue, retirado ou servido. O banco guarda um estado só (`completed`); a palavra na tela vem da modalidade do pedido.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "orderId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "type": {
+                      "type": "string"
+                    },
                     "status": {
                       "type": "string"
                     },
@@ -1689,11 +2476,11 @@
     "/restaurants/{restaurantId}/orders/{orderId}/cancel": {
       "post": {
         "operationId": "cancelOrder",
-        "summary": "Cancela um pedido pendente",
+        "summary": "Cancela o pedido",
         "tags": [
           "Pedidos"
         ],
-        "description": "Não mexe em estoque, porque pedido pendente nunca chegou a debitar. Pedido já confirmado NÃO é cancelável: devolver estoque é operação própria, ainda não implementada.",
+        "description": "Cancela a partir de qualquer estado não terminal. O estoque volta quando o pedido ainda estava em `confirmed` ou `preparing`; depois que saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha.",
         "parameters": [
           {
             "schema": {
@@ -1750,6 +2537,9 @@
                           "type": "string"
                         }
                       }
+                    },
+                    "type": {
+                      "type": "string"
                     },
                     "status": {
                       "type": "string"
@@ -1931,6 +2721,9 @@
                         }
                       }
                     },
+                    "type": {
+                      "type": "string"
+                    },
                     "status": {
                       "type": "string"
                     },
@@ -2098,6 +2891,9 @@
                       }
                     },
                     "isDelivery": {
+                      "type": "boolean"
+                    },
+                    "isTakeaway": {
                       "type": "boolean"
                     },
                     "isQrcode": {
@@ -2276,6 +3072,7 @@
                       "cuisineType",
                       "address",
                       "isDelivery",
+                      "isTakeaway",
                       "isQrcode"
                     ],
                     "properties": {
@@ -2335,6 +3132,9 @@
                         }
                       },
                       "isDelivery": {
+                        "type": "boolean"
+                      },
+                      "isTakeaway": {
                         "type": "boolean"
                       },
                       "isQrcode": {
@@ -2429,6 +3229,9 @@
                           }
                         },
                         "isDelivery": {
+                          "type": "boolean"
+                        },
+                        "isTakeaway": {
                           "type": "boolean"
                         },
                         "isQrcode": {

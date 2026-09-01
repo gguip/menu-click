@@ -35,8 +35,9 @@ describe("POST /auth/register — corpo do restaurante", () => {
       name: validBody.name,
       cuisineType: validBody.cuisineType,
       address: validBody.address,
-      isDelivery: true,
-      isQrcode: false,
+      isDelivery: validBody.isDelivery,
+      isTakeaway: validBody.isTakeaway,
+      isQrcode: validBody.isQrcode,
     });
     expect(restaurant.id).toEqual(expect.any(String));
     expect(restaurant.slug).toEqual(expect.any(String));

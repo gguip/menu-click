@@ -9,6 +9,7 @@ import type {
   OrderItem,
   OrderStatus,
   OrderSummary,
+  OrderType,
 } from "../domain/order.ts";
 import type { Address } from "../domain/restaurant.ts";
 
@@ -27,6 +28,7 @@ type OrderRow = {
   id: string;
   restaurant_id: string;
   customer_id: string;
+  type: OrderType;
   status: OrderStatus;
   total_in_cents: number;
   street: string | null;
@@ -102,6 +104,7 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
     id: row.id,
     restaurantId: row.restaurant_id,
     customer: toCustomer(customerRow),
+    type: row.type,
     status: row.status,
     totalInCents: row.total_in_cents,
     deliveryAddress: toAddress(row),
@@ -123,6 +126,7 @@ function toOrderItem(row: OrderItemRow): OrderItem {
 /** O que o serviço já resolveu antes de gravar o pedido. */
 export type InsertOrderData = {
   customerId: string;
+  type: OrderType;
   totalInCents: number;
   deliveryAddress?: Address;
 };
@@ -149,15 +153,17 @@ export async function insertOrder(
   const address = data.deliveryAddress;
   const { rows } = await db.query<{ id: string }>(
     `insert into orders
-       (restaurant_id, customer_id, total_in_cents,
+       (restaurant_id, customer_id, type, total_in_cents,
         street, number, neighborhood, city, state, zip_code)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      returning id`,
     [
       restaurantId,
       data.customerId,
+      data.type,
       data.totalInCents,
-      // endereço é tudo-ou-nada: sem entrega, as seis colunas vão NULL
+      // o check do banco garante a coerência com `type`: as seis colunas vêm
+      // preenchidas em delivery e NULL nas outras duas modalidades
       address?.street ?? null,
       address?.number ?? null,
       address?.neighborhood ?? null,
@@ -233,25 +239,27 @@ export async function findItems(
 }
 
 /**
- * Status do pedido com a linha **travada** até o fim da transação.
+ * Status e modalidade do pedido, com a linha **travada** até o fim da transação.
  *
- * É o que serializa duas confirmações simultâneas do mesmo pedido: a segunda
- * fica bloqueada nesta leitura até a primeira commitar, e aí enxerga
- * `confirmed` em vez de `pending`. Sem o lock, as duas leriam `pending` e as
- * duas debitariam estoque.
+ * É o que serializa duas transições simultâneas do mesmo pedido: a segunda fica
+ * bloqueada nesta leitura até a primeira commitar, e aí enxerga o estado novo.
+ * Sem o lock, as duas leriam `pending` e as duas debitariam estoque.
+ *
+ * A modalidade vem junto porque é ela que decide quais transições são legais —
+ * buscá-la numa segunda query seria ler fora do lock.
  */
-export async function selectStatusForUpdate(
+export async function selectForUpdate(
   restaurantId: string,
   orderId: string,
   client: PoolClient,
-): Promise<OrderStatus | null> {
-  const { rows } = await client.query<{ status: OrderStatus }>(
-    `select status from orders
+): Promise<{ status: OrderStatus; type: OrderType } | null> {
+  const { rows } = await client.query<{ status: OrderStatus; type: OrderType }>(
+    `select status, type from orders
       where id = $1 and restaurant_id = $2 and deleted_at is null
       for update`,
     [orderId, restaurantId],
   );
-  return rows.length === 0 ? null : rows[0].status;
+  return rows.length === 0 ? null : rows[0];
 }
 
 /** Grava a transição de status. Quem valida a transição é o serviço. */

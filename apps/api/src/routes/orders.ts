@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { createRequire } from "node:module";
 import type { CreateOrderInput, OrderStatus } from "../domain/order.ts";
-import { ORDER_STATUSES } from "../domain/order.ts";
+import { ORDER_STATUSES, ORDER_TYPES } from "../domain/order.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import * as ordersService from "../services/orders.ts";
 import {
@@ -53,8 +53,10 @@ addFormats(coercingAjv);
 const createOrderBodySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["customer", "items"],
+  required: ["type", "customer", "items"],
   properties: {
+    // decide a trilha de status, se exige endereço e se há acompanhamento
+    type: { type: "string", enum: [...ORDER_TYPES] },
     customer: {
       type: "object",
       additionalProperties: false,
@@ -77,7 +79,7 @@ const createOrderBodySchema = {
         },
       },
     },
-    // ausente = pedido de mesa (QR code); presente = entrega
+    // obrigatório em `delivery`, recusado nas outras duas (400)
     deliveryAddress: addressSchema,
   },
   // `totalInCents` não está aqui de propósito: o total é calculado no servidor.
@@ -110,9 +112,10 @@ const orderSummaryProperties = {
   id: { type: "string" },
   restaurantId: { type: "string" },
   customer: customerResponseSchema,
+  type: { type: "string" },
   status: { type: "string" },
   totalInCents: { type: "integer" },
-  // `nullable` em vez de `anyOf: [..., {type:"null"}]` (F12); null = pedido de mesa
+  // `nullable` em vez de `anyOf: [..., {type:"null"}]` (F12); null fora de delivery
   deliveryAddress: {
     type: "object",
     nullable: true,
@@ -192,6 +195,7 @@ export async function orderRoutes(app: FastifyInstance) {
         body: createOrderBodySchema,
         response: {
           201: orderResponseSchema,
+          400: errorResponseSchema,
           404: errorResponseSchema,
           409: errorResponseSchema,
         },
@@ -256,16 +260,112 @@ export async function orderRoutes(app: FastifyInstance) {
     },
   );
 
-  // Cancelar um pedido pendente (não mexe em estoque: nada foi debitado ainda)
+  // Manda para a cozinha. Vale nas três modalidades.
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/start-preparing",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "startPreparingOrder",
+        summary: "Manda o pedido para a cozinha",
+        description:
+          "Transição `confirmed → preparing`, nas três modalidades. Não mexe em estoque — o débito acontece na confirmação.",
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.startPreparing(restaurantId, orderId);
+    },
+  );
+
+  // Só na trilha de entrega.
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/dispatch",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "dispatchOrder",
+        summary: "Saiu para entrega",
+        description:
+          "Transição `preparing → out_for_delivery`, **só em pedido de entrega**. Em retirada ou salão responde 409, porque esses estados não existem naquelas trilhas.",
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.dispatch(restaurantId, orderId);
+    },
+  );
+
+  // Só na trilha de retirada.
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/ready",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "markOrderReady",
+        summary: "Disponível para retirada",
+        description:
+          "Transição `preparing → ready_for_pickup`, **só em pedido de retirada**. É o momento em que o cliente é avisado de que pode buscar.",
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.markReady(restaurantId, orderId);
+    },
+  );
+
+  // Fim do ciclo, nas três modalidades.
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/complete",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "completeOrder",
+        summary: "Conclui o pedido",
+        description:
+          "Último passo de cada trilha: entregue, retirado ou servido. O banco guarda um estado só (`completed`); a palavra na tela vem da modalidade do pedido.",
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.complete(restaurantId, orderId);
+    },
+  );
+
+  // Cancelar. Devolve estoque conforme o estado de origem.
   app.post<{ Params: { restaurantId: string; orderId: string } }>(
     "/restaurants/:restaurantId/orders/:orderId/cancel",
     {
       schema: {
         tags: ["Pedidos"],
         operationId: "cancelOrder",
-        summary: "Cancela um pedido pendente",
+        summary: "Cancela o pedido",
         description:
-          "Não mexe em estoque, porque pedido pendente nunca chegou a debitar. Pedido já confirmado NÃO é cancelável: devolver estoque é operação própria, ainda não implementada.",
+          "Cancela a partir de qualquer estado não terminal. O estoque volta quando o pedido ainda estava em `confirmed` ou `preparing`; depois que saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha.",
         params: orderParamsSchema,
         response: {
           200: orderResponseSchema,

@@ -248,6 +248,24 @@ export async function selectStocksForUpdate(
 }
 
 /**
+ * Devolve `quantity` ao estoque, no cancelamento de um pedido que já havia
+ * debitado. Roda na mesma transação e com a linha já travada, como o débito.
+ */
+export async function incrementStock(
+  id: string,
+  quantity: number,
+  client: PoolClient,
+): Promise<number> {
+  const { rows } = await client.query<{ stock: number }>(
+    `update products set stock = stock + $1, updated_at = now()
+      where id = $2 and deleted_at is null
+      returning stock`,
+    [quantity, id],
+  );
+  return rows[0].stock;
+}
+
+/**
  * Debita `quantity` do estoque e devolve o que sobrou. Roda dentro da
  * transação, com a linha já travada por `selectStocksForUpdate` — é o lock, e
  * não o `stock - $1`, que garante que ninguém leu o mesmo valor no meio.
