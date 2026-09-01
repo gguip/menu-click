@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug, CRUD de restaurantes e de produtos no Postgres, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias e de produtos no Postgres, busca no cardápio, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -62,7 +62,7 @@ Não há bundler, `tsx`, `ts-node` nem passo de emit. O Node executa `.ts` diret
 
 ### Três camadas: rota → serviço → repositório
 
-O domínio (restaurantes, usuários, produtos, clientes e pedidos) é dividido em três camadas, e cada uma só conhece a de baixo:
+O domínio (restaurantes, usuários, categorias, produtos, clientes e pedidos) é dividido em três camadas, e cada uma só conhece a de baixo:
 
 - **`src/routes/` (controller)** — só HTTP: JSON Schema de entrada/saída, ler `params`/`body`, chamar o serviço e escolher o status code do caminho feliz. **Nunca escreve SQL nem importa `pool`/repositório.**
 - **`src/services/`** — a regra de negócio: "produto só existe dentro de restaurante vivo", o congelamento de preço no pedido, a transação da confirmação, a cascata do soft delete. Não conhece Fastify (nada de `request`/`reply`) e não escreve SQL. Quando a operação não pode acontecer, **lança erro tipado** de `src/errors.ts` (`NotFoundError`, `ConflictError`).
@@ -72,9 +72,11 @@ O domínio (restaurantes, usuários, produtos, clientes e pedidos) é dividido e
 
 Nem todo domínio ganha serviço: **não existe `services/customers.ts`**, porque resolver o cliente é uma chamada ao repositório sem regra própria — uma camada de repasse não ganharia nada.
 
+Os validadores de entrada das rotas (o estrito para o corpo, o coercitivo para a URL) ficam em `routes/validators.ts` e entram no plugin com `installRouteValidators(app)` — chamado **dentro** do plugin, não no `buildApp()`, para o encapsulamento do Fastify continuar isolando-os das rotas irmãs (F2).
+
 ### Listagens paginadas
 
-As três listagens (`GET /restaurants`, `GET /restaurants/:restaurantId/products` e `GET /restaurants/:restaurantId/orders`) respondem um **envelope**, nunca um array cru:
+Todas as listagens (`GET /restaurants`, `.../products`, `.../categories`, `.../orders` e o cardápio público) respondem um **envelope**, nunca um array cru:
 
 ```json
 { "data": [ ... ], "limit": 20, "offset": 0, "total": 137 }
@@ -118,6 +120,27 @@ Colisão tem duas políticas: slug **explícito** que colide é **409** (o clien
 ⚠️ **Retry de insert dentro de transação precisa de savepoint.** No Postgres, um comando que falha aborta o bloco inteiro, e a query seguinte estoura `current transaction is aborted`. Foi um 500 real no cadastro (que cria restaurante e usuário na mesma transação) até cada tentativa ganhar o seu savepoint. Fora de transação o problema não existe, porque cada query já é a própria transação — ver `isTransactionClient()` em `db/pool.ts`.
 
 As rotas de `/menu` têm `schema.response` próprio, mais enxuto que o das rotas de gestão. **`stock` não sai por ali** — quantas unidades o restaurante tem é informação dele; o cliente recebe `available: boolean`. É a diferença entre a superfície aberta e a fechada, e é o que impede uma coluna nova de vazar sozinha (S10).
+
+### Categorias e o cardápio agrupado
+
+A seção do cardápio ("Entradas", "Pratos", "Bebidas") é uma **entidade**, `categories`, com CRUD em `/restaurants/:restaurantId/categories`. Até a migration `link-products-to-categories` ela era o texto livre `products.category`, e o texto não resolvia três coisas: renomear uma seção era editar produto por produto, "Bebidas" e "bebidas" conviviam no mesmo cardápio, e não havia onde guardar a **ordem** das seções.
+
+- **O nome é único por restaurante, e o índice é sobre `lower(name)`.** É a razão de a entidade existir; sem o `lower` ela não resolveria o problema que motivou a mudança. Nome repetido é **409**, nunca sufixo automático — é o oposto da política do `slug`, e de propósito: lá o nome derivado é palpite do servidor, aqui foi digitado por quem edita o cardápio.
+- **A ordem é a `position` que o restaurante define, não a alfabética.** Cardápio segue a sequência da refeição; por nome, "Bebidas" abriria todos eles. Sem `position` na criação, a categoria vai para o fim (o cálculo acontece dentro do próprio `insert`). Empate é desfeito pelo nome, então duas criações simultâneas nascendo na mesma posição não quebram a ordem.
+- **`products.category_id` é nulável, e produto sem seção é estado legítimo.** Ele aparece no cardápio, no grupo final "Sem categoria".
+
+⚠️ **Apagar uma seção não apaga a comida.** A remoção marca a categoria e põe `category_id = null` nos produtos dela, na mesma transação (D3). A alternativa — recusar com 409 enquanto houver produto — obrigaria a recategorizar o cardápio inteiro à mão só para corrigir um nome digitado errado.
+
+⚠️ **`categoryId` no produto é conferido contra o restaurante da rota** (`categoriesService.ensureExists`), e categoria de outro dono responde 404 (S19). Sem essa checagem o produto apareceria agrupado no cardápio de quem não o criou. No PATCH, `categoryId: null` tira o produto da seção — é o que diferencia "tira daquela seção" de "não mexe na categoria" (por isso o schema usa `nullable: true`, não `anyOf`, F12).
+
+**O cardápio público vem agrupado, e quem pagina são as CATEGORIAS.** `GET /menu/:slug/products` responde `{ data: [{ id, name, products: [...] }], limit, offset, total }`. Paginar produtos partiria um grupo entre duas páginas, e aí o envelope deixaria de descrever o que devolveu. Consequências que valem para código novo:
+
+- `total` conta **categorias**, não produtos.
+- O grupo "Sem categoria" **não tem `id`**, não conta no `total`, e sai só na **última página** — em todas, ele se repetiria a cada rolagem.
+- Os produtos de uma seção vêm **todos**, sem teto. É deliberado: a paginação existe para impedir que um *cliente* peça uma resposta sem fim, e o cliente não escolhe quantos produtos cabem numa seção — quem escolhe é o restaurante. Cortar em N esconderia prato do cardápio. O eixo continua sem limite, e é o único: medido no banco de dev (12.574 produtos numa seção), a resposta dá **1,9 MB**. Se isso virar problema, a saída é limitar o catálogo, não truncar a resposta.
+- A listagem de **gestão** (`/restaurants/:restaurantId/products`) continua plana e paginada por produto: ela é a grade de edição, não a tela do cliente.
+
+**A busca é `?search=` na listagem de gestão, e ela é o primeiro uso do S5.** `%` e `_` vindos do cliente são escapados antes de virar o padrão do `ilike` — não é injection (o termo continua indo como `$n`), mas sem escapar, procurar por "%" varre o cardápio inteiro em vez de achar o texto digitado. A busca **não** existe no cardápio público, e não por esquecimento: como ele vem inteiro numa resposta só, filtrar no servidor não economizaria nada que o cliente não faça localmente.
 
 ### Pedidos
 
@@ -227,7 +250,7 @@ Todos os números vivem em `src/limits.ts`, cada um com o porquê ao lado, e **n
 
 ### Banco: Postgres via `pg` (sem ORM)
 
-`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, usuários, sessões, produtos, clientes e pedidos vivem no Postgres — não há mais nada em memória.
+`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, usuários, sessões, categorias, produtos, clientes e pedidos vivem no Postgres — não há mais nada em memória.
 
 O `server.ts` fecha o pool no hook `onClose` e trata `SIGINT`/`SIGTERM` (F26). Requer **Postgres >= 13** (`gen_random_uuid()` nativo).
 

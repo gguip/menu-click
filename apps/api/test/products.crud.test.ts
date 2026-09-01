@@ -36,7 +36,6 @@ describe("CRUD /restaurants/:restaurantId/products", () => {
       expect(response.json()).toMatchObject({
         restaurantId: restaurant.id,
         name: validProductBody.name,
-        category: validProductBody.category,
         priceInCents: validProductBody.priceInCents,
       });
     });

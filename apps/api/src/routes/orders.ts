@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { createRequire } from "node:module";
 import type { CreateOrderInput, OrderStatus } from "../domain/order.ts";
 import { ORDER_STATUSES, ORDER_TYPES } from "../domain/order.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import * as ordersService from "../services/orders.ts";
+import { installRouteValidators } from "./validators.ts";
 import {
   addressProperties,
   addressSchema,
@@ -19,34 +19,6 @@ import {
  * são regra de negócio e moram no serviço; aqui elas chegam como
  * `NotFoundError`/`ConflictError` e viram 404/409 no error handler central.
  */
-
-// Mesmo motivo de `products.ts`: ajv/ajv-formats são CJS com `export default`.
-const nodeRequire = createRequire(import.meta.url);
-const Ajv = nodeRequire("ajv") as typeof import("ajv")["default"];
-const addFormats = nodeRequire(
-  "ajv-formats",
-) as typeof import("ajv-formats")["default"];
-
-/**
- * Estrito para o corpo: `quantity: "2"` tem que ser 400, não virar 2
- * silenciosamente — quantidade errada em pedido é dinheiro errado.
- */
-const strictAjv = new Ajv({
-  coerceTypes: false,
-  useDefaults: true,
-  removeAdditional: true,
-  allErrors: false,
-});
-addFormats(strictAjv);
-
-/** Coercitivo para params/querystring: o que vem na URL é sempre string. */
-const coercingAjv = new Ajv({
-  coerceTypes: "array",
-  useDefaults: true,
-  removeAdditional: true,
-  allErrors: false,
-});
-addFormats(coercingAjv);
 
 // ===================== JSON Schemas =====================
 
@@ -193,9 +165,7 @@ type OrderListQuery = Pagination & { status?: OrderStatus };
 
 /** Plugin encapsulado: os validadores abaixo não vazam para as irmãs (F2). */
 export async function orderRoutes(app: FastifyInstance) {
-  app.setValidatorCompiler(({ schema, httpPart }) =>
-    (httpPart === "body" ? strictAjv : coercingAjv).compile(schema as object),
-  );
+  installRouteValidators(app);
 
   // Criar pedido. Nasce `pending` e NÃO mexe em estoque — a baixa acontece na
   // confirmação do restaurante.

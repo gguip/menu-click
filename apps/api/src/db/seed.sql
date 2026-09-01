@@ -35,30 +35,44 @@ values
    'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, false, true)
 on conflict (id) do nothing;
 
+-- As seções do cardápio. A `position` é a ordem em que aparecem no cardápio
+-- público (a sequência da refeição), não a alfabética — por isso "Bebidas" é a
+-- última do Tokyo mesmo começando com B.
+insert into categories (id, restaurant_id, name, position)
+values
+  ('1a9c4e37-52b8-4d06-9f31-7e0a5c284b6d', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Entradas', 0),
+  ('2b8d5f46-63c9-4e17-8a42-6f1b4d395c7e', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Pratos principais', 1),
+  ('3c7e6a55-74da-4f28-9b53-5a2c3e406d8f', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Bebidas', 2),
+  ('4d6f7b64-85eb-4a39-8c64-4b3d2f517e90', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Entradas', 0),
+  ('5e508c73-96fc-4b40-9d75-3c4e1a628f01', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Massas', 1),
+  ('6f419d82-a70d-4c51-8e86-2d5f0b739012', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Pratos principais', 2),
+  ('7a32ae91-b81e-4d62-9f97-1e6a9c84a123', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Sobremesas', 3)
+on conflict (id) do nothing;
+
 insert into products
-  (id, restaurant_id, name, category, price_in_cents, description, stock)
+  (id, restaurant_id, name, category_id, price_in_cents, description, stock)
 values
   ('a54930aa-5548-4668-b545-b7c646757704', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   'Ramen Shoyu', 'Pratos principais', 4890, 'Caldo de shoyu, chashu e ovo marinado', 30),
+   'Ramen Shoyu', '2b8d5f46-63c9-4e17-8a42-6f1b4d395c7e', 4890, 'Caldo de shoyu, chashu e ovo marinado', 30),
   ('23755745-45ac-47f5-bbed-ad4af525c04a', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   'Guioza', 'Entradas', 2490, null, 45),
+   'Guioza', '1a9c4e37-52b8-4d06-9f31-7e0a5c284b6d', 2490, null, 45),
   ('5791e1ee-ad59-4f93-aec2-74f9ce31c5b7', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8',
-   'Spaghetti Carbonara', 'Massas', 5290, 'Massa fresca, guanciale e pecorino', 25),
+   'Spaghetti Carbonara', '5e508c73-96fc-4b40-9d75-3c4e1a628f01', 5290, 'Massa fresca, guanciale e pecorino', 25),
   ('442c7ad5-f9a4-4ae2-9e10-61af1c5d4734', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8',
-   'Tiramisù', 'Sobremesas', 3190, null, 12),
+   'Tiramisù', '7a32ae91-b81e-4d62-9f97-1e6a9c84a123', 3190, null, 12),
 
   -- Cardápio mais variado, de R$ 8,90 a R$ 74,50: serve para testar ordenação
   -- por preço, faixas de valor e formatação de moeda no cliente.
   ('a48d8d89-bdd9-44dd-98b7-d47472930b7a', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   'Chá Verde Gelado', 'Bebidas', 890, 'Sencha gelado, 500ml', 80),
+   'Chá Verde Gelado', '3c7e6a55-74da-4f28-9b53-5a2c3e406d8f', 890, 'Sencha gelado, 500ml', 80),
   ('fd5e2172-eda0-46d2-9bf0-580dd8d0b413', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   'Temaki de Salmão', 'Entradas', 2290, 'Salmão fresco, arroz shari e nori', 18),
+   'Temaki de Salmão', '1a9c4e37-52b8-4d06-9f31-7e0a5c284b6d', 2290, 'Salmão fresco, arroz shari e nori', 18),
   ('f5ca08e5-1bb0-4f81-8cd7-8c897431bc14', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   'Yakisoba de Frango', 'Pratos principais', 3890, 'Macarrão salteado com legumes', 22),
+   'Yakisoba de Frango', '2b8d5f46-63c9-4e17-8a42-6f1b4d395c7e', 3890, 'Macarrão salteado com legumes', 22),
   ('6a39d53c-0791-4ee0-8235-47ce3cb11960', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8',
-   'Bruschetta al Pomodoro', 'Entradas', 1890, 'Pão italiano, tomate e manjericão', 40),
+   'Bruschetta al Pomodoro', '4d6f7b64-85eb-4a39-8c64-4b3d2f517e90', 1890, 'Pão italiano, tomate e manjericão', 40),
   ('aa3d4bc2-b2db-4c0d-b2fd-8d1f4db92850', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8',
-   'Ossobuco alla Milanese', 'Pratos principais', 7450, 'Com risoto de açafrão', 8)
+   'Ossobuco alla Milanese', '6f419d82-a70d-4c51-8e86-2d5f0b739012', 7450, 'Com risoto de açafrão', 8)
 on conflict (id) do nothing;
 
 -- Um usuário por restaurante, para dar em quem entrar num ambiente novo.
