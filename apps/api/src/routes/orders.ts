@@ -56,6 +56,23 @@ const createOrderBodySchema = {
         properties: {
           productId: { type: "string", format: "uuid" },
           quantity: { type: "integer", minimum: 1 },
+          // ausente = nenhuma opção; o serviço confere contra os grupos do
+          // produto (obrigatoriedade, teto de opções, teto de unidades,
+          // disponibilidade) — tudo isso é 400, não 404: é a montagem do
+          // pedido que falha, não um recurso ausente
+          options: {
+            type: "array",
+            default: [],
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["optionId", "quantity"],
+              properties: {
+                optionId: { type: "string" },
+                quantity: { type: "integer", minimum: 1 },
+              },
+            },
+          },
         },
       },
     },
@@ -77,6 +94,18 @@ const customerResponseSchema = {
   },
 };
 
+/** Uma opção escolhida, como congelada no item — nunca lida de `options`. */
+const orderItemOptionResponseSchema = {
+  type: "object",
+  properties: {
+    optionId: { type: "string" },
+    groupName: { type: "string" },
+    name: { type: "string" },
+    priceInCents: { type: "integer" },
+    quantity: { type: "integer" },
+  },
+};
+
 const orderItemResponseSchema = {
   type: "object",
   properties: {
@@ -84,7 +113,11 @@ const orderItemResponseSchema = {
     productId: { type: "string" },
     name: { type: "string" },
     priceInCents: { type: "integer" },
+    // preço de UMA unidade já com as opções escolhidas; `priceInCents` acima
+    // continua sendo só o preço do produto
+    unitPriceInCents: { type: "integer" },
     quantity: { type: "integer" },
+    options: { type: "array", items: orderItemOptionResponseSchema },
   },
 };
 
@@ -239,7 +272,7 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "createOrder",
         summary: "Cria um pedido (público)",
         description:
-          "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome e preço do produto, então reajuste de cardápio não muda pedido já feito. Duas linhas do mesmo produto viram uma, com a quantidade somada. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
+          "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
         params: restaurantIdParamsSchema,
         body: createOrderBodySchema,
         response: {

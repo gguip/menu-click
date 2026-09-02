@@ -170,7 +170,11 @@ export const validCustomerBody = {
 export async function createOrder(
   app: FastifyInstance,
   restaurantId: string,
-  items: { productId: string; quantity: number }[],
+  items: {
+    productId: string;
+    quantity: number;
+    options?: { optionId: string; quantity: number }[];
+  }[],
   overrides: Record<string, unknown> = {},
 ) {
   const response = await app.inject({

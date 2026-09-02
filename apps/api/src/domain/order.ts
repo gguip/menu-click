@@ -170,6 +170,8 @@ export function cancellingReturnsStock(from: OrderStatus): boolean {
 export type CreateOrderItemInput = {
   productId: string;
   quantity: number;
+  /** Ausente = nenhuma opção. Produto sem grupo obrigatório aceita assim. */
+  options?: { optionId: string; quantity: number }[];
 };
 
 /**
@@ -188,16 +190,37 @@ export type CreateOrderInput = {
 };
 
 /**
+ * Uma opção escolhida, congelada no item.
+ *
+ * `groupName` e `name` são cópias — sem elas não dá para reconstruir o
+ * agrupamento no recibo depois que o cardápio mudar (ou a opção sumir).
+ */
+export type OrderItemOption = {
+  optionId: string;
+  /** Cópia: sem ela não dá para reconstruir o agrupamento no recibo. */
+  groupName: string;
+  name: string;
+  priceInCents: number;
+  quantity: number;
+};
+
+/**
  * Item já gravado: `name` e `priceInCents` são **cópias** do produto no momento
  * do pedido, não uma leitura de `products`. Reajuste de cardápio não mexe em
  * pedido antigo.
+ *
+ * `unitPriceInCents` é o preço de uma unidade **já com as opções escolhidas**
+ * (`priceInCents` continua sendo só o preço do produto). `options` é a lista
+ * congelada do que foi escolhido — nenhuma leitura de pedido junta `options`.
  */
 export type OrderItem = {
   id: string;
   productId: string;
   name: string;
   priceInCents: number;
+  unitPriceInCents: number;
   quantity: number;
+  options: OrderItemOption[];
 };
 
 /**

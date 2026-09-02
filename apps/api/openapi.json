@@ -3240,7 +3240,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome e preço do produto, então reajuste de cardápio não muda pedido já feito. Duas linhas do mesmo produto viram uma, com a quantidade somada. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
+        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3298,6 +3298,27 @@
                         "quantity": {
                           "type": "integer",
                           "minimum": 1
+                        },
+                        "options": {
+                          "type": "array",
+                          "default": [],
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "optionId",
+                              "quantity"
+                            ],
+                            "properties": {
+                              "optionId": {
+                                "type": "string"
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "minimum": 1
+                              }
+                            }
+                          }
                         }
                       }
                     }
@@ -3452,8 +3473,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -4060,8 +4107,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -4243,8 +4316,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -4426,8 +4525,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -4609,8 +4734,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -4792,8 +4943,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -4975,8 +5152,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -5158,8 +5361,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }

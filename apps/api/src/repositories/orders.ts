@@ -9,6 +9,7 @@ import type { OrderSortField, SortDirection } from "../domain/order.ts";
 import type {
   Order,
   OrderItem,
+  OrderItemOption,
   OrderStatus,
   OrderSummary,
   OrderType,
@@ -56,6 +57,19 @@ type OrderItemRow = {
   id: string;
   order_id: string;
   product_id: string;
+  name: string;
+  price_in_cents: number;
+  /** Preço de uma unidade já com as opções escolhidas (ver `add-option-groups`). */
+  unit_price_in_cents: number;
+  quantity: number;
+};
+
+/** Linha da tabela `order_item_options` — o congelamento de uma escolha. */
+type OrderItemOptionRow = {
+  id: string;
+  order_item_id: string;
+  option_id: string;
+  group_name: string;
   name: string;
   price_in_cents: number;
   quantity: number;
@@ -115,10 +129,23 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
   };
 }
 
-function toOrderItem(row: OrderItemRow): OrderItem {
+function toOrderItem(row: OrderItemRow, options: OrderItemOption[]): OrderItem {
   return {
     id: row.id,
     productId: row.product_id,
+    name: row.name,
+    priceInCents: row.price_in_cents,
+    unitPriceInCents: row.unit_price_in_cents,
+    quantity: row.quantity,
+    options,
+  };
+}
+
+/** Converte a linha de `order_item_options` no formato camelCase (D12). */
+function toOrderItemOption(row: OrderItemOptionRow): OrderItemOption {
+  return {
+    optionId: row.option_id,
+    groupName: row.group_name,
     name: row.name,
     priceInCents: row.price_in_cents,
     quantity: row.quantity,
@@ -138,6 +165,18 @@ export type InsertOrderData = {
 /** Uma linha de `order_items` pronta para gravar, com os valores congelados. */
 export type InsertOrderItemData = {
   productId: string;
+  name: string;
+  priceInCents: number;
+  /** Preço de uma unidade já com as opções escolhidas — ver `domain/option.ts`. */
+  unitPriceInCents: number;
+  quantity: number;
+};
+
+/** Uma linha de `order_item_options` pronta para gravar, já com o item dono. */
+export type InsertOrderItemOptionData = {
+  orderItemId: string;
+  optionId: string;
+  groupName: string;
   name: string;
   priceInCents: number;
   quantity: number;
@@ -180,12 +219,16 @@ export async function insertOrder(
   return rows[0].id;
 }
 
-/** Grava todos os itens do pedido numa query só. */
+/**
+ * Grava todos os itens do pedido numa query só, e devolve os ids gerados **na
+ * mesma ordem** de `items` — é por esse id que cada opção escolhida (gravada
+ * a seguir, por `insertItemOptions`) sabe a qual item pertence.
+ */
 export async function insertItems(
   orderId: string,
   items: InsertOrderItemData[],
   db: Queryable = pool,
-): Promise<void> {
+): Promise<string[]> {
   const values: unknown[] = [];
   const tuples: string[] = [];
 
@@ -195,16 +238,59 @@ export async function insertItems(
       item.productId,
       item.name,
       item.priceInCents,
+      item.unitPriceInCents,
       item.quantity,
     );
     // os `$n` são gerados a partir do TAMANHO do array, não de nada que veio do
     // cliente — o conteúdo continua indo 100% por parâmetro (S2/S8).
     const n = values.length;
-    tuples.push(`($${n - 4}, $${n - 3}, $${n - 2}, $${n - 1}, $${n})`);
+    tuples.push(
+      `($${n - 5}, $${n - 4}, $${n - 3}, $${n - 2}, $${n - 1}, $${n})`,
+    );
+  }
+
+  const { rows } = await db.query<{ id: string }>(
+    `insert into order_items
+       (order_id, product_id, name, price_in_cents, unit_price_in_cents, quantity)
+     values ${tuples.join(", ")}
+     returning id`,
+    values,
+  );
+  return rows.map((row) => row.id);
+}
+
+/**
+ * Grava as opções escolhidas de vários itens numa query só — mesmo padrão de
+ * tuplas de `insertItems`. Chamada uma vez para o pedido inteiro, nunca uma
+ * vez por item.
+ */
+export async function insertItemOptions(
+  rows: InsertOrderItemOptionData[],
+  db: Queryable = pool,
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  const values: unknown[] = [];
+  const tuples: string[] = [];
+
+  for (const row of rows) {
+    values.push(
+      row.orderItemId,
+      row.optionId,
+      row.groupName,
+      row.name,
+      row.priceInCents,
+      row.quantity,
+    );
+    const n = values.length;
+    tuples.push(
+      `($${n - 5}, $${n - 4}, $${n - 3}, $${n - 2}, $${n - 1}, $${n})`,
+    );
   }
 
   await db.query(
-    `insert into order_items (order_id, product_id, name, price_in_cents, quantity)
+    `insert into order_item_options
+       (order_item_id, option_id, group_name, name, price_in_cents, quantity)
      values ${tuples.join(", ")}`,
     values,
   );
@@ -229,7 +315,34 @@ export async function findById(
   };
 }
 
-/** Itens vivos do pedido, em ordem de criação (D11). */
+/**
+ * As opções congeladas de vários itens, agrupadas por item — **uma** query
+ * para o pedido inteiro, nunca uma por item (mesmo padrão de
+ * `findGroupsByProductIds`).
+ */
+async function findItemOptions(
+  orderItemIds: string[],
+  db: Queryable = pool,
+): Promise<Map<string, OrderItemOption[]>> {
+  const porItem = new Map<string, OrderItemOption[]>();
+  if (orderItemIds.length === 0) return porItem;
+
+  const { rows } = await db.query<OrderItemOptionRow>(
+    `select * from order_item_options
+      where order_item_id = any($1::uuid[]) and deleted_at is null
+      order by created_at, id`,
+    [orderItemIds],
+  );
+
+  for (const row of rows) {
+    const lista = porItem.get(row.order_item_id) ?? [];
+    lista.push(toOrderItemOption(row));
+    porItem.set(row.order_item_id, lista);
+  }
+  return porItem;
+}
+
+/** Itens vivos do pedido, em ordem de criação (D11), com as opções de cada um. */
 export async function findItems(
   orderId: string,
   db: Queryable = pool,
@@ -240,7 +353,12 @@ export async function findItems(
       order by created_at, id`,
     [orderId],
   );
-  return rows.map(toOrderItem);
+
+  const optionsByItem = await findItemOptions(
+    rows.map((row) => row.id),
+    db,
+  );
+  return rows.map((row) => toOrderItem(row, optionsByItem.get(row.id) ?? []));
 }
 
 /**
