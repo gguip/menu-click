@@ -144,33 +144,61 @@ describe("filtro por período nos pedidos", () => {
   /**
    * A razão de existir da coluna `timezone`, num teste só.
    *
-   * O mesmo instante — 00h30 em São Paulo — é hoje para um restaurante
-   * paulista e ontem para um em Manaus, que está uma hora atrás. Se o recorte
-   * fosse feito em UTC ou no fuso do servidor, os dois veriam a mesma coisa, e
-   * um deles estaria errado.
+   * A propriedade que vale em qualquer hora do dia é: cada restaurante
+   * classifica um instante contra a PRÓPRIA meia-noite, nunca contra a de um
+   * fuso fixo. Testar com um instante fixo (ex.: "00h30 em São Paulo") quebra
+   * por uma hora todo dia: entre 00h e 01h em São Paulo (que vira o dia uma
+   * hora antes de Manaus), aquele instante já é "ontem" nos DOIS fusos, não
+   * hoje num e ontem no outro — o que a asserção original supunha.
    */
   describe("o fuso do restaurante decide onde o dia começa", () => {
-    /** 00h30 de hoje em São Paulo = 23h30 de ontem em Manaus. */
-    const MEIA_NOITE_E_MEIA_EM_SP =
-      "(date_trunc('day', now() at time zone 'America/Sao_Paulo') + interval '30 minutes') at time zone 'America/Sao_Paulo'";
+    /** Meia-noite de hoje, no fuso passado, como expressão SQL. */
+    const meiaNoiteEm = (timezone: string) =>
+      `date_trunc('day', now() at time zone '${timezone}') at time zone '${timezone}'`;
 
-    it("para São Paulo, o pedido das 00h30 é de HOJE", async () => {
+    it("para São Paulo, um pedido feito 30min depois da PRÓPRIA meia-noite é de HOJE", async () => {
       const { restaurant, product } = await cenario("America/Sao_Paulo");
-      const pedido = await pedir(restaurant, product.id);
-      await backdate(pedido, MEIA_NOITE_E_MEIA_EM_SP);
+      const hoje = await pedir(restaurant, product.id);
+      const ontem = await pedir(restaurant, product.id);
+      await backdate(
+        hoje,
+        `${meiaNoiteEm("America/Sao_Paulo")} + interval '30 minutes'`,
+      );
+      await backdate(
+        ontem,
+        `${meiaNoiteEm("America/Sao_Paulo")} - interval '30 minutes'`,
+      );
 
-      expect((await listar(restaurant, "period=today")).ids).toEqual([pedido]);
+      expect((await listar(restaurant, "period=today")).ids).toEqual([hoje]);
+      expect((await listar(restaurant, "period=yesterday")).ids).toEqual([
+        ontem,
+      ]);
     });
 
-    it("para Manaus, o MESMO instante é de ONTEM", async () => {
+    it("para Manaus, a MESMA regra vale contra a PRÓPRIA meia-noite — não a de São Paulo", async () => {
       const { restaurant, product } = await cenario("America/Manaus");
-      const pedido = await pedir(restaurant, product.id);
-      await backdate(pedido, MEIA_NOITE_E_MEIA_EM_SP);
+      const hoje = await pedir(restaurant, product.id);
+      const ontem = await pedir(restaurant, product.id);
+      await backdate(
+        hoje,
+        `${meiaNoiteEm("America/Manaus")} + interval '30 minutes'`,
+      );
+      await backdate(
+        ontem,
+        `${meiaNoiteEm("America/Manaus")} - interval '30 minutes'`,
+      );
 
-      expect((await listar(restaurant, "period=today")).ids).toEqual([]);
+      expect((await listar(restaurant, "period=today")).ids).toEqual([hoje]);
       expect((await listar(restaurant, "period=yesterday")).ids).toEqual([
-        pedido,
+        ontem,
       ]);
+
+      // e a meia-noite de Manaus é um instante genuinamente diferente da de
+      // São Paulo — senão a coluna `timezone` não estaria fazendo nada
+      const { rows } = await pool.query<{ sp: Date; manaus: Date }>(
+        `select (${meiaNoiteEm("America/Sao_Paulo")}) as sp, (${meiaNoiteEm("America/Manaus")}) as manaus`,
+      );
+      expect(rows[0].sp.getTime()).not.toBe(rows[0].manaus.getTime());
     });
   });
 

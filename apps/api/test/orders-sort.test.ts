@@ -54,15 +54,20 @@ describe("ordenação dos pedidos", () => {
       { productId: barato.id, quantity: 2 },
     ]);
 
-    // instantes distintos e conhecidos, para a ordem não depender do relógio
+    // instantes distintos e conhecidos, ancorados na meia-noite de SP (o fuso
+    // default do restaurante) em vez de "now() - X minutos": perto da virada
+    // do dia, subtrair minutos de `now()` podia jogar o pedido para ONTEM, e
+    // o teste de "period=today" logo abaixo via menos de três pedidos
+    const inicioDoDiaEmSp =
+      "date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'";
     const em = async (id: string, minutos: number) =>
       pool.query(
-        `update orders set created_at = now() - interval '${minutos} minutes' where id = $1`,
+        `update orders set created_at = (${inicioDoDiaEmSp}) + interval '${minutos} minutes' where id = $1`,
         [id],
       );
-    await em(primeiro.id, 30);
+    await em(primeiro.id, 10);
     await em(segundo.id, 20);
-    await em(terceiro.id, 10);
+    await em(terceiro.id, 30);
 
     return { restaurant, primeiro, segundo, terceiro };
   }
