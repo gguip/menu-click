@@ -2,7 +2,9 @@ import type { FastifyInstance } from "fastify";
 import { PRICE_RULES } from "../domain/option.ts";
 import type {
   CreateOptionGroupInput,
+  CreateOptionInput,
   UpdateOptionGroupInput,
+  UpdateOptionInput,
 } from "../domain/option.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import * as optionGroupsService from "../services/option-groups.ts";
@@ -96,6 +98,58 @@ const optionGroupParamsSchema = {
   required: ["restaurantId", "id"],
   properties: {
     restaurantId: { type: "string" },
+    id: { type: "string" },
+  },
+};
+
+/**
+ * Corpo de criação de opção.
+ *
+ * `priceInCents` ausente vira 0: cobre a escolha obrigatória sem custo
+ * ("ponto da carne"). `minimum: 0` porque preço negativo abriria a porta da
+ * assimetria do arredondamento do `average` — ver `domain/option.ts`.
+ */
+const createOptionBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: optionGroupNameSchema,
+    priceInCents: { type: "integer", minimum: 0, default: 0 },
+    maxQuantity: { type: "integer", minimum: 1, default: 1 },
+    available: { type: "boolean", default: true },
+    position: { type: "integer", minimum: 0, default: 0 },
+  },
+};
+
+const updateOptionBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    name: optionGroupNameSchema,
+    priceInCents: { type: "integer", minimum: 0 },
+    maxQuantity: { type: "integer", minimum: 1 },
+    available: { type: "boolean" },
+    position: { type: "integer", minimum: 0 },
+  },
+};
+
+const optionGroupIdParamsSchema = {
+  type: "object",
+  required: ["restaurantId", "groupId"],
+  properties: {
+    restaurantId: { type: "string" },
+    groupId: { type: "string" },
+  },
+};
+
+const optionParamsSchema = {
+  type: "object",
+  required: ["restaurantId", "groupId", "id"],
+  properties: {
+    restaurantId: { type: "string" },
+    groupId: { type: "string" },
     id: { type: "string" },
   },
 };
@@ -224,6 +278,93 @@ export async function optionGroupRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const { restaurantId, id } = request.params;
       await optionGroupsService.remove(restaurantId, id);
+      return reply.code(204).send();
+    },
+  );
+
+  // As opções vivem só aninhadas no grupo (ver o comentário em
+  // `optionGroupResponseSchema`): não existe rota para ler uma sozinha.
+
+  app.post<{
+    Params: { restaurantId: string; groupId: string };
+    Body: CreateOptionInput;
+  }>(
+    "/restaurants/:restaurantId/option-groups/:groupId/options",
+    {
+      schema: {
+        tags: ["Opções"],
+        operationId: "createOption",
+        summary: "Cria uma opção dentro do grupo",
+        description:
+          "Sem `priceInCents`, a opção nasce sem custo (cobre a escolha obrigatória, como o ponto da carne). Grupo de outro restaurante é 404.",
+        params: optionGroupIdParamsSchema,
+        body: createOptionBodySchema,
+        response: {
+          201: optionResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { restaurantId, groupId } = request.params;
+      const option = await optionGroupsService.createOption(
+        restaurantId,
+        groupId,
+        request.body,
+      );
+      reply.code(201);
+      return option;
+    },
+  );
+
+  app.patch<{
+    Params: { restaurantId: string; groupId: string; id: string };
+    Body: UpdateOptionInput;
+  }>(
+    "/restaurants/:restaurantId/option-groups/:groupId/options/:id",
+    {
+      schema: {
+        tags: ["Opções"],
+        operationId: "updateOption",
+        summary: "Muda preço, disponibilidade, teto ou posição da opção",
+        description:
+          "Grupo ou opção de outro restaurante é 404 — a mesma checagem de escopo do grupo vale aqui.",
+        params: optionParamsSchema,
+        body: updateOptionBodySchema,
+        response: {
+          200: optionResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, groupId, id } = request.params;
+      return optionGroupsService.updateOption(
+        restaurantId,
+        groupId,
+        id,
+        request.body,
+      );
+    },
+  );
+
+  app.delete<{ Params: { restaurantId: string; groupId: string; id: string } }>(
+    "/restaurants/:restaurantId/option-groups/:groupId/options/:id",
+    {
+      schema: {
+        tags: ["Opções"],
+        operationId: "deleteOption",
+        summary: "Remove a opção",
+        description: "Soft delete, como todo DELETE da API.",
+        params: optionParamsSchema,
+        response: { 404: errorResponseSchema },
+      },
+    },
+    async (request, reply) => {
+      const { restaurantId, groupId, id } = request.params;
+      await optionGroupsService.removeOption(restaurantId, groupId, id);
       return reply.code(204).send();
     },
   );

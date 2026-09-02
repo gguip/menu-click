@@ -1,7 +1,11 @@
+import { withTransaction } from "../db/pool.ts";
 import type {
   CreateOptionGroupInput,
+  CreateOptionInput,
+  Option,
   OptionGroup,
   UpdateOptionGroupInput,
+  UpdateOptionInput,
 } from "../domain/option.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
 import { isUuid } from "../domain/uuid.ts";
@@ -20,6 +24,11 @@ import * as restaurantsService from "./restaurants.ts";
 /** Erro padrão de grupo inexistente — mesma mensagem em toda a API. */
 function optionGroupNotFound(id: string): NotFoundError {
   return new NotFoundError(`Grupo de opções com id "${id}" não encontrado`);
+}
+
+/** Erro padrão de opção inexistente — mesma mensagem em toda a API. */
+function optionNotFound(id: string): NotFoundError {
+  return new NotFoundError(`Opção com id "${id}" não encontrada`);
 }
 
 /**
@@ -72,6 +81,7 @@ export async function listByRestaurant(
     restaurantId,
     pagination,
   );
+  await attachOptions(rows);
   return { data: rows, ...pagination, total };
 }
 
@@ -84,7 +94,22 @@ export async function getById(
 
   const optionGroup = await optionGroupsRepository.findById(restaurantId, id);
   if (optionGroup === null) throw optionGroupNotFound(id);
+  await attachOptions([optionGroup]);
   return optionGroup;
+}
+
+/**
+ * Preenche `options` em cada grupo, em uma query só (é quem compõe — o
+ * repositório devolve as duas coisas cruas, sem montar formato de resposta).
+ * Muta os grupos recebidos.
+ */
+async function attachOptions(optionGroups: OptionGroup[]): Promise<void> {
+  const porGrupo = await optionGroupsRepository.findOptionsByGroupIds(
+    optionGroups.map((optionGroup) => optionGroup.id),
+  );
+  for (const optionGroup of optionGroups) {
+    optionGroup.options = porGrupo.get(optionGroup.id) ?? [];
+  }
 }
 
 export async function update(
@@ -110,10 +135,65 @@ export async function update(
   return result.optionGroup;
 }
 
+/**
+ * Remove o grupo e **as opções dele**, na mesma transação (D3).
+ *
+ * (`softDeleteLinksByGroups` chega na Task 5 — a junção com produtos ainda
+ * não existe aqui.)
+ */
 export async function remove(restaurantId: string, id: string): Promise<void> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(id)) throw optionGroupNotFound(id);
 
-  const removed = await optionGroupsRepository.softDelete(restaurantId, id);
-  if (!removed) throw optionGroupNotFound(id);
+  await withTransaction(async (client) => {
+    const removed = await optionGroupsRepository.softDelete(
+      restaurantId,
+      id,
+      client,
+    );
+    if (!removed) throw optionGroupNotFound(id);
+
+    await optionGroupsRepository.softDeleteOptionsByGroups([id], client);
+  });
+}
+
+/**
+ * Cria uma opção dentro do grupo.
+ *
+ * `getById` já garante o escopo (404 para grupo alheio ou inexistente) — não
+ * há segunda checagem aqui.
+ */
+export async function createOption(
+  restaurantId: string,
+  groupId: string,
+  input: CreateOptionInput,
+): Promise<Option> {
+  await getById(restaurantId, groupId);
+  return optionGroupsRepository.insertOption(groupId, input);
+}
+
+export async function updateOption(
+  restaurantId: string,
+  groupId: string,
+  id: string,
+  input: UpdateOptionInput,
+): Promise<Option> {
+  await getById(restaurantId, groupId);
+  if (!isUuid(id)) throw optionNotFound(id);
+
+  const option = await optionGroupsRepository.updateOption(groupId, id, input);
+  if (option === null) throw optionNotFound(id);
+  return option;
+}
+
+export async function removeOption(
+  restaurantId: string,
+  groupId: string,
+  id: string,
+): Promise<void> {
+  await getById(restaurantId, groupId);
+  if (!isUuid(id)) throw optionNotFound(id);
+
+  const removed = await optionGroupsRepository.softDeleteOption(groupId, id);
+  if (!removed) throw optionNotFound(id);
 }

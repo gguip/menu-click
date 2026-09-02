@@ -2,10 +2,12 @@ import { pool } from "../db/pool.ts";
 import type { Queryable } from "../db/pool.ts";
 import type {
   CreateOptionGroupInput,
+  CreateOptionInput,
   Option,
   OptionGroup,
   PriceRule,
   UpdateOptionGroupInput,
+  UpdateOptionInput,
 } from "../domain/option.ts";
 import type { Pagination } from "../domain/pagination.ts";
 
@@ -29,7 +31,7 @@ export type OptionGroupRow = {
   updated_at: Date;
 };
 
-/** Linha da tabela `options` (usada pela Task 5, que preenche `options`). */
+/** Linha da tabela `options`. */
 export type OptionRow = {
   id: string;
   option_group_id: string;
@@ -257,3 +259,132 @@ export async function softDeleteByRestaurant(
   );
 }
 
+// ===================== Opções =====================
+//
+// As opções são escopadas por GRUPO, não por restaurante: quem chama já
+// passou por `getById(restaurantId, groupId)` no serviço, que lança 404 para
+// grupo alheio ou inexistente. Repetir `restaurant_id` aqui seria uma segunda
+// checagem redundante com a primeira.
+
+/** Campos editáveis via PATCH → coluna correspondente na tabela. */
+const optionColumns = {
+  name: "name",
+  priceInCents: "price_in_cents",
+  maxQuantity: "max_quantity",
+  available: "available",
+  position: "position",
+} as const;
+
+/** Insere uma opção no grupo e devolve o que foi criado. */
+export async function insertOption(
+  groupId: string,
+  input: CreateOptionInput,
+  db: Queryable = pool,
+): Promise<Option> {
+  const { rows } = await db.query<OptionRow>(
+    `insert into options (option_group_id, name, price_in_cents, max_quantity, available, position)
+     values ($1, $2, $3, $4, $5, $6)
+     returning *`,
+    [
+      groupId,
+      input.name,
+      // as colunas são `not null default ...`; sem valor explícito o driver
+      // mandaria NULL (que não é "ausente") e a inserção estouraria.
+      input.priceInCents ?? 0,
+      input.maxQuantity ?? 1,
+      input.available ?? true,
+      input.position ?? 0,
+    ],
+  );
+  return toOption(rows[0]);
+}
+
+/**
+ * As opções vivas de vários grupos, em uma query só.
+ *
+ * Recebe uma lista porque quem lê grupos quase sempre lê mais de um — a
+ * listagem, e o cardápio público. Uma consulta por grupo seria N+1 numa tela
+ * que mostra o cardápio inteiro.
+ */
+export async function findOptionsByGroupIds(
+  groupIds: string[],
+  db: Queryable = pool,
+): Promise<Map<string, Option[]>> {
+  const porGrupo = new Map<string, Option[]>();
+  if (groupIds.length === 0) return porGrupo;
+
+  const { rows } = await db.query<OptionRow>(
+    `select * from options
+      where option_group_id = any($1::uuid[]) and deleted_at is null
+      order by position, name, id`,
+    [groupIds],
+  );
+
+  for (const row of rows) {
+    const lista = porGrupo.get(row.option_group_id) ?? [];
+    lista.push(toOption(row));
+    porGrupo.set(row.option_group_id, lista);
+  }
+  return porGrupo;
+}
+
+/** Aplica os campos enviados; `null` se a opção não existe nesse grupo. */
+export async function updateOption(
+  groupId: string,
+  id: string,
+  input: UpdateOptionInput,
+  db: Queryable = pool,
+): Promise<Option | null> {
+  // SET dinâmico percorrendo o mapa fixo de colunas, nunca as chaves do input
+  // (S8/D8).
+  const assignments: string[] = [];
+  const values: unknown[] = [];
+
+  for (const [field, column] of Object.entries(optionColumns)) {
+    const value = input[field as keyof typeof optionColumns];
+    if (value === undefined) continue;
+    values.push(value);
+    assignments.push(`${column} = $${values.length}`);
+  }
+
+  assignments.push("updated_at = now()");
+  values.push(id, groupId);
+
+  const { rows } = await db.query<OptionRow>(
+    `update options
+        set ${assignments.join(", ")}
+      where id = $${values.length - 1}
+        and option_group_id = $${values.length}
+        and deleted_at is null
+      returning *`,
+    values,
+  );
+  return rows.length === 0 ? null : toOption(rows[0]);
+}
+
+/** Soft delete de uma opção. `false` = não existe ou já estava removida (D1). */
+export async function softDeleteOption(
+  groupId: string,
+  id: string,
+  db: Queryable = pool,
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `update options set deleted_at = now()
+      where id = $1 and option_group_id = $2 and deleted_at is null`,
+    [id, groupId],
+  );
+  return rowCount === 1;
+}
+
+/** Soft delete das opções de vários grupos — a cascata da remoção do grupo. */
+export async function softDeleteOptionsByGroups(
+  groupIds: string[],
+  db: Queryable,
+): Promise<void> {
+  if (groupIds.length === 0) return;
+  await db.query(
+    `update options set deleted_at = now()
+      where option_group_id = any($1::uuid[]) and deleted_at is null`,
+    [groupIds],
+  );
+}

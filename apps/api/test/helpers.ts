@@ -124,6 +124,22 @@ export async function createOptionGroup(
   return response.json();
 }
 
+/** Cria uma opção dentro de um grupo, via API. */
+export async function createOption(
+  app: FastifyInstance,
+  restaurant: TestRestaurant,
+  optionGroupId: string,
+  overrides: Record<string, unknown> = {},
+) {
+  const response = await app.inject({
+    method: "POST",
+    url: `/restaurants/${restaurant.id}/option-groups/${optionGroupId}/options`,
+    headers: restaurant.headers,
+    payload: { name: "Bacon", priceInCents: 500, ...overrides },
+  });
+  return response.json();
+}
+
 export const validCustomerBody = {
   name: "Ana Souza",
   phone: "11999990000",
