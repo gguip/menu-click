@@ -193,12 +193,50 @@ describe("filtro por período nos pedidos", () => {
         ontem,
       ]);
 
-      // e a meia-noite de Manaus é um instante genuinamente diferente da de
-      // São Paulo — senão a coluna `timezone` não estaria fazendo nada
-      const { rows } = await pool.query<{ sp: Date; manaus: Date }>(
-        `select (${meiaNoiteEm("America/Sao_Paulo")}) as sp, (${meiaNoiteEm("America/Manaus")}) as manaus`,
-      );
-      expect(rows[0].sp.getTime()).not.toBe(rows[0].manaus.getTime());
+    });
+
+    /**
+     * A propriedade que motivou a coluna `timezone`: **um mesmo instante é
+     * classificado de formas diferentes** pelos dois restaurantes.
+     *
+     * O instante escolhido fica entre as duas meias-noites — depois da que
+     * vem primeiro, antes da que vem depois. Logo ele é "hoje" para um e
+     * "ontem" para o outro, sempre.
+     *
+     * Qual é qual **troca** ao longo do dia, e é por isso que o teste afirma
+     * a propriedade e não os papéis: entre 00:00 e 01:00 em São Paulo, Manaus
+     * ainda está na data anterior, e é a meia-noite DELE que vem primeiro. A
+     * versão anterior deste teste fixava os papéis e falhava uma hora por dia.
+     */
+    it("o MESMO instante é hoje para um restaurante e ontem para o outro", async () => {
+      const sp = await cenario("America/Sao_Paulo");
+      const manaus = await cenario("America/Manaus");
+
+      // 30 minutos antes da mais tardia das duas meia-noites
+      const entreAsDuas = `greatest(${meiaNoiteEm("America/Sao_Paulo")}, ${meiaNoiteEm("America/Manaus")}) - interval '30 minutes'`;
+
+      const pedidoSp = await pedir(sp.restaurant, sp.product.id);
+      const pedidoManaus = await pedir(manaus.restaurant, manaus.product.id);
+      await backdate(pedidoSp, entreAsDuas);
+      await backdate(pedidoManaus, entreAsDuas);
+
+      const spHoje = (await listar(sp.restaurant, "period=today")).ids;
+      const spOntem = (await listar(sp.restaurant, "period=yesterday")).ids;
+      const manausHoje = (await listar(manaus.restaurant, "period=today")).ids;
+      const manausOntem = (await listar(manaus.restaurant, "period=yesterday"))
+        .ids;
+
+      // exatamente um dos dois vê o pedido como de hoje, e o outro como de ontem
+      const veHoje = [spHoje.length, manausHoje.length];
+      expect(veHoje.filter((n) => n === 1)).toHaveLength(1);
+
+      if (spHoje.length === 1) {
+        expect(spHoje).toEqual([pedidoSp]);
+        expect(manausOntem).toEqual([pedidoManaus]);
+      } else {
+        expect(manausHoje).toEqual([pedidoManaus]);
+        expect(spOntem).toEqual([pedidoSp]);
+      }
     });
   });
 

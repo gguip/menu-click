@@ -54,20 +54,19 @@ describe("ordenação dos pedidos", () => {
       { productId: barato.id, quantity: 2 },
     ]);
 
-    // instantes distintos e conhecidos, ancorados na meia-noite de SP (o fuso
-    // default do restaurante) em vez de "now() - X minutos": perto da virada
-    // do dia, subtrair minutos de `now()` podia jogar o pedido para ONTEM, e
-    // o teste de "period=today" logo abaixo via menos de três pedidos
-    const inicioDoDiaEmSp =
-      "date_trunc('day', now() at time zone 'America/Sao_Paulo') at time zone 'America/Sao_Paulo'";
+    // Instantes distintos, conhecidos e SEMPRE no passado. Ancorar na
+    // meia-noite ("+ N minutos") datava o pedido no futuro quando o teste
+    // rodava logo depois da virada, e isso só não quebrava porque `today` não
+    // tem limite superior — uma dependência silenciosa que sumiria no dia em
+    // que ele tivesse.
     const em = async (id: string, minutos: number) =>
       pool.query(
-        `update orders set created_at = (${inicioDoDiaEmSp}) + interval '${minutos} minutes' where id = $1`,
+        `update orders set created_at = now() - interval '${minutos} minutes' where id = $1`,
         [id],
       );
-    await em(primeiro.id, 10);
+    await em(primeiro.id, 30);
     await em(segundo.id, 20);
-    await em(terceiro.id, 30);
+    await em(terceiro.id, 10);
 
     return { restaurant, primeiro, segundo, terceiro };
   }
@@ -179,10 +178,16 @@ describe("ordenação dos pedidos", () => {
     });
   });
 
+  /**
+   * `last7days` e não `today`: os pedidos são de 10 a 30 minutos atrás, e
+   * perto da meia-noite isso é ONTEM. O que este teste afirma é que ordenar e
+   * recortar convivem — não onde começa o dia, que é assunto de
+   * `orders-period.test.ts`.
+   */
   it("a ordenação combina com o filtro por período", async () => {
     const { restaurant, primeiro, segundo, terceiro } = await cenario();
 
-    const { ids } = await listar(restaurant, "period=today&order=asc");
+    const { ids } = await listar(restaurant, "period=last7days&order=asc");
 
     expect(ids).toEqual([primeiro.id, segundo.id, terceiro.id]);
   });
