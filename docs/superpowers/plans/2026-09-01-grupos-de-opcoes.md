@@ -12,6 +12,16 @@
 
 ## Global Constraints
 
+> **Conferência de conformidade (aprendido em execução):** antes de despachar a
+> primeira tarefa, passe os artefatos que ESTE plano prescreve — nomes de
+> identificador, mensagens de commit, formato de teste — contra cada arquivo de
+> `.claude/rules/` e contra o `CLAUDE.md`. Três defeitos deste plano chegaram à
+> revisão por falta desse passo: identificadores em português (contra o
+> `CLAUDE.md`), um teste cujo oráculo era a própria implementação copiada, e
+> títulos de commit sem verbo no presente do indicativo (contra o
+> `commits.md`). Os três eram mecanicamente detectáveis; nenhum exigia
+> julgamento.
+
 Valem para **toda** tarefa. Vêm de `CLAUDE.md` e `.claude/rules/`.
 
 - **Node >= 23.6**, TypeScript executado direto: imports locais **com extensão `.ts`**, `import type` para tipos, **sem `enum`** (uniões `as const`), sem parameter properties.
@@ -488,7 +498,7 @@ Desfaça a mutação e confirme que volta a passar.
 pnpm --filter @menuclick/api build
 cd /Users/guilhermepassarinho/Desktop/Projects/MenuClick && pnpm lint
 git add apps/api/src/domain/option.ts apps/api/test/option-price.test.ts
-git commit -m "feat(menu): ✨ aritmética de preço dos grupos de opções
+git commit -m "feat(menu): ✨ adiciona a aritmética de preço dos grupos de opções
 
 O arredondamento acontece UMA vez, no preço unitário. Por grupo dá viés
 sistemático para cima (medido: 10 centavos em 3 grupos x 10 units); no
@@ -719,7 +729,7 @@ Esperado: PASS — a migration não muda comportamento nenhum ainda.
 
 ```bash
 git add apps/api/migrations/
-git commit -m "feat(menu): ✨ tabelas dos grupos de opções
+git commit -m "feat(menu): ✨ cria as tabelas dos grupos de opções
 
 Quatro tabelas: os grupos (do restaurante, não do produto), as opções, a
 junção com produtos e o congelamento no pedido. Mais \`unit_price_in_cents\`
@@ -1195,7 +1205,7 @@ Desfaça as duas.
 docker exec capstone-db psql -U postgres -q -c 'drop database if exists capstone_test with (force)'
 pnpm --filter @menuclick/api openapi:generate
 pnpm --filter @menuclick/api test
-git add apps/api/ && git commit -m "feat(menu): ✨ CRUD dos grupos de opções"
+git add apps/api/ && git commit -m "feat(menu): ✨ adiciona o CRUD dos grupos de opções"
 ```
 
 ---
@@ -1538,7 +1548,7 @@ Esperado: **FALHA** em "remover o grupo remove as opções dele (D3)".
 ```bash
 pnpm --filter @menuclick/api openapi:generate
 pnpm --filter @menuclick/api test
-git add apps/api/ && git commit -m "feat(menu): ✨ opções dentro do grupo"
+git add apps/api/ && git commit -m "feat(menu): ✨ adiciona as opções dentro do grupo"
 ```
 
 ---
@@ -2339,7 +2349,7 @@ Esperado: **FALHA** no caso 13.
 ```bash
 pnpm --filter @menuclick/api openapi:generate
 pnpm --filter @menuclick/api test
-git add apps/api/ && git commit -m "feat(orders)!: ✨ pedido com opções escolhidas
+git add apps/api/ && git commit -m "feat(orders)!: ✨ aceita opções escolhidas no pedido
 
 BREAKING CHANGE: itens do pedido ganham \`options\` no corpo e
 \`unitPriceInCents\` na resposta.
