@@ -1999,7 +1999,20 @@ await optionGroupsRepository.softDeleteOptionsByRestaurant(id, client);
 await optionGroupsRepository.softDeleteByRestaurant(id, client);
 ```
 
-A ordem importa: vínculos e opções são marcados enquanto os grupos ainda estão vivos, senão a subconsulta que os encontra não acharia nada.
+⚠️ **Correção, verificada em execução: a ordem NÃO importa aqui.** O plano
+afirmava que vínculos e opções precisavam ser marcados enquanto os grupos ainda
+estivessem vivos. Está errado: as subconsultas alcançam os filhos pela coluna do
+**pai** (`where option_group_id in (select id from option_groups where
+restaurant_id = $1)`), e o soft delete não mexe nessa coluna — só em
+`deleted_at`, que a subconsulta nem filtra. Qualquer ordem devolve o mesmo
+conjunto de ids.
+
+E o fato de a subconsulta **não** filtrar `deleted_at is null` é o correto aqui,
+não um esquecimento: ela precisa alcançar filhos de um pai que está sendo
+marcado na mesma transação. É a exceção consciente à D2.
+
+Mantenha a ordem escrita mesmo assim — ela lê na direção da cascata —, mas não
+escreva no código um comentário dizendo que ela é obrigatória.
 
 Em `src/services/option-groups.ts`, `remove` ganha a terceira linha prometida na Task 4:
 
