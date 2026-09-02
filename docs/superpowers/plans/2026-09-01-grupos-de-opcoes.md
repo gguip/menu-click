@@ -103,10 +103,10 @@ Primeira porque é a única parte **sem banco**: testável em milissegundos, e �
 - Produces:
   - `PRICE_RULES: readonly ["sum", "highest", "average"]`, `type PriceRule`
   - `divideRounded(n: number, d: number): number`
-  - `groupContribution(regra: PriceRule, escolhas: PricedChoice[]): number`
-  - `unitPrice(productPriceInCents: number, grupos: PricedGroup[]): number`
+  - `groupContribution(rule: PriceRule, choices: PricedChoice[]): number`
+  - `unitPrice(productPriceInCents: number, groups: PricedGroup[]): number`
   - `type PricedChoice = { priceInCents: number; quantity: number }`
-  - `type PricedGroup = { priceRule: PriceRule; escolhas: PricedChoice[] }`
+  - `type PricedGroup = { priceRule: PriceRule; choices: PricedChoice[] }`
   - `type Option`, `type OptionGroup`, `type CreateOptionGroupInput`,
     `type UpdateOptionGroupInput`, `type CreateOptionInput`,
     `type UpdateOptionInput` — as assinaturas exatas estão no Step 3
@@ -147,20 +147,25 @@ describe("aritmética de preço das opções", () => {
      * A razão de a função existir em vez de `Math.round(n / d)`: remover a
      * classe inteira de dúvida sobre float, não porque ele erre nas nossas
      * magnitudes (foi medido que não), mas porque a equivalência depende da
-     * faixa de valor e a aritmética inteira não.
+     * faixa de valor e a aritmética inteira não. Este teste trava justamente
+     * essa equivalência, contra um oráculo independente.
      */
-    it("concorda com a divisão exata em toda a faixa de um cardápio", () => {
+    it("concorda com Math.round(n / d) em toda a faixa de um cardápio", () => {
       for (let d = 1; d <= 6; d++) {
         for (let n = 0; n <= 30000; n += 7) {
-          const exato = Math.floor(n / d) + (2 * (n % d) >= d ? 1 : 0);
-          expect(divideRounded(n, d)).toBe(exato);
+          // oráculo INDEPENDENTE: divisão em float + arredondamento da
+          // biblioteca, que é o caminho contra o qual a equivalência foi
+          // medida. Repetir aqui a fórmula inteira da implementação faria um
+          // teste que não pode falhar.
+          const independente = Math.round(n / d);
+          expect(divideRounded(n, d)).toBe(independente);
         }
       }
     });
   });
 
   describe("groupContribution", () => {
-    it("sum soma preço vezes quantidade", () => {
+    it("sum sum preço vezes quantidade", () => {
       expect(
         groupContribution("sum", [
           { priceInCents: 500, quantity: 2 },
@@ -201,25 +206,25 @@ describe("aritmética de preço das opções", () => {
 
     /** 2x o mesmo sabor é uma pizza inteira daquele sabor, pelo preço dele. */
     it("highest e average sobre uma opção repetida degradam para o preço dela", () => {
-      const escolhas = [{ priceInCents: 4505, quantity: 2 }];
-      expect(groupContribution("highest", escolhas)).toBe(4505);
-      expect(groupContribution("average", escolhas)).toBe(4505);
+      const choices = [{ priceInCents: 4505, quantity: 2 }];
+      expect(groupContribution("highest", choices)).toBe(4505);
+      expect(groupContribution("average", choices)).toBe(4505);
     });
 
     it("grupo sem escolha não contribui", () => {
-      for (const regra of ["sum", "highest", "average"] as const) {
-        expect(groupContribution(regra, [])).toBe(0);
+      for (const rule of ["sum", "highest", "average"] as const) {
+        expect(groupContribution(rule, [])).toBe(0);
       }
     });
   });
 
   describe("unitPrice", () => {
-    it("soma as contribuições ao preço do produto", () => {
+    it("sum as contribuições ao preço do produto", () => {
       expect(
         unitPrice(3000, [
           {
             priceRule: "sum",
-            escolhas: [{ priceInCents: 500, quantity: 2 }],
+            choices: [{ priceInCents: 500, quantity: 2 }],
           },
         ]),
       ).toBe(4000);
@@ -234,14 +239,14 @@ describe("aritmética de preço das opções", () => {
       const resultado = unitPrice(3000, [
         {
           priceRule: "average",
-          escolhas: [
+          choices: [
             { priceInCents: 4505, quantity: 1 },
             { priceInCents: 5000, quantity: 1 },
           ],
         },
         {
           priceRule: "average",
-          escolhas: [
+          choices: [
             { priceInCents: 1005, quantity: 1 },
             { priceInCents: 1200, quantity: 1 },
           ],
@@ -274,7 +279,7 @@ Crie `apps/api/src/domain/option.ts`:
 
 ```ts
 /**
- * Grupos de opções do cardápio — as escolhas que um produto pede ("Tamanho",
+ * Grupos de opções do cardápio — as choices que um produto pede ("Tamanho",
  * "Sabores", "Adicionais"). Tipos, mais as funções de preço, que são o único
  * runtime deste arquivo.
  *
@@ -301,7 +306,7 @@ export type Option = {
   optionGroupId: string;
   name: string;
   priceInCents: number;
-  /** Teto de unidades desta opção dentro de um item. */
+  /** Teto de units desta opção dentro de um item. */
   maxQuantity: number;
   available: boolean;
   position: number;
@@ -355,10 +360,10 @@ export type PricedChoice = {
   quantity: number;
 };
 
-/** Um grupo com as escolhas que o cliente fez nele. */
+/** Um grupo com as choices que o cliente fez nele. */
 export type PricedGroup = {
   priceRule: PriceRule;
-  escolhas: PricedChoice[];
+  choices: PricedChoice[];
 };
 
 /**
@@ -384,33 +389,33 @@ export function divideRounded(n: number, d: number): number {
  * Quanto um grupo acrescenta ao preço unitário do item.
  *
  * ⚠️ O resultado de `average` é o único que arredonda, e ele arredonda **aqui**
- * por ser a fronteira do grupo — mas quem chama (`unitPrice`) NÃO soma
+ * por ser a fronteira do grupo — mas quem chama (`unitPrice`) NÃO sum
  * contribuições já arredondadas. Ver o comentário lá.
  */
 export function groupContribution(
-  regra: PriceRule,
-  escolhas: PricedChoice[],
+  rule: PriceRule,
+  choices: PricedChoice[],
 ): number {
-  if (escolhas.length === 0) return 0;
+  if (choices.length === 0) return 0;
 
-  if (regra === "sum") {
-    return escolhas.reduce(
-      (soma, escolha) => soma + escolha.priceInCents * escolha.quantity,
+  if (rule === "sum") {
+    return choices.reduce(
+      (sum, escolha) => sum + choice.priceInCents * choice.quantity,
       0,
     );
   }
 
-  if (regra === "highest") {
+  if (rule === "highest") {
     // a quantidade não entra: dois pedaços do mesmo sabor não dobram o preço
-    return Math.max(...escolhas.map((escolha) => escolha.priceInCents));
+    return Math.max(...choices.map((choice) => choice.priceInCents));
   }
 
-  const total = escolhas.reduce(
-    (soma, escolha) => soma + escolha.priceInCents * escolha.quantity,
+  const total = choices.reduce(
+    (sum, escolha) => sum + choice.priceInCents * choice.quantity,
     0,
   );
-  const unidades = escolhas.reduce((soma, escolha) => soma + escolha.quantity, 0);
-  return divideRounded(total, unidades);
+  const units = choices.reduce((sum, escolha) => sum + choice.quantity, 0);
+  return divideRounded(total, units);
 }
 
 /**
@@ -420,41 +425,41 @@ export function groupContribution(
  * são acumuladas como numerator/denominator exatos e só viram inteiro no fim.
  *
  * Arredondar por grupo produziria viés sistemático **para cima** — medido: três
- * grupos caindo em meio centavo, em dez unidades, cobram dez centavos a mais.
+ * grupos caindo em meio centavo, em dez units, cobram dez centavos a mais.
  * Arredondar no total do item faria `unitário × quantidade` deixar de fechar
  * com o total do pedido, e um recibo cuja conta não bate é lido como erro por
  * quem confere.
  */
 export function unitPrice(
   productPriceInCents: number,
-  grupos: PricedGroup[],
+  groups: PricedGroup[],
 ): number {
   // acumula em milésimos de centavo para não arredondar no meio do caminho:
   // só `average` produz fração, e ela é sempre uma divisão exata por um
-  // inteiro pequeno (o número de unidades escolhidas no grupo)
+  // inteiro pequeno (o número de units escolhidas no grupo)
   let numerator = productPriceInCents;
   let fractional = 0;
   let denominator = 1;
 
-  for (const grupo of grupos) {
-    if (grupo.escolhas.length === 0) continue;
+  for (const grupo of groups) {
+    if (group.choices.length === 0) continue;
 
-    if (grupo.priceRule === "average") {
-      const total = grupo.escolhas.reduce(
-        (soma, escolha) => soma + escolha.priceInCents * escolha.quantity,
+    if (group.priceRule === "average") {
+      const total = group.choices.reduce(
+        (sum, escolha) => sum + choice.priceInCents * choice.quantity,
         0,
       );
-      const unidades = grupo.escolhas.reduce(
-        (soma, escolha) => soma + escolha.quantity,
+      const units = group.choices.reduce(
+        (sum, escolha) => sum + choice.quantity,
         0,
       );
-      // soma de frações: a/b + c/d = (ad + cb) / bd
-      fractional = fractional * unidades + total * denominator;
-      denominator = denominator * unidades;
+      // sum de frações: a/b + c/d = (ad + cb) / bd
+      fractional = fractional * units + total * denominator;
+      denominator = denominator * units;
       continue;
     }
 
-    numerator += groupContribution(grupo.priceRule, grupo.escolhas);
+    numerator += groupContribution(group.priceRule, group.choices);
   }
 
   return numerator + divideRounded(fractional, denominator);
@@ -486,7 +491,7 @@ git add apps/api/src/domain/option.ts apps/api/test/option-price.test.ts
 git commit -m "feat(menu): ✨ aritmética de preço dos grupos de opções
 
 O arredondamento acontece UMA vez, no preço unitário. Por grupo dá viés
-sistemático para cima (medido: 10 centavos em 3 grupos x 10 unidades); no
+sistemático para cima (medido: 10 centavos em 3 grupos x 10 units); no
 total do item faz \`unitário x quantidade\` deixar de fechar com o total do
 pedido, e recibo que não bate é lido como erro por quem confere.
 
