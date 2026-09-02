@@ -140,6 +140,21 @@ export async function createOption(
   return response.json();
 }
 
+/** Define a lista ordenada de grupos de opções de um produto. */
+export function linkOptionGroups(
+  app: FastifyInstance,
+  restaurant: TestRestaurant,
+  productId: string,
+  optionGroupIds: string[],
+) {
+  return app.inject({
+    method: "PUT",
+    url: `/restaurants/${restaurant.id}/products/${productId}/option-groups`,
+    headers: restaurant.headers,
+    payload: { optionGroupIds },
+  });
+}
+
 export const validCustomerBody = {
   name: "Ana Souza",
   phone: "11999990000",

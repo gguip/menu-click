@@ -11,6 +11,7 @@ import type { Page, Pagination } from "../domain/pagination.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
+import * as productsService from "./products.ts";
 import * as restaurantsService from "./restaurants.ts";
 
 /**
@@ -136,10 +137,8 @@ export async function update(
 }
 
 /**
- * Remove o grupo e **as opções dele**, na mesma transação (D3).
- *
- * (`softDeleteLinksByGroups` chega na Task 5 — a junção com produtos ainda
- * não existe aqui.)
+ * Remove o grupo, **as opções dele** e os vínculos com produtos, na mesma
+ * transação (D3).
  */
 export async function remove(restaurantId: string, id: string): Promise<void> {
   await restaurantsService.ensureExists(restaurantId);
@@ -154,6 +153,7 @@ export async function remove(restaurantId: string, id: string): Promise<void> {
     if (!removed) throw optionGroupNotFound(id);
 
     await optionGroupsRepository.softDeleteOptionsByGroups([id], client);
+    await optionGroupsRepository.softDeleteLinksByGroups([id], client);
   });
 }
 
@@ -196,4 +196,42 @@ export async function removeOption(
 
   const removed = await optionGroupsRepository.softDeleteOption(groupId, id);
   if (!removed) throw optionNotFound(id);
+}
+
+/**
+ * Define a lista ordenada de grupos de um produto.
+ *
+ * Id repetido é 400, não deduplicação silenciosa: a tela que produz esta
+ * chamada não consegue gerar repetição, então repetição é erro do cliente — e
+ * aceitar em silêncio esconderia o erro em vez de mostrá-lo.
+ */
+export async function replaceProductGroups(
+  restaurantId: string,
+  productId: string,
+  optionGroupIds: string[],
+): Promise<OptionGroup[]> {
+  await productsService.getById(restaurantId, productId); // 404 se não for dele
+
+  if (new Set(optionGroupIds).size !== optionGroupIds.length) {
+    throw new ValidationError("A lista de grupos tem ids repetidos");
+  }
+
+  // cada grupo é conferido contra o restaurante da rota; grupo alheio é 404
+  for (const id of optionGroupIds) {
+    await getById(restaurantId, id);
+  }
+
+  await withTransaction(async (client) => {
+    await optionGroupsRepository.replaceProductLinks(
+      productId,
+      optionGroupIds,
+      client,
+    );
+  });
+
+  const porProduto = await optionGroupsRepository.findGroupsByProductIds(
+    restaurantId,
+    [productId],
+  );
+  return porProduto.get(productId) ?? [];
 }

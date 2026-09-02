@@ -368,4 +368,54 @@ export async function optionGroupRoutes(app: FastifyInstance) {
       return reply.code(204).send();
     },
   );
+
+  // O vínculo mora aqui, não em `routes/products.ts`: é o vínculo produto ↔
+  // grupo que esta rota edita, e `:id` na URL é o produto.
+  app.put<{
+    Params: { restaurantId: string; id: string };
+    Body: { optionGroupIds: string[] };
+  }>(
+    "/restaurants/:restaurantId/products/:id/option-groups",
+    {
+      schema: {
+        tags: ["Opções"],
+        operationId: "setProductOptionGroups",
+        summary: "Define os grupos de opções do produto",
+        description:
+          "Substitui a lista **inteira**, na ordem do array — uma rota em vez de três (vincular, desvincular, reordenar), porque é como uma tela faz. Lista vazia desvincula tudo. Id repetido é 400; grupo de outro restaurante é 404.",
+        params: optionGroupParamsSchema,
+        body: {
+          type: "object",
+          additionalProperties: false,
+          required: ["optionGroupIds"],
+          properties: {
+            optionGroupIds: { type: "array", items: { type: "string" } },
+          },
+        },
+        response: {
+          200: {
+            type: "object",
+            properties: {
+              optionGroups: {
+                type: "array",
+                items: optionGroupResponseSchema,
+              },
+            },
+          },
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, id } = request.params;
+      return {
+        optionGroups: await optionGroupsService.replaceProductGroups(
+          restaurantId,
+          id,
+          request.body.optionGroupIds,
+        ),
+      };
+    },
+  );
 }

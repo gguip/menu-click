@@ -1,3 +1,4 @@
+import { withTransaction } from "../db/pool.ts";
 import type {
   CreateProductInput,
   Product,
@@ -7,6 +8,7 @@ import type {
 import type { Page, Pagination } from "../domain/pagination.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { NotFoundError } from "../errors.ts";
+import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as productsRepository from "../repositories/products.ts";
 import * as categoriesService from "./categories.ts";
 import * as restaurantsService from "./restaurants.ts";
@@ -107,12 +109,24 @@ export async function update(
   return product;
 }
 
+/**
+ * Remove o produto e **os vínculos dele com grupos de opções**, na mesma
+ * transação (D3).
+ */
 export async function remove(restaurantId: string, id: string): Promise<void> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(id)) throw productNotFound(id);
 
-  const removed = await productsRepository.softDelete(restaurantId, id);
-  if (!removed) throw productNotFound(id);
+  await withTransaction(async (client) => {
+    const removed = await productsRepository.softDelete(
+      restaurantId,
+      id,
+      client,
+    );
+    if (!removed) throw productNotFound(id);
+
+    await optionGroupsRepository.softDeleteLinksByProducts([id], client);
+  });
 }
 
 /**

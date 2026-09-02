@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { pool } from "../db/pool.ts";
 import type { Queryable } from "../db/pool.ts";
 import type {
@@ -255,6 +256,148 @@ export async function softDeleteByRestaurant(
   await db.query(
     `update option_groups set deleted_at = now()
       where restaurant_id = $1 and deleted_at is null`,
+    [restaurantId],
+  );
+}
+
+// ===================== Vínculo produto ↔ grupo =====================
+//
+// `product_option_groups` é a junção: o grupo pertence ao restaurante, mas a
+// LISTA e a ORDEM de grupos são por produto.
+
+/**
+ * Troca a lista de grupos de um produto pela informada, na ordem do array.
+ *
+ * Desvincula tudo e revincula, em vez de calcular a diferença: é uma tabela de
+ * junção, a "rotatividade" de linhas não custa nada, e o código que calcula
+ * diferença é onde mora o bug que ninguém vê. A posição sai do índice.
+ *
+ * Recebe o `client` porque as duas metades valem juntas ou não valem.
+ */
+export async function replaceProductLinks(
+  productId: string,
+  optionGroupIds: string[],
+  client: PoolClient,
+): Promise<void> {
+  await client.query(
+    `update product_option_groups set deleted_at = now()
+      where product_id = $1 and deleted_at is null`,
+    [productId],
+  );
+
+  if (optionGroupIds.length === 0) return;
+
+  const values: unknown[] = [];
+  const tuples: string[] = [];
+  optionGroupIds.forEach((optionGroupId, position) => {
+    values.push(productId, optionGroupId, position);
+    // os `$n` vêm do TAMANHO do array, não de nada vindo do cliente (S2)
+    const n = values.length;
+    tuples.push(`($${n - 2}, $${n - 1}, $${n})`);
+  });
+
+  await client.query(
+    `insert into product_option_groups (product_id, option_group_id, position)
+     values ${tuples.join(", ")}`,
+    values,
+  );
+}
+
+/**
+ * Os grupos vivos ligados a cada produto, com as opções aninhadas, em duas
+ * queries — não uma por produto.
+ */
+export async function findGroupsByProductIds(
+  restaurantId: string,
+  productIds: string[],
+  db: Queryable = pool,
+): Promise<Map<string, OptionGroup[]>> {
+  const porProduto = new Map<string, OptionGroup[]>();
+  if (productIds.length === 0) return porProduto;
+
+  const { rows } = await db.query<OptionGroupRow & { product_id: string }>(
+    `select g.*, l.product_id
+       from product_option_groups l
+       join option_groups g on g.id = l.option_group_id
+      where l.product_id = any($1::uuid[])
+        and g.restaurant_id = $2
+        and l.deleted_at is null
+        and g.deleted_at is null
+      order by l.product_id, l.position, g.name, g.id`,
+    [productIds, restaurantId],
+  );
+
+  const opcoes = await findOptionsByGroupIds(
+    [...new Set(rows.map((row) => row.id))],
+    db,
+  );
+
+  for (const row of rows) {
+    const lista = porProduto.get(row.product_id) ?? [];
+    lista.push({ ...toOptionGroup(row), options: opcoes.get(row.id) ?? [] });
+    porProduto.set(row.product_id, lista);
+  }
+  return porProduto;
+}
+
+/** Soft delete dos vínculos de vários grupos — a cascata da remoção do grupo. */
+export async function softDeleteLinksByGroups(
+  groupIds: string[],
+  db: Queryable,
+): Promise<void> {
+  if (groupIds.length === 0) return;
+  await db.query(
+    `update product_option_groups set deleted_at = now()
+      where option_group_id = any($1::uuid[]) and deleted_at is null`,
+    [groupIds],
+  );
+}
+
+/** Soft delete dos vínculos de vários produtos — a cascata da remoção do produto. */
+export async function softDeleteLinksByProducts(
+  productIds: string[],
+  db: Queryable,
+): Promise<void> {
+  if (productIds.length === 0) return;
+  await db.query(
+    `update product_option_groups set deleted_at = now()
+      where product_id = any($1::uuid[]) and deleted_at is null`,
+    [productIds],
+  );
+}
+
+/**
+ * Soft delete de todos os vínculos do restaurante — a cascata da remoção dele.
+ *
+ * `product_option_groups` não tem `restaurant_id` próprio: o dono é alcançado
+ * pela subconsulta em `products`.
+ */
+export async function softDeleteLinksByRestaurant(
+  restaurantId: string,
+  db: Queryable,
+): Promise<void> {
+  await db.query(
+    `update product_option_groups set deleted_at = now()
+      where product_id in (select id from products where restaurant_id = $1)
+        and deleted_at is null`,
+    [restaurantId],
+  );
+}
+
+/**
+ * Soft delete de todas as opções do restaurante — a cascata da remoção dele.
+ *
+ * `options` não tem `restaurant_id` próprio: o dono é alcançado pela
+ * subconsulta em `option_groups`.
+ */
+export async function softDeleteOptionsByRestaurant(
+  restaurantId: string,
+  db: Queryable,
+): Promise<void> {
+  await db.query(
+    `update options set deleted_at = now()
+      where option_group_id in (select id from option_groups where restaurant_id = $1)
+        and deleted_at is null`,
     [restaurantId],
   );
 }
