@@ -220,9 +220,22 @@ export async function insertOrder(
 }
 
 /**
- * Grava todos os itens do pedido numa query só, e devolve os ids gerados **na
- * mesma ordem** de `items` — é por esse id que cada opção escolhida (gravada
- * a seguir, por `insertItemOptions`) sabe a qual item pertence.
+ * Grava todos os itens do pedido numa query só, e devolve os ids gerados — é
+ * por esse id que cada opção escolhida (gravada a seguir, por
+ * `insertItemOptions`) sabe a qual item pertence.
+ *
+ * ⚠️ **Pressuposto que sustenta isso: a linha N do `RETURNING` corresponde à
+ * tupla N do `VALUES`.** Não é coincidência nem sorte de plano de execução —
+ * um único `INSERT ... VALUES ... RETURNING` não paraleliza nem reordena o
+ * `VALUES`, e o Postgres emite as linhas na ordem literal em que foram
+ * escritas. O que quebraria isso não é reordenar, é **omitir** uma linha:
+ * `ON CONFLICT DO NOTHING` ou um trigger `BEFORE INSERT` que devolva `NULL`
+ * nesta tabela fariam o `RETURNING` sair mais curto que `items`, deslocando
+ * todo índice seguinte — e a opção paga por um item seria gravada como se
+ * fosse de outro (ver o guard em `services/orders.ts`, logo depois da
+ * chamada). Nenhum dos dois existe hoje em `order_items`. Se um dia existir,
+ * este mapeamento por posição para de valer e vira `order_items.position`
+ * (fora do escopo desta tarefa).
  */
 export async function insertItems(
   orderId: string,

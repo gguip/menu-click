@@ -328,6 +328,20 @@ export async function create(
     );
     const itemIds = await ordersRepository.insertItems(orderId, items, client);
 
+    // Guarda contra o único jeito realista de o mapeamento por posição
+    // (comentado em `insertItems`) quebrar hoje: uma linha OMITIDA do
+    // `RETURNING`. Isso não prova que a ordem está certa — só transforma uma
+    // omissão silenciosa (que atribuiria a opção paga ao item errado) num
+    // erro alto, em vez de um pedido gravado errado sem ninguém notar.
+    if (itemIds.length !== items.length) {
+      throw new Error(
+        `insertItems devolveu ${itemIds.length} id(s) para ${items.length} item(ns) — ` +
+          "RETURNING veio mais curto que VALUES, o mapeamento por posição não é seguro",
+      );
+    }
+
+    // `itemIds[index]` depende de `insertItems` devolver uma linha do
+    // `RETURNING` por tupla do `VALUES`, na mesma ordem — ver o comentário lá.
     const optionRows = items.flatMap((item, index) =>
       item.options.map((option) => ({
         orderItemId: itemIds[index],

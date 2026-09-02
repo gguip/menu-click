@@ -212,6 +212,40 @@ describe("pedidos com opções", () => {
   });
 
   /**
+   * `chaveDeFusao` ordena as escolhas por optionId antes de montar a chave —
+   * sem o `.sort()`, a mesma seleção mandada em ordem diferente cairia em
+   * chaves diferentes e NÃO fundiria. O caso acima usa uma lista de uma opção
+   * só, então não exercita o `.sort()` (uma lista de um elemento "ordena"
+   * sozinha); este caso manda os dois sabores em ordens opostas.
+   */
+  it("a mesma seleção em ordem diferente ainda funde (exercita o sort da chave)", async () => {
+    const { restaurant, produto, calabresa, portuguesa } =
+      await cenarioComSabores("highest");
+
+    const order = await createOrder(app, restaurant.id, [
+      {
+        productId: produto.id,
+        quantity: 1,
+        options: [
+          { optionId: calabresa.id, quantity: 1 },
+          { optionId: portuguesa.id, quantity: 1 },
+        ],
+      },
+      {
+        productId: produto.id,
+        quantity: 1,
+        options: [
+          { optionId: portuguesa.id, quantity: 1 },
+          { optionId: calabresa.id, quantity: 1 },
+        ],
+      },
+    ]);
+
+    expect(order.items).toHaveLength(1);
+    expect(order.items[0].quantity).toBe(2);
+  });
+
+  /**
    * A regra de fusão de linhas mudou por causa disto. Fundir por `productId`
    * transformaria "um com bacon" e "um sem bacon" em "dois hambúrgueres", e o
    * cliente receberia dois iguais.
@@ -233,6 +267,55 @@ describe("pedidos com opções", () => {
     const items = detalhe.json().items;
     expect(items).toHaveLength(2);
     expect(items.map((i: { quantity: number }) => i.quantity).sort()).toEqual([1, 1]);
+  });
+
+  /**
+   * `findItems` ordena por `created_at, id` — e `created_at` é o instante em
+   * que a TRANSAÇÃO começou, igual para todo item do mesmo pedido. Quem
+   * desempata é o uuid aleatório de cada linha, então a ordem da resposta NÃO
+   * é a ordem do corpo da requisição. Por isso o teste identifica cada linha
+   * pelo conteúdo (o `unitPriceInCents`, que só a linha com bacon tem), nunca
+   * por índice — um teste por índice não pegaria `insertItems` devolvendo os
+   * ids fora de ordem, porque as quantidades (1 e 1) seriam simétricas sob
+   * inversão. Aqui as quantidades são 1 e 3, de propósito: assimétricas.
+   */
+  it("cada linha recebe as opções que ELA pediu, não a de outra linha", async () => {
+    const { restaurant, produto, bacon } = await cenarioComAdicionais();
+
+    const order = await createOrder(app, restaurant.id, [
+      {
+        productId: produto.id,
+        quantity: 1,
+        options: [{ optionId: bacon.id, quantity: 1 }],
+      },
+      { productId: produto.id, quantity: 3 },
+    ]);
+
+    const detalhe = await app.inject({
+      method: "GET",
+      url: `/restaurants/${restaurant.id}/orders/${order.id}`,
+      headers: restaurant.headers,
+    });
+
+    const items = detalhe.json().items;
+    expect(items).toHaveLength(2);
+
+    // 3000 (produto) + 500 (bacon) = 3500; sem bacon é só o produto, 3000
+    const comBacon = items.find(
+      (i: { unitPriceInCents: number }) => i.unitPriceInCents === 3500,
+    );
+    const semBacon = items.find(
+      (i: { unitPriceInCents: number }) => i.unitPriceInCents === 3000,
+    );
+
+    expect(comBacon).toBeDefined();
+    expect(semBacon).toBeDefined();
+    expect(comBacon.quantity).toBe(1);
+    expect(comBacon.options.map((o: { name: string }) => o.name)).toEqual([
+      "Bacon",
+    ]);
+    expect(semBacon.quantity).toBe(3);
+    expect(semBacon.options).toEqual([]);
   });
 
   it("opção repetida no mesmo item soma a quantidade antes de checar o teto", async () => {
