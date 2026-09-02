@@ -53,7 +53,7 @@ O banco de teste (`capstone_test`) é criado e migrado pelo `globalSetup`. Depoi
 | Arquivo | Responsabilidade |
 | --- | --- |
 | `apps/api/migrations/<ts>_add-option-groups.sql` | as quatro tabelas, os índices e a coluna nova de `order_items` |
-| `apps/api/src/domain/option.ts` | tipos + as funções puras de preço (`dividirArredondando`, `contribuicaoDoGrupo`, `precoUnitario`) |
+| `apps/api/src/domain/option.ts` | tipos + as funções puras de preço (`divideRounded`, `groupContribution`, `unitPrice`) |
 | `apps/api/src/repositories/option-groups.ts` | todo o SQL de `option_groups`, `options` e `product_option_groups` |
 | `apps/api/src/services/option-groups.ts` | regras de negócio dos grupos, opções e vínculo |
 | `apps/api/src/routes/option-groups.ts` | as rotas HTTP de grupo, opção e vínculo |
@@ -86,6 +86,12 @@ O banco de teste (`capstone_test`) é criado e migrado pelo `globalSetup`. Depoi
 
 ### Task 1: A aritmética de preço (domínio puro)
 
+> **Correção após a revisão da Task 1:** os identificadores exportados nasceram em
+> português neste plano e foram renomeados para inglês. O `CLAUDE.md` manda
+> "identificadores em inglês", e as nove funções e todos os tipos exportados de
+> `src/domain/` já seguiam isso — só helpers **privados** de serviço são em
+> português no projeto. Comentários continuam em pt-BR.
+
 Primeira porque é a única parte **sem banco**: testável em milissegundos, e é onde mora a decisão mais delicada da spec.
 
 **Files:**
@@ -96,11 +102,11 @@ Primeira porque é a única parte **sem banco**: testável em milissegundos, e �
 - Consumes: nada.
 - Produces:
   - `PRICE_RULES: readonly ["sum", "highest", "average"]`, `type PriceRule`
-  - `dividirArredondando(n: number, d: number): number`
-  - `contribuicaoDoGrupo(regra: PriceRule, escolhas: EscolhaPrecificada[]): number`
-  - `precoUnitario(precoDoProduto: number, grupos: GrupoPrecificado[]): number`
-  - `type EscolhaPrecificada = { priceInCents: number; quantity: number }`
-  - `type GrupoPrecificado = { priceRule: PriceRule; escolhas: EscolhaPrecificada[] }`
+  - `divideRounded(n: number, d: number): number`
+  - `groupContribution(regra: PriceRule, escolhas: PricedChoice[]): number`
+  - `unitPrice(productPriceInCents: number, grupos: PricedGroup[]): number`
+  - `type PricedChoice = { priceInCents: number; quantity: number }`
+  - `type PricedGroup = { priceRule: PriceRule; escolhas: PricedChoice[] }`
   - `type Option`, `type OptionGroup`, `type CreateOptionGroupInput`,
     `type UpdateOptionGroupInput`, `type CreateOptionInput`,
     `type UpdateOptionInput` — as assinaturas exatas estão no Step 3
@@ -112,9 +118,9 @@ Crie `apps/api/test/option-price.test.ts`:
 ```ts
 import { describe, expect, it } from "vitest";
 import {
-  contribuicaoDoGrupo,
-  dividirArredondando,
-  precoUnitario,
+  groupContribution,
+  divideRounded,
+  unitPrice,
 } from "../src/domain/option.ts";
 
 /**
@@ -125,16 +131,16 @@ import {
  * subir nada.
  */
 describe("aritmética de preço das opções", () => {
-  describe("dividirArredondando", () => {
+  describe("divideRounded", () => {
     it("arredonda meio para cima", () => {
-      expect(dividirArredondando(5, 2)).toBe(3); // 2.5
-      expect(dividirArredondando(7, 2)).toBe(4); // 3.5
-      expect(dividirArredondando(9505, 2)).toBe(4753); // 4752.5
+      expect(divideRounded(5, 2)).toBe(3); // 2.5
+      expect(divideRounded(7, 2)).toBe(4); // 3.5
+      expect(divideRounded(9505, 2)).toBe(4753); // 4752.5
     });
 
     it("não arredonda o que já é inteiro", () => {
-      expect(dividirArredondando(8180, 2)).toBe(4090);
-      expect(dividirArredondando(0, 3)).toBe(0);
+      expect(divideRounded(8180, 2)).toBe(4090);
+      expect(divideRounded(0, 3)).toBe(0);
     });
 
     /**
@@ -147,16 +153,16 @@ describe("aritmética de preço das opções", () => {
       for (let d = 1; d <= 6; d++) {
         for (let n = 0; n <= 30000; n += 7) {
           const exato = Math.floor(n / d) + (2 * (n % d) >= d ? 1 : 0);
-          expect(dividirArredondando(n, d)).toBe(exato);
+          expect(divideRounded(n, d)).toBe(exato);
         }
       }
     });
   });
 
-  describe("contribuicaoDoGrupo", () => {
+  describe("groupContribution", () => {
     it("sum soma preço vezes quantidade", () => {
       expect(
-        contribuicaoDoGrupo("sum", [
+        groupContribution("sum", [
           { priceInCents: 500, quantity: 2 },
           { priceInCents: 300, quantity: 1 },
         ]),
@@ -165,27 +171,27 @@ describe("aritmética de preço das opções", () => {
 
     it("highest devolve o maior preço unitário, ignorando a quantidade", () => {
       expect(
-        contribuicaoDoGrupo("highest", [
+        groupContribution("highest", [
           { priceInCents: 4505, quantity: 1 },
           { priceInCents: 5000, quantity: 1 },
         ]),
       ).toBe(5000);
       expect(
-        contribuicaoDoGrupo("highest", [{ priceInCents: 4505, quantity: 3 }]),
+        groupContribution("highest", [{ priceInCents: 4505, quantity: 3 }]),
       ).toBe(4505);
     });
 
     it("average é a média por unidade, arredondada", () => {
       // (4505 + 5000) / 2 = 4752.5
       expect(
-        contribuicaoDoGrupo("average", [
+        groupContribution("average", [
           { priceInCents: 4505, quantity: 1 },
           { priceInCents: 5000, quantity: 1 },
         ]),
       ).toBe(4753);
       // (3000 + 3500 + 4100) / 3 = 3533.33…
       expect(
-        contribuicaoDoGrupo("average", [
+        groupContribution("average", [
           { priceInCents: 3000, quantity: 1 },
           { priceInCents: 3500, quantity: 1 },
           { priceInCents: 4100, quantity: 1 },
@@ -196,21 +202,21 @@ describe("aritmética de preço das opções", () => {
     /** 2x o mesmo sabor é uma pizza inteira daquele sabor, pelo preço dele. */
     it("highest e average sobre uma opção repetida degradam para o preço dela", () => {
       const escolhas = [{ priceInCents: 4505, quantity: 2 }];
-      expect(contribuicaoDoGrupo("highest", escolhas)).toBe(4505);
-      expect(contribuicaoDoGrupo("average", escolhas)).toBe(4505);
+      expect(groupContribution("highest", escolhas)).toBe(4505);
+      expect(groupContribution("average", escolhas)).toBe(4505);
     });
 
     it("grupo sem escolha não contribui", () => {
       for (const regra of ["sum", "highest", "average"] as const) {
-        expect(contribuicaoDoGrupo(regra, [])).toBe(0);
+        expect(groupContribution(regra, [])).toBe(0);
       }
     });
   });
 
-  describe("precoUnitario", () => {
+  describe("unitPrice", () => {
     it("soma as contribuições ao preço do produto", () => {
       expect(
-        precoUnitario(3000, [
+        unitPrice(3000, [
           {
             priceRule: "sum",
             escolhas: [{ priceInCents: 500, quantity: 2 }],
@@ -225,7 +231,7 @@ describe("aritmética de preço das opções", () => {
      * daria 8856 em vez de 8855.
      */
     it("arredonda UMA vez, no fim — não por grupo", () => {
-      const resultado = precoUnitario(3000, [
+      const resultado = unitPrice(3000, [
         {
           priceRule: "average",
           escolhas: [
@@ -247,7 +253,7 @@ describe("aritmética de preço das opções", () => {
     });
 
     it("produto sem grupo nenhum custa o preço dele", () => {
-      expect(precoUnitario(4890, [])).toBe(4890);
+      expect(unitPrice(4890, [])).toBe(4890);
     });
   });
 });
@@ -344,15 +350,15 @@ export type CreateOptionInput = {
 export type UpdateOptionInput = Partial<CreateOptionInput>;
 
 /** Uma opção escolhida, já com o preço congelado. */
-export type EscolhaPrecificada = {
+export type PricedChoice = {
   priceInCents: number;
   quantity: number;
 };
 
 /** Um grupo com as escolhas que o cliente fez nele. */
-export type GrupoPrecificado = {
+export type PricedGroup = {
   priceRule: PriceRule;
-  escolhas: EscolhaPrecificada[];
+  escolhas: PricedChoice[];
 };
 
 /**
@@ -370,7 +376,7 @@ export type GrupoPrecificado = {
  * Só funciona para `n >= 0`, que é garantido pelo `check (price_in_cents >= 0)`
  * da tabela `options`.
  */
-export function dividirArredondando(n: number, d: number): number {
+export function divideRounded(n: number, d: number): number {
   return Math.floor(n / d) + (2 * (n % d) >= d ? 1 : 0);
 }
 
@@ -378,12 +384,12 @@ export function dividirArredondando(n: number, d: number): number {
  * Quanto um grupo acrescenta ao preço unitário do item.
  *
  * ⚠️ O resultado de `average` é o único que arredonda, e ele arredonda **aqui**
- * por ser a fronteira do grupo — mas quem chama (`precoUnitario`) NÃO soma
+ * por ser a fronteira do grupo — mas quem chama (`unitPrice`) NÃO soma
  * contribuições já arredondadas. Ver o comentário lá.
  */
-export function contribuicaoDoGrupo(
+export function groupContribution(
   regra: PriceRule,
-  escolhas: EscolhaPrecificada[],
+  escolhas: PricedChoice[],
 ): number {
   if (escolhas.length === 0) return 0;
 
@@ -404,14 +410,14 @@ export function contribuicaoDoGrupo(
     0,
   );
   const unidades = escolhas.reduce((soma, escolha) => soma + escolha.quantity, 0);
-  return dividirArredondando(total, unidades);
+  return divideRounded(total, unidades);
 }
 
 /**
  * O preço de UMA unidade do item, com tudo que foi escolhido.
  *
  * ⚠️ **O arredondamento acontece uma vez, aqui.** As contribuições de `average`
- * são acumuladas como numerador/denominador exatos e só viram inteiro no fim.
+ * são acumuladas como numerator/denominator exatos e só viram inteiro no fim.
  *
  * Arredondar por grupo produziria viés sistemático **para cima** — medido: três
  * grupos caindo em meio centavo, em dez unidades, cobram dez centavos a mais.
@@ -419,16 +425,16 @@ export function contribuicaoDoGrupo(
  * com o total do pedido, e um recibo cuja conta não bate é lido como erro por
  * quem confere.
  */
-export function precoUnitario(
-  precoDoProduto: number,
-  grupos: GrupoPrecificado[],
+export function unitPrice(
+  productPriceInCents: number,
+  grupos: PricedGroup[],
 ): number {
   // acumula em milésimos de centavo para não arredondar no meio do caminho:
   // só `average` produz fração, e ela é sempre uma divisão exata por um
   // inteiro pequeno (o número de unidades escolhidas no grupo)
-  let numerador = precoDoProduto;
-  let fracionario = 0;
-  let denominador = 1;
+  let numerator = productPriceInCents;
+  let fractional = 0;
+  let denominator = 1;
 
   for (const grupo of grupos) {
     if (grupo.escolhas.length === 0) continue;
@@ -443,15 +449,15 @@ export function precoUnitario(
         0,
       );
       // soma de frações: a/b + c/d = (ad + cb) / bd
-      fracionario = fracionario * unidades + total * denominador;
-      denominador = denominador * unidades;
+      fractional = fractional * unidades + total * denominator;
+      denominator = denominator * unidades;
       continue;
     }
 
-    numerador += contribuicaoDoGrupo(grupo.priceRule, grupo.escolhas);
+    numerator += groupContribution(grupo.priceRule, grupo.escolhas);
   }
 
-  return numerador + dividirArredondando(fracionario, denominador);
+  return numerator + divideRounded(fractional, denominator);
 }
 ```
 
@@ -465,7 +471,7 @@ Esperado: PASS, 10 testes.
 
 - [ ] **Step 5: Verificar por mutação**
 
-Troque, em `precoUnitario`, a acumulação fracionária por `numerador += contribuicaoDoGrupo(...)` para todas as regras (isto é, arredondando por grupo). Rode o teste.
+Troque, em `unitPrice`, a acumulação fracionária por `numerator += groupContribution(...)` para todas as regras (isto é, arredondando por grupo). Rode o teste.
 
 Esperado: **FALHA** em "arredonda UMA vez, no fim — não por grupo", com `8856` em vez de `8855`.
 
@@ -2023,7 +2029,7 @@ A tarefa mais delicada: valida, muda a chave de fusão e congela.
 - Create: `apps/api/test/orders-options.test.ts`
 
 **Interfaces:**
-- Consumes: `precoUnitario`, `GrupoPrecificado` (Task 1); `findGroupsByProductIds` (Task 5).
+- Consumes: `unitPrice`, `PricedGroup` (Task 1); `findGroupsByProductIds` (Task 5).
 - Produces:
   - `CreateOrderItemInput` ganha `options?: { optionId: string; quantity: number }[]`
   - `OrderItem` ganha `unitPriceInCents: number` e `options: OrderItemOption[]`
@@ -2218,7 +2224,7 @@ function validarEscolhas(
   produto: Product,
   grupos: OptionGroup[],
   escolhas: Map<string, number>,
-): { congeladas: OrderItemOption[]; grupos: GrupoPrecificado[] } {
+): { congeladas: OrderItemOption[]; grupos: PricedGroup[] } {
   const opcaoPorId = new Map(
     grupos.flatMap((grupo) =>
       grupo.options.map((opcao) => [opcao.id, { grupo, opcao }] as const),
@@ -2243,7 +2249,7 @@ function validarEscolhas(
   }
 
   const congeladas: OrderItemOption[] = [];
-  const precificados: GrupoPrecificado[] = [];
+  const precificados: PricedGroup[] = [];
 
   for (const grupo of grupos) {
     const doGrupo = grupo.options
