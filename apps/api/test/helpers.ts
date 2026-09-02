@@ -100,6 +100,30 @@ export async function createProduct(
   return response.json();
 }
 
+/**
+ * Cria um grupo de opções via API. Como `createProduct`, recebe o restaurante
+ * inteiro porque é rota de gestão e precisa do `headers`.
+ */
+export async function createOptionGroup(
+  app: FastifyInstance,
+  restaurant: TestRestaurant,
+  overrides: Record<string, unknown> = {},
+) {
+  const response = await app.inject({
+    method: "POST",
+    url: `/restaurants/${restaurant.id}/option-groups`,
+    headers: restaurant.headers,
+    payload: {
+      name: "Adicionais",
+      minOptions: 0,
+      maxOptions: 3,
+      priceRule: "sum",
+      ...overrides,
+    },
+  });
+  return response.json();
+}
+
 export const validCustomerBody = {
   name: "Ana Souza",
   phone: "11999990000",
