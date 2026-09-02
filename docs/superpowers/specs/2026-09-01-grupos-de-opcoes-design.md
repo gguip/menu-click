@@ -70,8 +70,10 @@ create table options (
   id              uuid        primary key default gen_random_uuid(),
   option_group_id uuid        not null references option_groups (id),
   name            text        not null,
-  -- 0 cobre a escolha obrigatória sem custo ("ponto da carne")
-  price_in_cents  integer     not null default 0,
+  -- 0 cobre a escolha obrigatória sem custo ("ponto da carne"). O check não
+  -- é decoração: o arredondamento de `average` é meio-para-cima em direção a
+  -- +infinito, e portanto assimétrico no negativo. Ver "Aritmética de dinheiro".
+  price_in_cents  integer     not null default 0 check (price_in_cents >= 0),
   -- teto de unidades DESTA opção. Default 1 faz "Sabores" já nascer impedindo
   -- 2x o mesmo sabor sem ninguém configurar nada.
   max_quantity    integer     not null default 1,
@@ -153,18 +155,14 @@ Por grupo escolhido dentro de um item:
 | --- | --- |
 | `sum` | Σ (preço da opção × quantidade) |
 | `highest` | o maior **preço unitário** entre as opções escolhidas (a quantidade não entra) |
-| `average` | Σ(preço × qtd) ÷ Σ(qtd), **arredondado** |
+| `average` | Σ(preço × qtd) ÷ Σ(qtd) — a única que produz fração |
 
 ```
-preçoUnitárioDoItem = produto.preço + Σ contribuição de cada grupo
+preçoUnitárioDoItem = arredonda( produto.preço + Σ contribuição exata de cada grupo )
 totalDoItem         = preçoUnitárioDoItem × item.quantidade
 ```
 
 Dois hambúrgueres com bacon cobram o bacon duas vezes — que é o esperado.
-
-⚠️ **`average` produz fração de centavo.** O arredondamento é `Math.round` e
-precisa estar testado com números conferidos à mão. Sem isso vira divergência de
-um centavo que ninguém consegue explicar depois.
 
 `highest` e `average` sobre uma opção repetida degradam para o preço dela — "até 2
 sabores" com 2× Calabresa dá uma pizza inteira de calabresa pelo preço da
@@ -173,18 +171,107 @@ calabresa, que é o resultado certo.
 O total do pedido continua **calculado no servidor**. `totalInCents` não existe no
 schema do corpo, e as opções não mudam isso.
 
+## Aritmética de dinheiro
+
+Só a regra `average` produz fração de centavo, e ela **não é caso raro**: em preços
+realistas de cardápio (R$ 5 a R$ 120, terminados em 0 ou 5 centavos), metade das
+combinações de dois sabores cai em meio centavo exato. Cada decisão abaixo foi
+medida, não deduzida.
+
+### O arredondamento acontece UMA vez, no preço unitário
+
+Três lugares eram possíveis, e os outros dois estão errados por motivos diferentes:
+
+| Onde | O que acontece |
+| --- | --- |
+| por grupo, antes de somar | **viés sistemático para cima**: 1 centavo por grupo em meio centavo, por unidade. Medido: 3 grupos × 10 unidades = 10 centavos a mais. |
+| no total do item | o recibo **deixa de fechar**: `unitário × quantidade ≠ total`. Medido: até 5 centavos de divergência com 10 unidades, crescendo linearmente. |
+| **no preço unitário, uma vez** | o recibo fecha, e o desvio fica limitado a meio centavo por unidade. |
+
+O critério que desempata é o recibo. Toda nota fiscal do mundo mostra
+`quantidade × preço unitário = total`, e um total que não bate com essa conta é lido
+como erro por quem confere — além de ser o preço unitário que foi mostrado na tela
+no momento da escolha.
+
+### A conta é feita em inteiros, sem passar por float
+
+Verificado que `Math.round(n / d)` concorda com aritmética inteira exata em 103 mil
+combinações nas nossas magnitudes — inclusive nos quocientes que caem exatamente em
+`.5`, que a divisão IEEE-754 representa sem erro. Ou seja: o float **não** é o
+problema aqui.
+
+Mesmo assim a implementação usa inteiros:
+
+```ts
+/** Arredonda n/d para o inteiro mais próximo, meio para cima, sem float. */
+function dividirArredondando(n: number, d: number): number {
+  return Math.floor(n / d) + (2 * (n % d) >= d ? 1 : 0);
+}
+```
+
+Não é desconfiança do resultado medido — é remover a classe inteira de dúvida de
+graça. Uma equivalência verificada hoje, em faixas de valor de hoje, é mais frágil
+que uma propriedade que não depende de faixa nenhuma.
+
+### Preço de opção não pode ser negativo
+
+`options.price_in_cents` ganha `check (price_in_cents >= 0)`.
+
+O motivo é o arredondamento: `Math.round` é meio-para-**cima em direção a +∞**, e
+portanto assimétrico no negativo — `Math.round(-2.5)` é `-2`, não `-3`. Com preços
+não-negativos essa assimetria nunca é alcançada, e o `check` transforma isso numa
+garantia estrutural em vez de uma coincidência.
+
+⚠️ Isso fecha a porta para "sem queijo −R$ 2,00" como opção de desconto. É
+consciente: desconto é outro assunto (cupom, promoção), e abrir preço negativo
+aqui obrigaria a revisitar o arredondamento antes.
+
+Note que este `check` **não** contradiz a ausência deliberada de
+`check (stock >= 0)` em `products`: lá a constraint esconderia o sintoma de uma
+race condition que o teste precisa enxergar. Aqui não há corrida nenhuma — preço
+negativo é entrada sem sentido, e recusá-la no banco não esconde nada.
+
+### O recibo não pode somar os preços das opções
+
+Para `sum`, os preços das opções são parcelas e somam. Para `highest` e `average`,
+eles são **entradas de uma fórmula**, não parcelas.
+
+Medido: uma pizza de R$ 30,00 com sabores de R$ 45,05 e R$ 50,00 custa R$ 77,53 na
+regra `average`. Um cliente que montasse o recibo somando as opções cobraria
+R$ 125,05 — **R$ 47,52 a mais**.
+
+Por isso `order_items` ganha `unit_price_in_cents`: o preço unitário **já calculado
+e congelado**, ao lado do `price_in_cents` do produto. A API devolve os dois, e
+nenhum cliente precisa (nem deve) recompor a conta. O total do pedido passa a ser
+verificável como `Σ (unit_price_in_cents × quantity)`.
+
 ## Congelamento no pedido
 
-`order_items.price_in_cents` **continua sendo o preço do produto**, sem as opções.
+`order_items` ganha uma coluna:
+
+```sql
+alter table order_items
+  -- o preço unitário JÁ com as opções, calculado e congelado. Sem ele, ler o
+  -- pedido exigiria refazer as regras de preço no cliente — e somar as opções
+  -- (o caminho ingênuo) erra por R$ 47,52 numa pizza. Ver "Aritmética de dinheiro".
+  add column unit_price_in_cents integer not null default 0;
+```
+
+`price_in_cents` **continua sendo o preço do produto**, sem as opções; o novo
+`unit_price_in_cents` é o que foi efetivamente cobrado por unidade. Os dois juntos
+tornam a conta conferível sem recompô-la:
+`total do pedido = Σ (unit_price_in_cents × quantity)`.
+
 As escolhas ficam nas linhas filhas de `order_item_options`, com o nome do grupo
 copiado junto.
 
 É o formato de um cupom fiscal:
 
 ```
-Ramen Shoyu ................ R$ 48,90
-  Sabores: Calabresa
-  Adicionais: 2× Bacon
+1x Pizza Grande ............ R$ 77,53      ← unit_price_in_cents
+   produto .................. R$ 30,00      ← price_in_cents
+   Sabores: Calabresa, Portuguesa           (regra 'average': não somam)
+   Adicionais: 2× Bacon                     (regra 'sum': somam)
 ```
 
 Sem a cópia de `group_name` não dá para reconstruir o agrupamento na tela de
@@ -399,8 +486,13 @@ o índice único parcial permite.
 
 Além do caminho feliz de cada rota:
 
-- **As três regras de preço**, com números conferidos à mão, incluindo o
-  arredondamento do `average`.
+- **As três regras de preço**, com números conferidos à mão.
+- **A aritmética de dinheiro**, com os casos medidos nesta spec: que o
+  arredondamento acontece uma vez no unitário (e não por grupo nem no total), que
+  `unitário × quantidade` fecha com o total do pedido, e que `dividirArredondando`
+  concorda com a divisão exata. Um teste que percorre uma faixa de preços e
+  compara as duas estratégias vale mais que três exemplos escolhidos a dedo.
+- **Preço negativo de opção é recusado** pelo banco.
 - **A fusão de linhas**: mesmo produto com opções diferentes gera duas linhas;
   mesmo produto com opções idênticas funde.
 - **A conferência de estoque somada por produto**: duas linhas do mesmo produto,
