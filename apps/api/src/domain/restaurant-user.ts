@@ -6,6 +6,22 @@
  * restaurante, que é o que torna a autorização uma comparação simples.
  */
 
+/**
+ * Os papéis dentro do restaurante.
+ *
+ * São dois, e a diferença entre eles vale em **duas** ações: remover o
+ * restaurante e administrar usuários. Cardápio, pedidos e configurações são
+ * iguais para os dois.
+ *
+ * O corte é esse porque o problema que os papéis resolvem é esse: sem eles, o
+ * atendente convidado herdaria o poder de apagar o negócio. Um sistema de
+ * permissão por ação seria escopo maior — e meio implementado seria pior que
+ * ausente, porque daria a impressão de proteger o que não protege.
+ */
+export const USER_ROLES = ["owner", "staff"] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
+
 /** Tamanho mínimo de senha aceito. O máximo é em BYTES — ver abaixo. */
 export const PASSWORD_MIN_LENGTH = 8;
 
@@ -25,6 +41,8 @@ export type CreateRestaurantUserInput = {
   name: string;
   email: string;
   password: string;
+  /** Ausente = `staff`. Quem nasce `owner` é o primeiro, no cadastro. */
+  role?: UserRole;
 };
 
 /**
@@ -39,6 +57,7 @@ export type RestaurantUser = {
   restaurantId: string;
   name: string;
   email: string;
+  role: UserRole;
   createdAt: string;
   updatedAt: string;
 };

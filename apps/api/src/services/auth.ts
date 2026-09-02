@@ -7,9 +7,11 @@ import type {
   RestaurantUser,
 } from "../domain/restaurant-user.ts";
 import { PASSWORD_MAX_BYTES } from "../domain/restaurant-user.ts";
+import { isUuid } from "../domain/uuid.ts";
 import type { AuthContext, IssuedSession } from "../domain/session.ts";
 import {
   ConflictError,
+  NotFoundError,
   UnauthorizedError,
   ValidationError,
 } from "../errors.ts";
@@ -102,6 +104,10 @@ export async function register(input: {
         name: input.user.name,
         email: input.user.email,
         passwordHash,
+        // o primeiro usuário é sempre o dono: ele acabou de criar o
+        // restaurante, e um restaurante sem nenhum owner não teria como
+        // convidar ninguém nem se remover
+        role: "owner",
       },
       client,
     );
@@ -154,6 +160,11 @@ export async function logout(sessionId: string): Promise<void> {
 }
 
 /** Dados do usuário da sessão atual (`GET /auth/me`). */
+/** Erro padrão de usuário inexistente — mesma mensagem em toda a API. */
+function userNotFound(id: string): NotFoundError {
+  return new NotFoundError(`Usuário com id "${id}" não encontrado`);
+}
+
 export async function getUser(userId: string): Promise<RestaurantUser> {
   const user = await restaurantUsersRepository.findById(userId);
   if (user === null) {
@@ -162,4 +173,106 @@ export async function getUser(userId: string): Promise<RestaurantUser> {
     throw new UnauthorizedError("Sessão inválida");
   }
   return user;
+}
+
+/**
+ * Troca a senha do usuário da sessão.
+ *
+ * Exige a senha **atual** mesmo já havendo sessão válida: sem isso, um token
+ * roubado trocaria a senha e trancaria o dono para fora da própria conta — o
+ * pior resultado possível de um vazamento de token.
+ *
+ * E derruba as demais sessões, poupando a atual. Trocar senha é o que alguém
+ * faz quando desconfia que ela vazou; se as outras continuassem valendo, a
+ * troca não resolveria nada. É para isso que a sessão mora no banco.
+ *
+ * A senha errada aqui é **401**, não 400: o corpo é válido, o que falhou foi a
+ * credencial. Diferente do login, não há oráculo a defender — quem chega aqui
+ * já provou quem é, e a existência da conta não é segredo para ela mesma.
+ */
+export async function changePassword(
+  auth: AuthContext,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  assertPasswordFits(newPassword);
+
+  const user = await restaurantUsersRepository.findByIdWithHash(auth.userId);
+  if (user === null) throw new UnauthorizedError("Sessão inválida ou expirada");
+
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    throw new UnauthorizedError("Senha atual incorreta");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await restaurantUsersRepository.updatePasswordHash(auth.userId, passwordHash);
+  await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId);
+}
+
+/** Os usuários com acesso ao painel do restaurante. */
+export async function listUsers(
+  restaurantId: string,
+): Promise<RestaurantUser[]> {
+  return restaurantUsersRepository.findByRestaurant(restaurantId);
+}
+
+/**
+ * Cria mais um usuário no restaurante.
+ *
+ * Sem papel informado nasce `staff`: o padrão é o menos poderoso, para que
+ * esquecer o campo não dê a alguém o poder de apagar o restaurante. Quem nasce
+ * `owner` nasce por escolha explícita, ou por ter feito o cadastro.
+ *
+ * O hash sai da transação — aqui nem há transação, mas vale a mesma razão do
+ * `register`: bcrypt a custo 12 leva centenas de milissegundos.
+ */
+export async function createUser(
+  restaurantId: string,
+  input: CreateRestaurantUserInput,
+): Promise<RestaurantUser> {
+  assertPasswordFits(input.password);
+
+  const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
+  const user = await restaurantUsersRepository.insert(restaurantId, {
+    name: input.name,
+    email: input.email,
+    passwordHash,
+    role: input.role ?? "staff",
+  });
+  if (user === null) {
+    throw new ConflictError(`O e-mail "${input.email}" já está em uso`);
+  }
+  return user;
+}
+
+/**
+ * Remove um usuário do restaurante.
+ *
+ * **Ninguém remove a si mesmo** (409). A regra existe para não deixar alguém
+ * se trancar para fora, e ela tem uma consequência que vale de invariante: como
+ * só `owner` remove usuário, o último dono nunca consegue sair — então o
+ * restaurante sempre tem pelo menos um `owner`, e nunca fica sem quem possa
+ * convidar alguém ou encerrá-lo.
+ *
+ * Não é preciso revogar as sessões do removido: a resolução do token junta
+ * `restaurant_users` filtrando `deleted_at is null`, então elas param de valer
+ * no mesmo instante. Há teste.
+ */
+export async function removeUser(
+  auth: AuthContext,
+  userId: string,
+): Promise<void> {
+  if (!isUuid(userId)) throw userNotFound(userId);
+
+  if (userId === auth.userId) {
+    throw new ConflictError(
+      "Você não pode remover a si mesmo. Peça a outro dono do restaurante",
+    );
+  }
+
+  const removed = await restaurantUsersRepository.softDelete(
+    auth.restaurantId,
+    userId,
+  );
+  if (!removed) throw userNotFound(userId);
 }

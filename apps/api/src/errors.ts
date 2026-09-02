@@ -33,6 +33,24 @@ export class ValidationError extends Error {
   }
 }
 
+/**
+ * Autenticado, e o recurso é do restaurante da sessão — mas este usuário não
+ * pode fazer isso. Vira **403**.
+ *
+ * É a única situação em que 403 é a resposta certa neste projeto, e ela não
+ * conflita com o S19. Lá o 404 protege a **existência** de um restaurante que
+ * não é seu; aqui a existência já é conhecida (o restaurante é da sessão) e o
+ * que falta é permissão. Devolver 404 diria que o próprio restaurante sumiu,
+ * o que seria mentira e mandaria quem está no painel procurar o problema no
+ * lugar errado.
+ */
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
 /** A operação é válida, mas o estado atual não permite. Vira **409**. */
 export class ConflictError extends Error {
   constructor(message: string) {

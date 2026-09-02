@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias e de produtos no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis e troca de senha, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias e de produtos no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -110,6 +110,26 @@ Público hoje, e nada além disso: `GET /health`, `GET /menu/:slug`, `GET /menu/
 - **O bcrypt ignora tudo depois do byte 72, em silêncio.** Verificado: duas senhas que só diferem do byte 73 em diante conferem como iguais, e 40 letras "ç" já são 80 bytes. Como `maxLength` do JSON Schema conta caracteres, a checagem é `Buffer.byteLength` no serviço, e falha com `ValidationError` (400).
 - **Login errado responde sempre a mesma coisa, e leva sempre o mesmo tempo**: o bcrypt roda contra um hash descartável quando o e-mail não existe, senão o tempo de resposta viraria um oráculo de quais e-mails estão cadastrados.
 - `BCRYPT_ROUNDS` existe só para a suíte baixar o custo para 4; o padrão é 12 e o valor é preso entre 4 e 15.
+
+### Acesso: papéis, senha e usuários
+
+O restaurante teve, por várias PRs, **um login só e nenhuma forma de trocar a senha** — quem a esquecesse perdia o restaurante, sem caminho de volta pela API. As rotas abaixo existem para fechar isso, e a ordem entre elas não é arbitrária.
+
+**`restaurant_users.role` é `owner` ou `staff`.** A checagem vale em **duas** ações — remover o restaurante e administrar usuários — e em nada mais: cardápio, pedidos e configurações são iguais para os dois. O corte é esse porque o problema que os papéis resolvem é esse: sem eles, o atendente convidado herdaria o poder de apagar o negócio.
+
+A marcação é `config: { ownerOnly: true }`, lida pelo **mesmo hook** que já faz autenticação e escopo — o papel vem junto da sessão, na query que resolve o token, então checar não custa ida a mais ao banco.
+
+⚠️ **O sentido do `ownerOnly` é o oposto do `public`, e de propósito.** Lá o padrão fecha, porque esquecer expõe. Aqui o padrão abre, porque o papel restringe só duas ações — marcar rota nova como `ownerOnly` por reflexo criaria uma hierarquia que ninguém decidiu.
+
+**403 aqui, e não 404.** É a única situação do projeto em que 403 é a resposta certa, e ela não conflita com o S19: lá o 404 protege a *existência* de um restaurante que não é seu; aqui o restaurante É o da sessão e o que falta é permissão. Responder 404 diria que o restaurante sumiu, e mandaria quem está no painel procurar o problema no lugar errado.
+
+**`POST /auth/change-password` exige a senha atual** mesmo já havendo sessão: sem isso, um token roubado trocaria a senha e trancaria o dono para fora — o pior resultado de um vazamento. E revoga as **demais** sessões, poupando a atual; trocar senha é o que se faz ao desconfiar de vazamento, e sessões antigas ainda válidas esvaziariam o gesto.
+
+**`/restaurants/:restaurantId/users`** cria, lista e remove — tudo `ownerOnly`. Sem papel informado o usuário nasce `staff`. **Ninguém remove a si mesmo** (409): a regra impede alguém de se trancar para fora e, como só `owner` remove usuário, garante de quebra que o restaurante **nunca fica sem nenhum dono**.
+
+A sessão de um usuário removido morre sozinha — a resolução do token junta `restaurant_users` filtrando `deleted_at is null`. Há teste para essa propriedade não se perder numa refatoração da query.
+
+⚠️ **Não há recuperação de senha por e-mail**, e isso ainda é um buraco: se o último `owner` perder a senha, o restaurante continua sem caminho de volta. Fechá-lo exige serviço de envio de e-mail — dependência e infra novas.
 
 ### Cardápio público e o slug
 
@@ -250,6 +270,8 @@ O roteamento é **por id de pedido** (o nome do evento é o id), e não um event
 
 A autorização roda em **`preHandler`, não `preValidation`**. Rota WebSocket passa pelos hooks antes do upgrade, mas `preValidation` roda **antes** da validação do schema — lá o `token` ainda pode ser `undefined`, e o hash dele estoura 500 em vez de responder 400. Os exemplos do plugin usam `preValidation` porque leem um header, que não passa por schema; credencial em querystring, não.
 
+**`GET /orders/:orderId?token=` é o gêmeo HTTP do canal**, e existe por duas razões que ele não cobre: o WebSocket transmite só `{ id, type, status, totalInCents, updatedAt }` (é mensagem de mudança, não de consulta), então depois de um reload a tela não teria como dizer o que a pessoa pediu; e upgrade de WebSocket morre atrás de proxy corporativo. A rota devolve os **itens**, confere o `orderId` contra o pedido que o token resolve (senão um token legítimo leria qualquer pedido) e **não** devolve os dados do cliente nem do restaurante.
+
 ⚠️ **O emissor é do processo.** Com duas instâncias, o cliente conectado na A não recebe o evento publicado na B, e a falha é silenciosa — a tela só não atualiza. Mesma limitação do contador de rate limit, mesma solução (pub/sub no Redis).
 
 **Teste de WebSocket não usa `app.inject()`** — ele não faz upgrade. `test/orders-tracking.test.ts` sobe o servidor em porta efêmera (`listen({ port: 0 })`) e conecta com um cliente real; é a exceção documentada ao F21. E o cliente de teste enfileira as mensagens desde antes do `open`: o servidor manda o `snapshot` assim que a conexão abre, e um listener registrado depois do `open` chega tarde demais.
@@ -280,7 +302,7 @@ O schema é versionado com **`node-pg-migrate`**, em migrations de **SQL puro** 
 
 ### Monorepo
 
-Turborepo (`turbo.json`) + pnpm workspaces (`pnpm-workspace.yaml`: `apps/*` + `packages/*`). `packages/` existe mas está vazio (reservado para libs compartilhadas). As tasks `dev`/`start` são `persistent` e sem cache; `build` depende de `^build` (builds das dependências primeiro).
+Turborepo (`turbo.json`) + pnpm workspaces (`pnpm-workspace.yaml`: `apps/*` + `packages/*`). `packages/` ainda **não existe** no disco — o `pnpm-workspace.yaml` só o declara, reservado para libs compartilhadas. As tasks `dev`/`start` são `persistent` e sem cache; `build` depende de `^build` (builds das dependências primeiro).
 
 ## Convenções
 

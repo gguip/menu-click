@@ -83,6 +83,18 @@ const registerBodySchema = {
   },
 };
 
+const changePasswordBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["currentPassword", "newPassword"],
+  properties: {
+    // a atual não tem `minLength`: ela é conferida contra o hash, e exigir
+    // formato dela recusaria uma senha legítima criada sob outra regra
+    currentPassword: { type: "string" },
+    newPassword: passwordSchema,
+  },
+};
+
 const userResponseSchema = {
   type: "object",
   properties: {
@@ -90,6 +102,7 @@ const userResponseSchema = {
     restaurantId: { type: "string" },
     name: { type: "string" },
     email: { type: "string" },
+    role: { type: "string" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
@@ -221,6 +234,35 @@ export async function authRoutes(app: FastifyInstance) {
     },
     async (request) => {
       return authService.getUser(requireAuth(request).userId);
+    },
+  );
+
+  // Trocar a própria senha. Sem esta rota, quem quisesse trocar a senha (ou
+  // desconfiasse de vazamento) não teria caminho nenhum pela API.
+  app.post<{ Body: { currentPassword: string; newPassword: string } }>(
+    "/auth/change-password",
+    {
+      schema: {
+        tags: ["Autenticação"],
+        operationId: "changePassword",
+        summary: "Troca a própria senha",
+        description:
+          "Exige a senha **atual** mesmo já havendo sessão: sem isso, um token roubado trocaria a senha e trancaria o dono para fora da própria conta. Ao trocar, as **demais** sessões do usuário são revogadas e a atual continua valendo — trocar senha é o que se faz ao desconfiar de vazamento, e sessões antigas ainda válidas esvaziariam o gesto. Senha atual errada é 401.",
+        body: changePasswordBodySchema,
+        response: {
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { currentPassword, newPassword } = request.body;
+      await authService.changePassword(
+        requireAuth(request),
+        currentPassword,
+        newPassword,
+      );
+      return reply.code(204).send();
     },
   );
 }

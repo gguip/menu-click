@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { AuthContext } from "../domain/session.ts";
-import { NotFoundError, UnauthorizedError } from "../errors.ts";
+import { ForbiddenError, NotFoundError, UnauthorizedError } from "../errors.ts";
 import * as authService from "../services/auth.ts";
 
 /**
@@ -27,6 +27,18 @@ declare module "fastify" {
      * Os dois erros não custam a mesma coisa.
      */
     public?: boolean;
+
+    /**
+     * Restringe a rota a quem é `owner` do restaurante. **Ausente = qualquer
+     * usuário do restaurante.**
+     *
+     * O sentido é o oposto do `public`, e de propósito. Lá o padrão fecha
+     * porque esquecer expõe; aqui o padrão abre porque o papel restringe
+     * apenas duas ações — remover o restaurante e administrar usuários — e
+     * tudo o mais é igual para os dois papéis. Marcar rota nova como
+     * `ownerOnly` por reflexo criaria uma hierarquia que ninguém decidiu.
+     */
+    ownerOnly?: boolean;
   }
 }
 
@@ -66,6 +78,18 @@ export function installAuth(app: FastifyInstance): void {
       // restaurante que não existe.
       throw new NotFoundError(
         `Restaurante com id "${restaurantId}" não encontrado`,
+      );
+    }
+
+    // Permissão, depois de identidade e escopo. 403 e não 404: o restaurante é
+    // o da sessão, então a existência dele já é conhecida — esconder aqui
+    // mandaria quem está no painel procurar o problema no lugar errado.
+    if (
+      request.routeOptions.config.ownerOnly === true &&
+      request.auth?.role !== "owner"
+    ) {
+      throw new ForbiddenError(
+        "Esta ação é restrita ao dono do restaurante",
       );
     }
   });

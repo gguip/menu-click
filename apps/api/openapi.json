@@ -1614,6 +1614,395 @@
         }
       }
     },
+    "/restaurants/{restaurantId}/users": {
+      "post": {
+        "operationId": "createRestaurantUser",
+        "summary": "Dá acesso ao painel para mais alguém",
+        "tags": [
+          "Usuários"
+        ],
+        "description": "Restrito ao dono. A senha é definida por quem convida e entregue à pessoa, que a troca depois em `/auth/change-password` — não há envio de e-mail no projeto. `role` ausente é `staff`: o padrão é o menos poderoso, para que esquecer o campo não dê a alguém o poder de apagar o restaurante.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "owner",
+                      "staff"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listRestaurantUsers",
+        "summary": "Quem tem acesso ao painel",
+        "tags": [
+          "Usuários"
+        ],
+        "description": "Restrito ao dono, e **sem envelope de paginação**: é a lista de quem entra no painel, não um catálogo. Um restaurante com dezenas de logins é outro problema, e ele ainda não existe.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "restaurantId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/users/{id}": {
+      "delete": {
+        "operationId": "deleteRestaurantUser",
+        "summary": "Tira o acesso de alguém",
+        "tags": [
+          "Usuários"
+        ],
+        "description": "Restrito ao dono. **Ninguém remove a si mesmo** (409): a regra impede alguém de se trancar para fora e, como só o dono remove usuário, garante de quebra que o restaurante nunca fica sem nenhum `owner`. As sessões do removido param de valer no mesmo instante — a resolução do token filtra usuário vivo.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/restaurants/{restaurantId}/orders": {
       "post": {
         "operationId": "createOrder",
@@ -3811,6 +4200,159 @@
         }
       }
     },
+    "/orders/{orderId}": {
+      "get": {
+        "operationId": "getTrackedOrder",
+        "summary": "Lê o pedido pelo token de acompanhamento",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "in": "query",
+            "name": "token",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "orderId",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "totalInCents": {
+                      "type": "integer"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "productId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "deliveryAddress": {
+                      "type": "object",
+                      "properties": {
+                        "street": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "neighborhood": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "city": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "zipCode": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/register": {
       "post": {
         "operationId": "register",
@@ -4033,6 +4575,9 @@
                           "type": "string"
                         },
                         "email": {
+                          "type": "string"
+                        },
+                        "role": {
                           "type": "string"
                         },
                         "createdAt": {
@@ -4266,10 +4811,97 @@
                     "email": {
                       "type": "string"
                     },
+                    "role": {
+                      "type": "string"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
                     "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "operationId": "changePassword",
+        "summary": "Troca a própria senha",
+        "tags": [
+          "Autenticação"
+        ],
+        "description": "Exige a senha **atual** mesmo já havendo sessão: sem isso, um token roubado trocaria a senha e trancaria o dono para fora da própria conta. Ao trocar, as **demais** sessões do usuário são revogadas e a atual continua valendo — trocar senha é o que se faz ao desconfiar de vazamento, e sessões antigas ainda válidas esvaziariam o gesto. Senha atual errada é 401.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currentPassword",
+                  "newPassword"
+                ],
+                "properties": {
+                  "currentPassword": {
+                    "type": "string"
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
                       "type": "string"
                     }
                   }
@@ -4324,6 +4956,10 @@
     {
       "name": "Produtos",
       "description": "O cardápio, do lado de quem o edita."
+    },
+    {
+      "name": "Usuários",
+      "description": "Quem tem acesso ao painel. Restrito ao dono: administrar usuários é uma das duas ações que o papel restringe — a outra é remover o restaurante."
     },
     {
       "name": "Categorias",

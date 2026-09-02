@@ -49,8 +49,9 @@ export async function findActiveByTokenHash(
     id: string;
     restaurant_user_id: string;
     restaurant_id: string;
+    role: AuthContext["role"];
   }>(
-    `select s.id, s.restaurant_user_id, u.restaurant_id
+    `select s.id, s.restaurant_user_id, u.restaurant_id, u.role
        from sessions s
        join restaurant_users u on u.id = s.restaurant_user_id
       where s.token_hash = $1
@@ -65,6 +66,7 @@ export async function findActiveByTokenHash(
     sessionId: rows[0].id,
     userId: rows[0].restaurant_user_id,
     restaurantId: rows[0].restaurant_id,
+    role: rows[0].role,
   };
 }
 
@@ -86,17 +88,32 @@ export async function revoke(
 }
 
 /**
- * Revoga TODAS as sessões vivas de um usuário. Ainda não tem rota: existe para
- * troca de senha e desligamento, e é a razão do índice por usuário.
+ * Revoga as sessões vivas de um usuário, opcionalmente poupando uma.
+ *
+ * É a razão do índice por usuário, e o que dá sentido à sessão opaca: revogar
+ * é apagar linhas, e não manter lista negra — que seria justamente o estado no
+ * banco que o JWT queria evitar.
+ *
+ * `exceptSessionId` existe para a troca de senha: derrubar tudo derrubaria
+ * também quem acabou de trocar, e a pessoa seria deslogada por uma ação que
+ * ela mesma acabou de fazer.
  */
 export async function revokeAllForUser(
   restaurantUserId: string,
+  exceptSessionId: string | undefined = undefined,
   db: Queryable = pool,
 ): Promise<number> {
+  const values: unknown[] = [restaurantUserId];
+  let excecao = "";
+  if (exceptSessionId !== undefined) {
+    values.push(exceptSessionId);
+    excecao = ` and id <> $${values.length}`;
+  }
+
   const { rowCount } = await db.query(
     `update sessions set deleted_at = now(), updated_at = now()
-      where restaurant_user_id = $1 and deleted_at is null`,
-    [restaurantUserId],
+      where restaurant_user_id = $1 and deleted_at is null${excecao}`,
+    values,
   );
   return rowCount ?? 0;
 }

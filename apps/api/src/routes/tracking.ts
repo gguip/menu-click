@@ -3,7 +3,7 @@ import type { Order } from "../domain/order.ts";
 import { isTerminalStatus } from "../domain/order.ts";
 import * as orderEvents from "../events/orders.ts";
 import * as ordersService from "../services/orders.ts";
-import { errorResponseSchema } from "./schemas.ts";
+import { addressProperties, errorResponseSchema } from "./schemas.ts";
 
 /**
  * Acompanhamento do pedido em tempo real — a única rota WebSocket da API.
@@ -35,6 +35,44 @@ function toPayload(order: Order) {
   };
 }
 
+/**
+ * O pedido como **quem o fez** o vê.
+ *
+ * Escrito campo a campo, e mais enxuto que o detalhe do restaurante, pela mesma
+ * razão do cardápio público: é a superfície aberta, e o que sai por aqui é
+ * decidido, não herdado (S10).
+ *
+ * O bloco `customer` não entra. A pessoa sabe o próprio nome e telefone, e
+ * devolvê-los numa rota autorizada por credencial de URL seria reexpor dado
+ * pessoal sem que ninguém ganhasse nada. Dados do restaurante também não: o
+ * cliente chegou aqui pelo cardápio, e é o front que sabe de onde veio.
+ */
+const trackedOrderResponseSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    type: { type: "string" },
+    status: { type: "string" },
+    totalInCents: { type: "integer" },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          productId: { type: "string" },
+          // cópias congeladas: é o que foi combinado, não o cardápio de hoje
+          name: { type: "string" },
+          priceInCents: { type: "integer" },
+          quantity: { type: "integer" },
+        },
+      },
+    },
+    deliveryAddress: { type: "object", properties: addressProperties },
+    createdAt: { type: "string" },
+    updatedAt: { type: "string" },
+  },
+};
+
 const paramsSchema = {
   type: "object",
   required: ["orderId"],
@@ -50,6 +88,48 @@ const querystringSchema = {
 export async function trackingRoutes(app: FastifyInstance) {
   // F18: nasce com valor "vazio" para o shape do objeto não mudar no meio.
   app.decorateRequest("trackedOrder", null);
+
+  /**
+   * O gêmeo HTTP do acompanhamento.
+   *
+   * Existe por duas razões que o WebSocket não cobre. A primeira é o conteúdo:
+   * o canal transmite só `{ id, type, status, totalInCents, updatedAt }`, sem
+   * os itens — de propósito, porque é mensagem de mudança, não de consulta.
+   * Depois de um reload, a tela não teria como dizer o que a pessoa pediu.
+   *
+   * A segunda é o socket não conectar. Rede móvel ruim e proxy corporativo
+   * derrubam upgrade de WebSocket, e sem esta rota o acompanhamento
+   * simplesmente não existiria para quem estivesse atrás de um.
+   *
+   * Mesma credencial e mesma resposta única de 404 do canal: um token que não
+   * existe e um token de outro pedido são indistinguíveis do lado de fora.
+   */
+  app.get<{ Params: { orderId: string }; Querystring: { token: string } }>(
+    "/orders/:orderId",
+    {
+      config: { public: true },
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "getTrackedOrder",
+        summary: "Lê o pedido pelo token de acompanhamento",
+        description:
+          "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante.",
+        params: paramsSchema,
+        querystring: querystringSchema,
+        response: {
+          200: trackedOrderResponseSchema,
+          400: errorResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      return ordersService.getByTrackingToken(
+        request.params.orderId,
+        request.query.token,
+      );
+    },
+  );
 
   app.get<{ Params: { orderId: string }; Querystring: { token: string } }>(
     "/orders/:orderId/track",

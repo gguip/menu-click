@@ -1,0 +1,204 @@
+import type { FastifyInstance } from "fastify";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  buildTestApp,
+  createOrder,
+  createProduct,
+  createRestaurant,
+  validDeliveryAddress,
+} from "./helpers.ts";
+
+const NONEXISTENT_ID = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * A leitura HTTP do pedido pelo token de acompanhamento.
+ *
+ * É o gêmeo do canal WebSocket e existe por duas razões que ele não cobre: o
+ * canal não transmite os **itens** (é mensagem de mudança, não de consulta), e
+ * upgrade de WebSocket morre atrás de proxy corporativo.
+ */
+describe("ler o pedido pelo token", () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await buildTestApp();
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  /** Um pedido de retirada, que é modalidade que recebe token. */
+  async function pedidoComToken() {
+    const restaurant = await createRestaurant(app);
+    const produto = await createProduct(app, restaurant, {
+      name: "Ramen Shoyu",
+      priceInCents: 4890,
+      stock: 10,
+    });
+    const outro = await createProduct(app, restaurant, {
+      name: "Guioza",
+      priceInCents: 2490,
+      stock: 10,
+    });
+    const order = await createOrder(
+      app,
+      restaurant.id,
+      [
+        { productId: produto.id, quantity: 2 },
+        { productId: outro.id, quantity: 1 },
+      ],
+      { type: "takeaway" },
+    );
+    return { restaurant, order };
+  }
+
+  function ler(orderId: string, token: string) {
+    return app.inject({
+      method: "GET",
+      url: `/orders/${orderId}?token=${encodeURIComponent(token)}`,
+    });
+  }
+
+  it("200 sem sessão, com os itens que o WebSocket não manda", async () => {
+    const { order } = await pedidoComToken();
+
+    const response = await ler(order.id, order.trackingToken);
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body).toMatchObject({
+      id: order.id,
+      type: "takeaway",
+      status: "pending",
+      totalInCents: 4890 * 2 + 2490,
+    });
+    // Busca por nome, e não por posição: os itens de um pedido nascem na
+    // mesma transação, então `created_at` empata e o desempate acaba sendo o
+    // uuid. A ordem é estável entre leituras, mas NÃO é a ordem em que o
+    // cliente montou o carrinho — para isso faltaria uma coluna de posição.
+    expect(body.items).toHaveLength(2);
+    expect(
+      body.items.find((i: { name: string }) => i.name === "Ramen Shoyu"),
+    ).toMatchObject({ priceInCents: 4890, quantity: 2 });
+    expect(
+      body.items.find((i: { name: string }) => i.name === "Guioza"),
+    ).toMatchObject({ priceInCents: 2490, quantity: 1 });
+  });
+
+  it("acompanha a mudança de status", async () => {
+    const { restaurant, order } = await pedidoComToken();
+
+    await app.inject({
+      method: "POST",
+      url: `/restaurants/${restaurant.id}/orders/${order.id}/confirm`,
+      headers: restaurant.headers,
+    });
+
+    expect((await ler(order.id, order.trackingToken)).json().status).toBe(
+      "confirmed",
+    );
+  });
+
+  it("entrega devolve o endereço congelado", async () => {
+    const restaurant = await createRestaurant(app);
+    const produto = await createProduct(app, restaurant, { stock: 5 });
+    const order = await createOrder(
+      app,
+      restaurant.id,
+      [{ productId: produto.id, quantity: 1 }],
+      { type: "delivery", deliveryAddress: validDeliveryAddress },
+    );
+
+    const body = (await ler(order.id, order.trackingToken)).json();
+
+    expect(body.deliveryAddress).toMatchObject({ street: "Rua Augusta" });
+  });
+
+  /**
+   * S10: o que sai na superfície aberta é decidido campo a campo. O cliente
+   * sabe o próprio nome; devolvê-lo numa rota autorizada por credencial de URL
+   * seria reexpor dado pessoal sem ninguém ganhar nada.
+   */
+  it("não devolve o cliente, o restaurante nem o próprio token", async () => {
+    const { order } = await pedidoComToken();
+
+    const body = (await ler(order.id, order.trackingToken)).json();
+
+    expect(body.customer).toBeUndefined();
+    expect(body.restaurantId).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain(order.trackingToken);
+  });
+
+  describe("autorização", () => {
+    it("404 sem token válido", async () => {
+      const { order } = await pedidoComToken();
+
+      expect((await ler(order.id, "token-inventado")).statusCode).toBe(404);
+    });
+
+    /**
+     * Sem conferir o id contra o pedido que o token resolve, um token legítimo
+     * leria qualquer pedido — e a credencial deixaria de valer para um só.
+     */
+    it("404 com token de OUTRO pedido", async () => {
+      const primeiro = await pedidoComToken();
+      const segundo = await pedidoComToken();
+
+      const response = await ler(
+        primeiro.order.id,
+        segundo.order.trackingToken,
+      );
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("404 com pedido inexistente, mesmo com token válido", async () => {
+      const { order } = await pedidoComToken();
+
+      expect(
+        (await ler(NONEXISTENT_ID, order.trackingToken)).statusCode,
+      ).toBe(404);
+    });
+
+    /** Pedido de salão não recebe token, então não é legível por aqui. */
+    it("pedido de salão não tem token para ler", async () => {
+      const restaurant = await createRestaurant(app);
+      const produto = await createProduct(app, restaurant, { stock: 5 });
+      const order = await createOrder(app, restaurant.id, [
+        { productId: produto.id, quantity: 1 },
+      ]);
+
+      expect(order.trackingToken).toBeUndefined();
+      expect((await ler(order.id, "qualquer-coisa")).statusCode).toBe(404);
+    });
+
+    /**
+     * S28: o token vem da querystring, que passa por schema — sem a validação
+     * antes do uso, o hash de `undefined` viraria 500 em vez de 400.
+     */
+    it("400 sem o parâmetro token, não 500", async () => {
+      const { order } = await pedidoComToken();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/orders/${order.id}`,
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("a sessão do restaurante não abre esta rota sem token", async () => {
+      const { restaurant, order } = await pedidoComToken();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/orders/${order.id}`,
+        headers: restaurant.headers,
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+  });
+});
