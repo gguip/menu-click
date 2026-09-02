@@ -573,6 +573,21 @@ async function debitarEstoque(
   );
   const stockById = new Map(stocks.map((row) => [row.id, row.stock]));
 
+  // Soma as linhas do mesmo produto ANTES de conferir. Desde que o pedido pode
+  // ter mais de uma linha do mesmo produto (opções diferentes), conferir linha
+  // a linha deixaria cada uma enxergar o estoque inteiro — e duas linhas de 3
+  // passariam por uma checagem de "tem 4?" que ambas consideram suficiente.
+  //
+  // O débito abaixo continua por linha, e isso está certo: as linhas rodam na
+  // mesma transação, com a linha do produto já travada.
+  const pedidoPorProduto = new Map<string, number>();
+  for (const item of items) {
+    pedidoPorProduto.set(
+      item.productId,
+      (pedidoPorProduto.get(item.productId) ?? 0) + item.quantity,
+    );
+  }
+
   for (const item of items) {
     const stock = stockById.get(item.productId);
     // produto removido do cardápio entre o pedido e a confirmação
@@ -581,9 +596,10 @@ async function debitarEstoque(
         `O produto "${item.name}" saiu do cardápio e o pedido não pode ser confirmado`,
       );
     }
-    if (stock < item.quantity) {
+    const pedido = pedidoPorProduto.get(item.productId) as number;
+    if (stock < pedido) {
       throw new ConflictError(
-        `Estoque insuficiente de "${item.name}": ${item.quantity} pedidos, ${stock} disponíveis`,
+        `Estoque insuficiente de "${item.name}": ${pedido} pedidos, ${stock} disponíveis`,
       );
     }
   }

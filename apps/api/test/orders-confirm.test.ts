@@ -4,9 +4,12 @@ import { pool } from "../src/db/pool.ts";
 import type { TestRestaurant } from "./helpers.ts";
 import {
   buildTestApp,
+  createOption,
+  createOptionGroup,
   createOrder,
   createProduct,
   createRestaurant,
+  linkOptionGroups,
 } from "./helpers.ts";
 
 /**
@@ -219,6 +222,45 @@ describe("confirmação e cancelamento de pedido", () => {
 
       expect(response.statusCode).toBe(404);
       expect(await stockOf(product.id)).toBe(10);
+    });
+
+    /**
+     * Consequência direta da Task 6: como o mesmo produto agora pode aparecer em
+     * várias linhas (opções diferentes), conferir linha a linha deixa cada uma ver
+     * o estoque inteiro. Duas linhas de 3 unidades passariam por uma checagem de
+     * "tem 4?" que ambas consideram suficiente, e o débito levaria o estoque a -2.
+     */
+    it("soma as linhas do mesmo produto antes de conferir o estoque", async () => {
+      const restaurant = await createRestaurant(app);
+      const grupo = await createOptionGroup(app, restaurant, {
+        name: "Adicionais",
+        maxOptions: 1,
+        priceRule: "sum",
+      });
+      const bacon = await createOption(app, restaurant, grupo.id, { name: "Bacon" });
+      const produto = await createProduct(app, restaurant, { stock: 4 });
+      await linkOptionGroups(app, restaurant, produto.id, [grupo.id]);
+
+      const order = await createOrder(app, restaurant.id, [
+        { productId: produto.id, quantity: 3, options: [{ optionId: bacon.id, quantity: 1 }] },
+        { productId: produto.id, quantity: 3 },
+      ]);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders/${order.id}/confirm`,
+        headers: restaurant.headers,
+      });
+
+      expect(response.statusCode).toBe(409);
+
+      // e o estoque não foi tocado
+      const produtoDepois = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/products/${produto.id}`,
+        headers: restaurant.headers,
+      });
+      expect(produtoDepois.json().stock).toBe(4);
     });
   });
 
