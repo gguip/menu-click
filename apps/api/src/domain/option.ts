@@ -75,15 +75,15 @@ export type CreateOptionInput = {
 export type UpdateOptionInput = Partial<CreateOptionInput>;
 
 /** Uma opção escolhida, já com o preço congelado. */
-export type EscolhaPrecificada = {
+export type PricedChoice = {
   priceInCents: number;
   quantity: number;
 };
 
 /** Um grupo com as escolhas que o cliente fez nele. */
-export type GrupoPrecificado = {
+export type PricedGroup = {
   priceRule: PriceRule;
-  escolhas: EscolhaPrecificada[];
+  choices: PricedChoice[];
 };
 
 /**
@@ -101,7 +101,7 @@ export type GrupoPrecificado = {
  * Só funciona para `n >= 0`, que é garantido pelo `check (price_in_cents >= 0)`
  * da tabela `options`.
  */
-export function dividirArredondando(n: number, d: number): number {
+export function divideRounded(n: number, d: number): number {
   return Math.floor(n / d) + (2 * (n % d) >= d ? 1 : 0);
 }
 
@@ -109,33 +109,33 @@ export function dividirArredondando(n: number, d: number): number {
  * Quanto um grupo acrescenta ao preço unitário do item.
  *
  * ⚠️ O resultado de `average` é o único que arredonda, e ele arredonda **aqui**
- * por ser a fronteira do grupo — mas quem chama (`precoUnitario`) NÃO soma
+ * por ser a fronteira do grupo — mas quem chama (`unitPrice`) NÃO soma
  * contribuições já arredondadas. Ver o comentário lá.
  */
-export function contribuicaoDoGrupo(
-  regra: PriceRule,
-  escolhas: EscolhaPrecificada[],
+export function groupContribution(
+  rule: PriceRule,
+  choices: PricedChoice[],
 ): number {
-  if (escolhas.length === 0) return 0;
+  if (choices.length === 0) return 0;
 
-  if (regra === "sum") {
-    return escolhas.reduce(
-      (soma, escolha) => soma + escolha.priceInCents * escolha.quantity,
+  if (rule === "sum") {
+    return choices.reduce(
+      (sum, choice) => sum + choice.priceInCents * choice.quantity,
       0,
     );
   }
 
-  if (regra === "highest") {
+  if (rule === "highest") {
     // a quantidade não entra: dois pedaços do mesmo sabor não dobram o preço
-    return Math.max(...escolhas.map((escolha) => escolha.priceInCents));
+    return Math.max(...choices.map((choice) => choice.priceInCents));
   }
 
-  const total = escolhas.reduce(
-    (soma, escolha) => soma + escolha.priceInCents * escolha.quantity,
+  const total = choices.reduce(
+    (sum, choice) => sum + choice.priceInCents * choice.quantity,
     0,
   );
-  const unidades = escolhas.reduce((soma, escolha) => soma + escolha.quantity, 0);
-  return dividirArredondando(total, unidades);
+  const units = choices.reduce((sum, choice) => sum + choice.quantity, 0);
+  return divideRounded(total, units);
 }
 
 /**
@@ -150,37 +150,37 @@ export function contribuicaoDoGrupo(
  * com o total do pedido, e um recibo cuja conta não bate é lido como erro por
  * quem confere.
  */
-export function precoUnitario(
-  precoDoProduto: number,
-  grupos: GrupoPrecificado[],
+export function unitPrice(
+  productPriceInCents: number,
+  groups: PricedGroup[],
 ): number {
   // acumula em milésimos de centavo para não arredondar no meio do caminho:
   // só `average` produz fração, e ela é sempre uma divisão exata por um
   // inteiro pequeno (o número de unidades escolhidas no grupo)
-  let numerador = precoDoProduto;
-  let fracionario = 0;
-  let denominador = 1;
+  let numerator = productPriceInCents;
+  let fractional = 0;
+  let denominator = 1;
 
-  for (const grupo of grupos) {
-    if (grupo.escolhas.length === 0) continue;
+  for (const group of groups) {
+    if (group.choices.length === 0) continue;
 
-    if (grupo.priceRule === "average") {
-      const total = grupo.escolhas.reduce(
-        (soma, escolha) => soma + escolha.priceInCents * escolha.quantity,
+    if (group.priceRule === "average") {
+      const total = group.choices.reduce(
+        (sum, choice) => sum + choice.priceInCents * choice.quantity,
         0,
       );
-      const unidades = grupo.escolhas.reduce(
-        (soma, escolha) => soma + escolha.quantity,
+      const units = group.choices.reduce(
+        (sum, choice) => sum + choice.quantity,
         0,
       );
       // soma de frações: a/b + c/d = (ad + cb) / bd
-      fracionario = fracionario * unidades + total * denominador;
-      denominador = denominador * unidades;
+      fractional = fractional * units + total * denominator;
+      denominator = denominator * units;
       continue;
     }
 
-    numerador += contribuicaoDoGrupo(grupo.priceRule, grupo.escolhas);
+    numerator += groupContribution(group.priceRule, group.choices);
   }
 
-  return numerador + dividirArredondando(fracionario, denominador);
+  return numerator + divideRounded(fractional, denominator);
 }
