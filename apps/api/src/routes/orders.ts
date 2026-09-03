@@ -60,9 +60,12 @@ const createOrderBodySchema = {
           // produto (obrigatoriedade, teto de opções, teto de unidades,
           // disponibilidade) — tudo isso é 400, não 404: é a montagem do
           // pedido que falha, não um recurso ausente
+          // ausente é lido como `[]` pelo serviço (`item.options ?? []`); sem
+          // `default` aqui de propósito — o `useDefaults` do Ajv insere o
+          // array POR REFERÊNCIA, e todo item que omitisse `options` receberia
+          // a MESMA instância guardada no schema compilado.
           options: {
             type: "array",
-            default: [],
             items: {
               type: "object",
               additionalProperties: false,

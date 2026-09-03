@@ -3325,7 +3325,6 @@
                         },
                         "options": {
                           "type": "array",
-                          "default": [],
                           "items": {
                             "type": "object",
                             "additionalProperties": false,
