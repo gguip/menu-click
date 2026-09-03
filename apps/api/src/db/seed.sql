@@ -75,6 +75,62 @@ values
    'Ossobuco alla Milanese', '6f419d82-a70d-4c51-8e86-2d5f0b739012', 7450, 'Com risoto de açafrão', 8)
 on conflict (id) do nothing;
 
+-- O quarto nível do cardápio (Categoria -> Produto -> Grupo -> Opção), só no
+-- Tokyo. A pizza é "sushi pizza" — prato real de temakeria brasileira, base de
+-- arroz gratinado — para o cardápio japonês continuar coerente e ainda existir
+-- pizza de verdade para testar o meio a meio à mão.
+insert into products
+  (id, restaurant_id, name, category_id, price_in_cents, description, stock)
+values
+  ('6467a6be-eb91-485c-a27c-c403f6adc49e', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Pizza Sushi', '2b8d5f46-63c9-4e17-8a42-6f1b4d395c7e', 3200,
+   'Base de arroz gratinado ao estilo das temakerias — escolha tamanho, sabor e adicionais', 20)
+on conflict (id) do nothing;
+
+-- O grupo pertence ao RESTAURANTE, não ao produto: os três abaixo ficam
+-- disponíveis para a próxima pizza sem recriar opção nenhuma.
+insert into option_groups (id, restaurant_id, name, min_options, max_options, price_rule)
+values
+  -- obrigatório (min 1), uma escolha só (max 1) — tamanho não se combina.
+  ('61395f22-0b52-4df9-9bbb-df9381fde66e', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Tamanho', 1, 1, 'sum'),
+  -- obrigatório (min 1), até duas escolhas (max 2): uma é pizza inteira, duas
+  -- é meio a meio. `highest` cobra o sabor mais caro dos dois, nunca a soma —
+  -- é o que torna o meio a meio testável à mão.
+  ('591a8ba8-b41b-40f4-b098-412fef6845b2', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Sabores', 1, 2, 'highest'),
+  -- opcional (min 0), até três adicionais
+  ('89ab4bad-2308-4692-927d-9dfaacd94694', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Adicionais', 0, 3, 'sum')
+on conflict (id) do nothing;
+
+insert into options (id, option_group_id, name, price_in_cents, max_quantity, position)
+values
+  ('05395bb9-effa-4792-b8f8-4a3fc83f001c', '61395f22-0b52-4df9-9bbb-df9381fde66e',
+   'Média', 0, 1, 0),
+  ('95b91fd9-3ba6-4b6c-be27-18e9dadb7453', '61395f22-0b52-4df9-9bbb-df9381fde66e',
+   'Grande', 1200, 1, 1),
+  -- preços diferentes de propósito: pedir os dois sabores exercita o
+  -- `highest` cobrando o mais caro (Camarão), não a soma dos dois
+  ('6a1c0e04-f511-4b35-8c59-587c5707cf37', '591a8ba8-b41b-40f4-b098-412fef6845b2',
+   'Salmão', 0, 1, 0),
+  ('2e588309-845c-4d84-bf15-cbc965fdb9f6', '591a8ba8-b41b-40f4-b098-412fef6845b2',
+   'Camarão', 1500, 1, 1),
+  -- max_quantity 3: dá para pedir "bacon triplo" e ver o `sum` multiplicar
+  ('9c1dd827-a1d2-4fa5-96f9-8cf9baaf3ba8', '89ab4bad-2308-4692-927d-9dfaacd94694',
+   'Bacon', 500, 3, 0)
+on conflict (id) do nothing;
+
+insert into product_option_groups (id, product_id, option_group_id, position)
+values
+  ('765d32c2-cf3b-44bb-aad2-a5e8b8367d27', '6467a6be-eb91-485c-a27c-c403f6adc49e',
+   '61395f22-0b52-4df9-9bbb-df9381fde66e', 0),
+  ('cf0450f7-f827-4b94-9148-b1341e864b6b', '6467a6be-eb91-485c-a27c-c403f6adc49e',
+   '591a8ba8-b41b-40f4-b098-412fef6845b2', 1),
+  ('2dfe82df-feac-479a-9a69-44d41bbbaccc', '6467a6be-eb91-485c-a27c-c403f6adc49e',
+   '89ab4bad-2308-4692-927d-9dfaacd94694', 2)
+on conflict (id) do nothing;
+
 -- Um usuário por restaurante, para dar em quem entrar num ambiente novo.
 --
 -- A senha é `senha-de-exemplo-123` nos dois, e o hash abaixo é bcrypt custo 12

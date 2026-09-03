@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis e troca de senha, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias e de produtos no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis e troca de senha, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -162,6 +162,28 @@ A seção do cardápio ("Entradas", "Pratos", "Bebidas") é uma **entidade**, `c
 
 **A busca é `?search=` na listagem de gestão, e ela é o primeiro uso do S5.** `%` e `_` vindos do cliente são escapados antes de virar o padrão do `ilike` — não é injection (o termo continua indo como `$n`), mas sem escapar, procurar por "%" varre o cardápio inteiro em vez de achar o texto digitado. A busca **não** existe no cardápio público, e não por esquecimento: como ele vem inteiro numa resposta só, filtrar no servidor não economizaria nada que o cliente não faça localmente.
 
+### Grupos de opções
+
+O cardápio ganhou um quarto nível: `Categoria -> Produto -> Grupo de opções -> Opção`. Sem ele o sistema não vende pizza (tamanho, sabor), hambúrguer com adicional nem combo — o produto sozinho só descreve item de preço fixo.
+
+**O grupo pertence ao RESTAURANTE, não ao produto**, e se liga a cada produto por uma junção (`product_option_groups`), como a `PUT /restaurants/:restaurantId/products/:id/option-groups` deixa explícito. "Sabores" vale para todas as pizzas do cardápio; com grupo por produto, a décima pizza recriaria quatro grupos e vinte opções à mão, e corrigir o preço do bacon viraria editar trinta lugares em vez de um.
+
+**Três regras decidem como o preço das opções escolhidas entra na conta** (`PRICE_RULES` em `domain/option.ts`, e o restaurante escolhe por grupo):
+
+- **`sum`** — soma tudo (o caso comum: adicionais, quantidade multiplica preço).
+- **`highest`** — cobra só a opção mais cara escolhida, sem multiplicar por quantidade. É a regra da pizza meio a meio: dois pedaços do mesmo sabor não dobram o preço, e dois sabores diferentes cobram o mais caro dos dois, não a soma.
+- **`average`** — a média das opções escolhidas, ponderada por quantidade, arredondada meio-para-cima. A outra convenção de meio a meio, e as duas convivem no mercado — quem decide é o restaurante, não o sistema. Fica de fora o "menor" que outra plataforma do ramo oferece: nenhum cardápio real do nicho o usa.
+
+Fica claro por que somar ingenuamente os preços das opções erra para `highest`/`average`: são **entradas de uma fórmula**, não parcelas de uma soma. Medido: uma pizza de R$ 30,00 com sabores de R$ 45,05 e R$ 50,00 custa **R$ 80,00** em `highest` (o mais caro dos dois) e **R$ 77,53** em `average` — a soma ingênua dos três daria R$ 125,05, quase o dobro do certo.
+
+**A aritmética de dinheiro — arredonda uma vez só, no preço unitário do item, nunca por grupo.** `unitPrice()` em `domain/option.ts` acumula as contribuições de `average` como uma fração exata (numerador/denominador, sem passar por float) e só converte para centavos inteiros no fim, com a mesma `divideRounded()` que soma o total. Arredondar dentro de cada grupo produziria viés sistemático **para cima** — medido: três grupos caindo em meio centavo, em dez unidades, cobram dez centavos a mais do que deveriam. E arredondar no total do item (`unitário × quantidade`) faria essa multiplicação deixar de fechar com o total do pedido — um recibo cuja conta não bate é lido como erro por quem confere, mesmo sendo só um centavo.
+
+⚠️ **`options.price_in_cents` tem `check (>= 0)`, e isso não contradiz a ausência do `check (stock >= 0)` em `products`.** São dois problemas diferentes: o `stock` não tem check de propósito, porque a constraint transformaria a race condition da confirmação num erro de Postgres e esconderia o sintoma que o teste de concorrência precisa enxergar — ali existe corrida de verdade, entre transações concomitantes. Preço de opção não tem corrida nenhuma: negativo é só entrada sem sentido, e barrá-la na constraint é rede de segurança, não sintoma escondido. O check também fecha uma porta específica: o arredondamento meio-para-cima de `average` é assimétrico no negativo, e é essa assimetria que abriria espaço para uma "opção de desconto" manipular o resultado — com preço sempre `>= 0`, ela nunca é alcançada.
+
+**A chave de fusão de itens do pedido deixou de ser só o `productId`.** Era a chave certa antes de existir opção: agora "um hambúrguer com bacon" e "um sem bacon" são pedidos diferentes, e fundi-los pelo `productId` sozinho os transformaria em "dois hambúrgueres" — o cliente receberia dois iguais no lugar de um com bacon e um sem. `chaveDeFusao()` em `services/orders.ts` inclui as escolhas do item, normalizadas (ordenadas por id de opção): a mesma seleção pedida em ordem diferente no corpo continua fundindo numa linha só, com a quantidade somada.
+
+**A confirmação confere estoque somado por produto, não por linha.** Um pedido pode ter mais de uma linha do mesmo produto — duas metades de sabores diferentes viram duas linhas de `order_items` do mesmo `product_id`, cada uma com suas opções. Se `debitarEstoque()` conferisse linha a linha, duas linhas de 3 unidades cada enxergariam o mesmo estoque de 4 e as duas passariam pela checagem "tem 4?" — e o débito, que continua rodando por linha (a linha do produto já está travada), tiraria 6 de um estoque de 4. Por isso a soma acontece **antes** de qualquer débito, por `product_id`, e só depois disso o loop de débito roda linha a linha.
+
 ### Pedidos
 
 O fluxo é `POST /restaurants/:restaurantId/orders` (nasce `pending`) → `.../orders/:orderId/confirm` **ou** `.../cancel`. Não há `DELETE`: pedido não se apaga, se cancela. `confirmed` é terminal — desfazer uma confirmação exigiria devolver estoque, e essa decisão de negócio ainda não foi tomada.
@@ -292,9 +314,9 @@ Todos os números vivem em `src/limits.ts`, cada um com o porquê ao lado, e **n
 
 ### Banco: Postgres via `pg` (sem ORM)
 
-`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, usuários, sessões, categorias, produtos, clientes e pedidos vivem no Postgres — não há mais nada em memória.
+`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, usuários, sessões, categorias, produtos, grupos de opções, opções, clientes e pedidos vivem no Postgres — não há mais nada em memória.
 
-O `server.ts` fecha o pool no hook `onClose` e trata `SIGINT`/`SIGTERM` (F26). Requer **Postgres >= 13** (`gen_random_uuid()` nativo).
+O `app.ts` fecha o pool no hook `onClose` (registrado no `buildApp()`, junto do error handler — não no `server.ts`) e o `server.ts` trata `SIGINT`/`SIGTERM` chamando `app.close()` (F26), que por sua vez dispara esse hook. A distinção importa para quem lê os testes: `buildTestApp()` + `app.close()` **encerra o pool singleton** de verdade — é por isso que cada arquivo de teste usa um único `describe` de topo (um segundo fecharia o pool que o primeiro ainda está usando). Requer **Postgres >= 13** (`gen_random_uuid()` nativo).
 
 O schema é versionado com **`node-pg-migrate`**, em migrations de **SQL puro** dentro de `apps/api/migrations/` (`-- Up Migration` / `-- Down Migration`, controle na tabela `pgmigrations`). Dados de exemplo ficam em `src/db/seed.sql`.
 
