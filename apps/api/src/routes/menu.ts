@@ -53,6 +53,36 @@ const menuProductResponseSchema = {
     photoUrl: { type: "string" },
     // `stock` NÃO entra: quantas unidades o restaurante tem é informação dele
     available: { type: "boolean" },
+    // só os ids, na ordem do produto: o conteúdo do grupo vem uma vez só, em
+    // `optionGroups`, no topo da página
+    optionGroupIds: { type: "array", items: { type: "string" } },
+  },
+};
+
+/**
+ * Um grupo de opções como o público o vê: sem opção indisponível (ela nunca
+ * chega a existir nesta resposta, o serviço já filtrou).
+ */
+const menuOptionGroupResponseSchema = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    name: { type: "string" },
+    minOptions: { type: "integer" },
+    maxOptions: { type: "integer" },
+    priceRule: { type: "string" },
+    options: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          priceInCents: { type: "integer" },
+          maxQuantity: { type: "integer" },
+        },
+      },
+    },
   },
 };
 
@@ -71,9 +101,17 @@ const menuSectionResponseSchema = {
   },
 };
 
-const menuSectionPageResponseSchema = pageResponseSchema(
-  menuSectionResponseSchema,
-);
+/**
+ * O envelope de sempre, mais `optionGroups`: os grupos referenciados pelos
+ * produtos desta página, cada um uma vez — nunca embutidos por produto.
+ */
+const menuSectionPageResponseSchema = {
+  ...pageResponseSchema(menuSectionResponseSchema),
+  properties: {
+    ...pageResponseSchema(menuSectionResponseSchema).properties,
+    optionGroups: { type: "array", items: menuOptionGroupResponseSchema },
+  },
+};
 
 export async function menuRoutes(app: FastifyInstance) {
   app.get<{ Params: { slug: string } }>(
@@ -108,7 +146,7 @@ export async function menuRoutes(app: FastifyInstance) {
         operationId: "listPublicMenuProducts",
         summary: "Cardápio do restaurante, por seção",
         description:
-          "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir.",
+          "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir — e que agora também leva em conta os grupos de opções obrigatórios do produto. Os grupos referenciados pelos produtos desta página vêm uma vez cada em `optionGroups`, no topo; cada produto aponta para eles por `optionGroupIds`. Opção indisponível não aparece.",
         params: slugParamsSchema,
         querystring: paginationQuerystringSchema,
         response: {

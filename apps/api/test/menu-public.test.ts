@@ -3,8 +3,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buildTestApp,
   createCategory,
+  createOption,
+  createOptionGroup,
   createProduct,
   createRestaurant,
+  linkOptionGroups,
 } from "./helpers.ts";
 
 /**
@@ -334,6 +337,130 @@ describe("cardápio público", () => {
       });
 
       expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe("grupos de opções no cardápio", () => {
+    it("os grupos vêm normalizados, cada um uma vez", async () => {
+      const restaurant = await createRestaurant(app, { slug: "pizzaria" });
+      const categoria = await createCategory(app, restaurant, { name: "Pizzas" });
+      const grupo = await createOptionGroup(app, restaurant, { name: "Sabores" });
+      await createOption(app, restaurant, grupo.id, { name: "Calabresa" });
+      // DOIS produtos usando o MESMO grupo: é o que o formato normalizado evita
+      // repetir
+      for (const nome of ["Pizza Grande", "Pizza Média"]) {
+        const produto = await createProduct(app, restaurant, {
+          name: nome,
+          categoryId: categoria.id,
+          stock: 10,
+        });
+        await linkOptionGroups(app, restaurant, produto.id, [grupo.id]);
+      }
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/pizzaria/products",
+      });
+
+      const body = response.json();
+      expect(body.optionGroups).toHaveLength(1);
+      expect(body.optionGroups[0].options[0].name).toBe("Calabresa");
+      for (const produto of body.data[0].products) {
+        expect(produto.optionGroupIds).toEqual([grupo.id]);
+      }
+    });
+
+    it("opção indisponível não sai no cardápio", async () => {
+      const restaurant = await createRestaurant(app, { slug: "pizzaria" });
+      const categoria = await createCategory(app, restaurant, { name: "Pizzas" });
+      const grupo = await createOptionGroup(app, restaurant, { name: "Sabores" });
+      await createOption(app, restaurant, grupo.id, { name: "Calabresa" });
+      await createOption(app, restaurant, grupo.id, {
+        name: "Fora de estoque",
+        available: false,
+      });
+      const produto = await createProduct(app, restaurant, {
+        categoryId: categoria.id,
+        stock: 10,
+      });
+      await linkOptionGroups(app, restaurant, produto.id, [grupo.id]);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/pizzaria/products",
+      });
+
+      expect(
+        response.json().optionGroups[0].options.map((o: { name: string }) => o.name),
+      ).toEqual(["Calabresa"]);
+    });
+
+    /**
+     * A regra do iFood: "o item não aparece à venda enquanto não houver opção
+     * para o usuário selecionar". Sem isso o cliente montaria um carrinho que a
+     * criação de pedido recusaria.
+     */
+    it("produto com grupo obrigatório sem opção disponível fica indisponível", async () => {
+      const restaurant = await createRestaurant(app, { slug: "pizzaria" });
+      const categoria = await createCategory(app, restaurant, { name: "Pizzas" });
+      const grupo = await createOptionGroup(app, restaurant, {
+        name: "Sabores",
+        minOptions: 1,
+        maxOptions: 2,
+        priceRule: "highest",
+      });
+      await createOption(app, restaurant, grupo.id, {
+        name: "Calabresa",
+        available: false,
+      });
+      const produto = await createProduct(app, restaurant, {
+        categoryId: categoria.id,
+        stock: 10,
+      });
+      await linkOptionGroups(app, restaurant, produto.id, [grupo.id]);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/pizzaria/products",
+      });
+
+      expect(response.json().data[0].products[0].available).toBe(false);
+    });
+
+    it("grupo opcional sem opção não torna o produto indisponível", async () => {
+      const restaurant = await createRestaurant(app, { slug: "pizzaria" });
+      const categoria = await createCategory(app, restaurant, { name: "Pizzas" });
+      const grupo = await createOptionGroup(app, restaurant, {
+        name: "Adicionais",
+        minOptions: 0,
+        maxOptions: 3,
+        priceRule: "sum",
+      });
+      const produto = await createProduct(app, restaurant, {
+        categoryId: categoria.id,
+        stock: 10,
+      });
+      await linkOptionGroups(app, restaurant, produto.id, [grupo.id]);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/pizzaria/products",
+      });
+
+      expect(response.json().data[0].products[0].available).toBe(true);
+    });
+
+    it("cardápio sem grupo nenhum devolve optionGroups vazio", async () => {
+      const restaurant = await createRestaurant(app, { slug: "pizzaria" });
+      const categoria = await createCategory(app, restaurant, { name: "Pizzas" });
+      await createProduct(app, restaurant, { categoryId: categoria.id, stock: 5 });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/pizzaria/products",
+      });
+
+      expect(response.json().optionGroups).toEqual([]);
     });
   });
 });

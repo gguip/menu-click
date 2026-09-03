@@ -5539,7 +5539,7 @@
         "tags": [
           "Cardápio público"
         ],
-        "description": "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir.",
+        "description": "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir — e que agora também leva em conta os grupos de opções obrigatórios do produto. Os grupos referenciados pelos produtos desta página vêm uma vez cada em `optionGroups`, no topo; cada produto aponta para eles por `optionGroupIds`. Opção indisponível não aparece.",
         "parameters": [
           {
             "schema": {
@@ -5614,6 +5614,12 @@
                                 },
                                 "available": {
                                   "type": "boolean"
+                                },
+                                "optionGroupIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
                                 }
                               }
                             }
@@ -5629,6 +5635,49 @@
                     },
                     "total": {
                       "type": "integer"
+                    },
+                    "optionGroups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "minOptions": {
+                            "type": "integer"
+                          },
+                          "maxOptions": {
+                            "type": "integer"
+                          },
+                          "priceRule": {
+                            "type": "string"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "maxQuantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
