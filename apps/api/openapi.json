@@ -5770,8 +5770,31 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }

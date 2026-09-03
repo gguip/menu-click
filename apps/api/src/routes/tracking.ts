@@ -36,6 +36,24 @@ function toPayload(order: Order) {
 }
 
 /**
+ * Uma opção escolhida, como o cliente vê no próprio recibo.
+ *
+ * Sem `optionId`: o recibo não referencia mais nada, só mostra o que foi
+ * escolhido. É a superfície aberta, e o que sai aqui é decidido campo a campo
+ * (S10) — carregar o identificador que o restaurante usa internamente não dá
+ * ao cliente nada que ele use.
+ */
+const trackedOrderItemOptionResponseSchema = {
+  type: "object",
+  properties: {
+    groupName: { type: "string" },
+    name: { type: "string" },
+    priceInCents: { type: "integer" },
+    quantity: { type: "integer" },
+  },
+};
+
+/**
  * O pedido como **quem o fez** o vê.
  *
  * Escrito campo a campo, e mais enxuto que o detalhe do restaurante, pela mesma
@@ -63,7 +81,15 @@ const trackedOrderResponseSchema = {
           // cópias congeladas: é o que foi combinado, não o cardápio de hoje
           name: { type: "string" },
           priceInCents: { type: "integer" },
+          // preço de UMA unidade já com as opções escolhidas; `priceInCents`
+          // acima continua sendo só o preço do produto. É a dupla que fecha a
+          // conta do recibo: unitPriceInCents × quantity === totalInCents.
+          unitPriceInCents: { type: "integer" },
           quantity: { type: "integer" },
+          options: {
+            type: "array",
+            items: trackedOrderItemOptionResponseSchema,
+          },
         },
       },
     },
