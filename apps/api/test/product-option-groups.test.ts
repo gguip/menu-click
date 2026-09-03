@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.ts";
 import {
   buildTestApp,
+  createOption,
   createOptionGroup,
   createProduct,
   createRestaurant,
@@ -176,6 +177,7 @@ describe("vínculo produto ↔ grupo de opções", () => {
 
     it("remover o restaurante alcança grupos, opções e vínculos", async () => {
       const { restaurant, produto, tamanho } = await cenario();
+      const bacon = await createOption(app, restaurant, tamanho.id);
       await linkOptionGroups(app, restaurant, produto.id, [tamanho.id]);
 
       await app.inject({
@@ -189,6 +191,13 @@ describe("vínculo produto ↔ grupo de opções", () => {
         [tamanho.id],
       );
       expect(rows[0].deleted_at).not.toBeNull();
+
+      const opcao = await pool.query<{ deleted_at: Date | null }>(
+        "select deleted_at from options where id = $1",
+        [bacon.id],
+      );
+      expect(opcao.rows[0].deleted_at).not.toBeNull();
+
       expect(await vinculosVivos(produto.id)).toBe(0);
     });
   });
