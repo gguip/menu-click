@@ -311,6 +311,27 @@ describe("CRUD /restaurants/:restaurantId/option-groups", () => {
       expect(response.statusCode).toBe(400);
     });
 
+    /**
+     * A rede do banco, testada como rede: sem passar pela rota (que já
+     * recusa com 400 antes de qualquer SQL rodar), inserir direto tem que
+     * esbarrar em `options_price_in_cents_check` — código `23514` do
+     * Postgres, "check_violation". As duas guardam camadas diferentes: a
+     * rota impede o caso comum sem custo de round-trip, o `check` impede
+     * até quem inserisse direto no banco (uma migration futura, um script).
+     */
+    it("banco recusa priceInCents negativo (código 23514)", async () => {
+      const restaurant = await createRestaurant(app);
+      const grupo = await createOptionGroup(app, restaurant, { name: "Extras" });
+
+      await expect(
+        pool.query(
+          `insert into options (option_group_id, name, price_in_cents)
+           values ($1, $2, $3)`,
+          [grupo.id, "Sem queijo", -200],
+        ),
+      ).rejects.toMatchObject({ code: "23514" });
+    });
+
     it("400 com preço em string — o validador não coage", async () => {
       const restaurant = await createRestaurant(app);
       const grupo = await createOptionGroup(app, restaurant, { name: "Extras" });
