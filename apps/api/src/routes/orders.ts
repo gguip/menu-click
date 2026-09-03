@@ -68,7 +68,7 @@ const createOrderBodySchema = {
               additionalProperties: false,
               required: ["optionId", "quantity"],
               properties: {
-                optionId: { type: "string" },
+                optionId: { type: "string", format: "uuid" },
                 quantity: { type: "integer", minimum: 1 },
               },
             },

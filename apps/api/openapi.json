@@ -3335,7 +3335,8 @@
                             ],
                             "properties": {
                               "optionId": {
-                                "type": "string"
+                                "type": "string",
+                                "format": "uuid"
                               },
                               "quantity": {
                                 "type": "integer",
