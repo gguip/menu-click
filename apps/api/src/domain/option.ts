@@ -106,6 +106,27 @@ export function divideRounded(n: number, d: number): number {
 }
 
 /**
+ * O par `(total, unidades)` que a regra `average` divide: soma de
+ * `priceInCents × quantity` sobre as unidades escolhidas no grupo.
+ *
+ * Extraído porque `groupContribution` e `unitPrice` precisam do MESMO par —
+ * a primeira arredonda ali mesmo, a segunda acumula a fração exata antes de
+ * arredondar (ver o comentário de `unitPrice`) —, e as duas definições
+ * precisam concordar sempre, não só nos casos que o teste cobre hoje.
+ */
+function averageTotals(choices: PricedChoice[]): {
+  total: number;
+  units: number;
+} {
+  const total = choices.reduce(
+    (sum, choice) => sum + choice.priceInCents * choice.quantity,
+    0,
+  );
+  const units = choices.reduce((sum, choice) => sum + choice.quantity, 0);
+  return { total, units };
+}
+
+/**
  * Quanto um grupo acrescenta ao preço unitário do item.
  *
  * ⚠️ O resultado de `average` é o único que arredonda, e ele arredonda **aqui**
@@ -130,11 +151,7 @@ export function groupContribution(
     return Math.max(...choices.map((choice) => choice.priceInCents));
   }
 
-  const total = choices.reduce(
-    (sum, choice) => sum + choice.priceInCents * choice.quantity,
-    0,
-  );
-  const units = choices.reduce((sum, choice) => sum + choice.quantity, 0);
+  const { total, units } = averageTotals(choices);
   return divideRounded(total, units);
 }
 
@@ -165,14 +182,7 @@ export function unitPrice(
     if (group.choices.length === 0) continue;
 
     if (group.priceRule === "average") {
-      const total = group.choices.reduce(
-        (sum, choice) => sum + choice.priceInCents * choice.quantity,
-        0,
-      );
-      const units = group.choices.reduce(
-        (sum, choice) => sum + choice.quantity,
-        0,
-      );
+      const { total, units } = averageTotals(group.choices);
       // soma de frações: a/b + c/d = (ad + cb) / bd
       fractional = fractional * units + total * denominator;
       denominator = denominator * units;
