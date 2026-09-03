@@ -427,6 +427,30 @@ describe("cardápio público", () => {
       expect(response.json().data[0].products[0].available).toBe(false);
     });
 
+    it("produto com grupo obrigatório e uma opção disponível fica disponível", async () => {
+      const restaurant = await createRestaurant(app, { slug: "pizzaria" });
+      const categoria = await createCategory(app, restaurant, { name: "Pizzas" });
+      const grupo = await createOptionGroup(app, restaurant, {
+        name: "Sabores",
+        minOptions: 1,
+        maxOptions: 2,
+        priceRule: "highest",
+      });
+      await createOption(app, restaurant, grupo.id, { name: "Calabresa" });
+      const produto = await createProduct(app, restaurant, {
+        categoryId: categoria.id,
+        stock: 10,
+      });
+      await linkOptionGroups(app, restaurant, produto.id, [grupo.id]);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/pizzaria/products",
+      });
+
+      expect(response.json().data[0].products[0].available).toBe(true);
+    });
+
     it("grupo opcional sem opção não torna o produto indisponível", async () => {
       const restaurant = await createRestaurant(app, { slug: "pizzaria" });
       const categoria = await createCategory(app, restaurant, { name: "Pizzas" });
