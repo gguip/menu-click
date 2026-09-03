@@ -3,6 +3,7 @@ import type {
   CreateProductInput,
   Product,
   ProductFilters,
+  ProductWithOptionGroups,
   UpdateProductInput,
 } from "../domain/product.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
@@ -50,6 +51,27 @@ async function ensureCategoryBelongs(
   await categoriesService.ensureExists(restaurantId, categoryId);
 }
 
+/**
+ * Anexa `optionGroupIds` a cada produto, numa consulta só (não uma por
+ * produto): mesmo padrão do cardápio público (`services/menu.ts`), aqui
+ * reaproveitado para o lado de gestão.
+ */
+async function withOptionGroupIds(
+  restaurantId: string,
+  products: Product[],
+): Promise<ProductWithOptionGroups[]> {
+  const gruposPorProduto = await optionGroupsRepository.findGroupsByProductIds(
+    restaurantId,
+    products.map((product) => product.id),
+  );
+  return products.map((product) => ({
+    ...product,
+    optionGroupIds: (gruposPorProduto.get(product.id) ?? []).map(
+      (grupo) => grupo.id,
+    ),
+  }));
+}
+
 export async function create(
   restaurantId: string,
   input: CreateProductInput,
@@ -73,26 +95,29 @@ export async function listByRestaurant(
   restaurantId: string,
   pagination: Pagination,
   filters: ProductFilters = {},
-): Promise<Page<Product>> {
+): Promise<Page<ProductWithOptionGroups>> {
   await restaurantsService.ensureExists(restaurantId);
   const { rows, total } = await productsRepository.findByRestaurant(
     restaurantId,
     pagination,
     filters,
   );
-  return { data: rows, ...pagination, total };
+  const data = await withOptionGroupIds(restaurantId, rows);
+  return { data, ...pagination, total };
 }
 
 export async function getById(
   restaurantId: string,
   id: string,
-): Promise<Product> {
+): Promise<ProductWithOptionGroups> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(id)) throw productNotFound(id);
 
   const product = await productsRepository.findById(restaurantId, id);
   if (product === null) throw productNotFound(id);
-  return product;
+
+  const [comOpcoes] = await withOptionGroupIds(restaurantId, [product]);
+  return comOpcoes;
 }
 
 export async function update(

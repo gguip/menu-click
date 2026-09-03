@@ -644,6 +644,12 @@
                     "stock": {
                       "type": "integer"
                     },
+                    "optionGroupIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -684,7 +690,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "Lista plana e paginada — é a grade de edição, não a tela do cliente (o cardápio público é que vem agrupado por seção). Ao contrário dele, esta listagem traz o `stock` exato. `categoryId` recorta por seção e `search` procura por parte do nome, sem diferenciar maiúscula; os dois valem também para o `total`.",
+        "description": "Lista plana e paginada — é a grade de edição, não a tela do cliente (o cardápio público é que vem agrupado por seção). Ao contrário dele, esta listagem traz o `stock` exato. `categoryId` recorta por seção e `search` procura por parte do nome, sem diferenciar maiúscula; os dois valem também para o `total`. Cada produto traz `optionGroupIds`, na ordem de exibição — é o que o painel usa para reabrir a edição sem depender do `PUT` de vínculo para ler o que já está marcado.",
         "parameters": [
           {
             "schema": {
@@ -776,6 +782,12 @@
                           "stock": {
                             "type": "integer"
                           },
+                          "optionGroupIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -830,7 +842,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "Escopado pelo restaurante da URL: produto de outro restaurante é 404, mesmo com o id certo.",
+        "description": "Escopado pelo restaurante da URL: produto de outro restaurante é 404, mesmo com o id certo. Traz `optionGroupIds` na ordem de exibição (a mesma do cardápio público).",
         "parameters": [
           {
             "schema": {
@@ -885,6 +897,12 @@
                     },
                     "stock": {
                       "type": "integer"
+                    },
+                    "optionGroupIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     },
                     "createdAt": {
                       "type": "string"
@@ -1018,6 +1036,12 @@
                     },
                     "stock": {
                       "type": "integer"
+                    },
+                    "optionGroupIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     },
                     "createdAt": {
                       "type": "string"

@@ -47,6 +47,19 @@ export type Product = CreateProductInput & {
 };
 
 /**
+ * Produto com os grupos de opções vinculados a ele — só para os pontos de
+ * leitura (`getById`/listagem), que juntam o produto ao vínculo
+ * (`product_option_groups`) para o painel saber o que já está marcado sem
+ * precisar chamar o `PUT` destrutivo para ler.
+ *
+ * Os ids vêm ordenados pela `position` do vínculo — a mesma ordem que o
+ * cardápio público usa.
+ */
+export type ProductWithOptionGroups = Product & {
+  optionGroupIds: string[];
+};
+
+/**
  * Filtros da listagem de produtos do restaurante, além da paginação.
  *
  * Os dois servem à mesma tela — a grade de gestão do cardápio — e por isso vêm

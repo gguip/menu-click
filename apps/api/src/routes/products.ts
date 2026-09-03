@@ -65,6 +65,10 @@ const productResponseSchema = {
     description: { type: "string" },
     photoUrl: { type: "string" },
     stock: { type: "integer" },
+    // ids dos grupos de opções vinculados, na ordem de exibição (`position`
+    // do vínculo) — a mesma ordem do cardápio público. Só sai preenchido nos
+    // pontos de leitura (get/list); criar/editar não o calcula.
+    optionGroupIds: { type: "array", items: { type: "string" } },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
@@ -146,7 +150,7 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "listProducts",
         summary: "Cardápio, do lado de quem edita",
         description:
-          "Lista plana e paginada — é a grade de edição, não a tela do cliente (o cardápio público é que vem agrupado por seção). Ao contrário dele, esta listagem traz o `stock` exato. `categoryId` recorta por seção e `search` procura por parte do nome, sem diferenciar maiúscula; os dois valem também para o `total`.",
+          "Lista plana e paginada — é a grade de edição, não a tela do cliente (o cardápio público é que vem agrupado por seção). Ao contrário dele, esta listagem traz o `stock` exato. `categoryId` recorta por seção e `search` procura por parte do nome, sem diferenciar maiúscula; os dois valem também para o `total`. Cada produto traz `optionGroupIds`, na ordem de exibição — é o que o painel usa para reabrir a edição sem depender do `PUT` de vínculo para ler o que já está marcado.",
         params: restaurantIdParamsSchema,
         querystring: productListQuerystringSchema,
         response: {
@@ -174,7 +178,7 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "getProduct",
         summary: "Detalhe do produto",
         description:
-          "Escopado pelo restaurante da URL: produto de outro restaurante é 404, mesmo com o id certo.",
+          "Escopado pelo restaurante da URL: produto de outro restaurante é 404, mesmo com o id certo. Traz `optionGroupIds` na ordem de exibição (a mesma do cardápio público).",
         params: productParamsSchema,
         response: { 200: productResponseSchema, 404: errorResponseSchema },
       },

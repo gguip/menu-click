@@ -138,6 +138,64 @@ describe("vínculo produto ↔ grupo de opções", () => {
     expect(response.statusCode).toBe(404);
   });
 
+  describe("leitura do produto", () => {
+    it("GET .../products/:id traz optionGroupIds na ordem de position", async () => {
+      const { restaurant, produto, tamanho, sabores } = await cenario();
+      await linkOptionGroups(app, restaurant, produto.id, [
+        sabores.id,
+        tamanho.id,
+      ]);
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/products/${produto.id}`,
+        headers: restaurant.headers,
+      });
+
+      expect(response.json().optionGroupIds).toEqual([sabores.id, tamanho.id]);
+    });
+
+    it("GET .../products/:id sem grupo vinculado traz optionGroupIds vazio", async () => {
+      const { restaurant, produto } = await cenario();
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/products/${produto.id}`,
+        headers: restaurant.headers,
+      });
+
+      expect(response.json().optionGroupIds).toEqual([]);
+    });
+
+    it("GET .../products traz optionGroupIds de cada item, na ordem de position", async () => {
+      const { restaurant, produto, tamanho, sabores } = await cenario();
+      const semGrupo = await createProduct(app, restaurant, {
+        name: "Água",
+      });
+      await linkOptionGroups(app, restaurant, produto.id, [
+        sabores.id,
+        tamanho.id,
+      ]);
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/products`,
+        headers: restaurant.headers,
+      });
+
+      const porId = new Map(
+        response
+          .json()
+          .data.map((item: { id: string; optionGroupIds: string[] }) => [
+            item.id,
+            item.optionGroupIds,
+          ]),
+      );
+      expect(porId.get(produto.id)).toEqual([sabores.id, tamanho.id]);
+      expect(porId.get(semGrupo.id)).toEqual([]);
+    });
+  });
+
   describe("cascatas", () => {
     /** Marca `deleted_at` nos vínculos vivos daquele produto. */
     async function vinculosVivos(productId: string) {
