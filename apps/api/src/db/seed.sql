@@ -181,15 +181,18 @@ on conflict (id) do nothing;
 
 -- name/price_in_cents são cópias congeladas do produto no momento do pedido —
 -- por isso repetem o que está em `products` em vez de referenciar.
+-- unit_price_in_cents repete price_in_cents porque nenhum destes itens tem
+-- opção: sem opção, o preço unitário é só o preço do produto (ver a migration
+-- add-option-groups).
 insert into order_items
-  (id, order_id, product_id, name, price_in_cents, quantity)
+  (id, order_id, product_id, name, price_in_cents, unit_price_in_cents, quantity)
 values
   ('c9a5e731-8f24-4b60-9d18-3e6b2c7a4f05', '3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83',
-   'a54930aa-5548-4668-b545-b7c646757704', 'Ramen Shoyu', 4890, 2),
+   'a54930aa-5548-4668-b545-b7c646757704', 'Ramen Shoyu', 4890, 4890, 2),
   ('7d3c8b12-4e95-4a07-b6f3-9c1a5d0e8b74', '3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83',
-   '23755745-45ac-47f5-bbed-ad4af525c04a', 'Guioza', 2490, 1),
+   '23755745-45ac-47f5-bbed-ad4af525c04a', 'Guioza', 2490, 2490, 1),
   ('1a6f4d90-3b78-4c52-8e01-5d9b7a2c6f38', 'b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12',
-   'a48d8d89-bdd9-44dd-98b7-d47472930b7a', 'Chá Verde Gelado', 890, 1),
+   'a48d8d89-bdd9-44dd-98b7-d47472930b7a', 'Chá Verde Gelado', 890, 890, 1),
   ('e0b7c352-9d41-4a86-b3f7-2c5e8a1d094b', '5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42',
-   '23755745-45ac-47f5-bbed-ad4af525c04a', 'Guioza', 2490, 1)
+   '23755745-45ac-47f5-bbed-ad4af525c04a', 'Guioza', 2490, 2490, 1)
 on conflict (id) do nothing;
