@@ -8,6 +8,7 @@
  */
 import type { Customer, CreateCustomerInput } from "./customer.ts";
 import type { Address } from "./restaurant.ts";
+import type { PaymentMethod } from "./payment.ts";
 
 /**
  * Modalidade do pedido.
@@ -187,6 +188,14 @@ export type CreateOrderInput = {
   items: CreateOrderItemInput[];
   /** Obrigatório em `delivery`, proibido nas outras duas modalidades. */
   deliveryAddress?: Address;
+  /** Como o pedido será pago. Sempre na entrega — o sistema registra, não cobra. */
+  paymentMethod: PaymentMethod;
+  /**
+   * "Troco para R$ 50", em centavos. Só em dinheiro, e opcional: ausente
+   * significa "tenho o valor certo". Exigi-lo obrigaria quem paga exato a
+   * inventar um número.
+   */
+  changeForInCents?: number;
 };
 
 /**
@@ -239,6 +248,9 @@ export type OrderSummary = {
   totalInCents: number;
   /** Preenchido só em `delivery`; `null` nas outras duas modalidades. */
   deliveryAddress: Address | null;
+  paymentMethod: PaymentMethod;
+  /** Ausente = "tenho o valor certo". Só faz sentido junto de `paymentMethod: "cash"`. */
+  changeForInCents?: number;
   createdAt: string;
   updatedAt: string;
 };

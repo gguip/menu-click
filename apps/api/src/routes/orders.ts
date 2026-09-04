@@ -10,6 +10,7 @@ import type { OrderSortField, SortDirection } from "../domain/order.ts";
 import { ORDER_PERIODS } from "../domain/period.ts";
 import type { OrderPeriod } from "../domain/period.ts";
 import type { Pagination } from "../domain/pagination.ts";
+import { PAYMENT_METHODS } from "../domain/payment.ts";
 import * as ordersService from "../services/orders.ts";
 import { installRouteValidators } from "./validators.ts";
 import {
@@ -33,7 +34,7 @@ import {
 const createOrderBodySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "customer", "items"],
+  required: ["type", "customer", "items", "paymentMethod"],
   properties: {
     // decide a trilha de status, se exige endereço e se há acompanhamento
     type: { type: "string", enum: [...ORDER_TYPES] },
@@ -81,6 +82,13 @@ const createOrderBodySchema = {
     },
     // obrigatório em `delivery`, recusado nas outras duas (400)
     deliveryAddress: addressSchema,
+    // como o pedido será pago; o restaurante que não aceitar a forma responde
+    // 409 (mesma pergunta que já recusa modalidade)
+    paymentMethod: { type: "string", enum: [...PAYMENT_METHODS] },
+    // "troco para R$ 50", em centavos — só faz sentido em dinheiro, e é
+    // opcional: ausente significa "tenho o valor certo". Comparado com o
+    // total calculado no SERVIDOR, nunca com um valor do cliente.
+    changeForInCents: { type: "integer", minimum: 0 },
   },
   // `totalInCents` não está aqui de propósito: o total é calculado no servidor.
   // Aceitá-lo do cliente seria deixar quem paga escolher o preço.
@@ -137,6 +145,10 @@ const orderSummaryProperties = {
     nullable: true,
     properties: addressProperties,
   },
+  paymentMethod: { type: "string" },
+  // ausente = "tenho o valor certo"; por isso não é `nullable` (F12) — a
+  // ausência é a informação, um `null` explícito não diria nada a mais
+  changeForInCents: { type: "integer" },
   createdAt: { type: "string" },
   updatedAt: { type: "string" },
 };

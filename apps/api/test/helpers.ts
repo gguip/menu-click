@@ -180,7 +180,13 @@ export async function createOrder(
   const response = await app.inject({
     method: "POST",
     url: `/restaurants/${restaurantId}/orders`,
-    payload: { type: "dine_in", customer: validCustomerBody, items, ...overrides },
+    payload: {
+      type: "dine_in",
+      customer: validCustomerBody,
+      items,
+      paymentMethod: "cash",
+      ...overrides,
+    },
   });
   return response.json();
 }

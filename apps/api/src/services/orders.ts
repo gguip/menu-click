@@ -24,6 +24,8 @@ import {
 } from "../domain/order.ts";
 import type { OptionGroup, PricedGroup } from "../domain/option.ts";
 import { unitPrice } from "../domain/option.ts";
+import type { AcceptedPaymentFlags, PaymentMethod } from "../domain/payment.ts";
+import { acceptedPaymentMethods } from "../domain/payment.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as customersRepository from "../repositories/customers.ts";
@@ -66,6 +68,14 @@ const NOME_DA_MODALIDADE: Record<OrderType, string> = {
   delivery: "entrega",
 };
 
+/** Como cada forma de pagamento se chama para quem lê a mensagem de erro. */
+const NOME_DA_FORMA: Record<PaymentMethod, string> = {
+  cash: "dinheiro",
+  card_on_delivery: "cartão na entrega",
+  pix: "pix",
+  meal_voucher: "vale-refeição",
+};
+
 /**
  * O restaurante aceita essa modalidade?
  *
@@ -85,6 +95,49 @@ function assertRestauranteAceita(
   if (!aceita[type]) {
     throw new ConflictError(
       `Este restaurante não aceita ${NOME_DA_MODALIDADE[type]}`,
+    );
+  }
+}
+
+/**
+ * Recusa forma que o restaurante não aceita — **409**, com a mesma forma do
+ * `assertRestauranteAceita` que já recusa modalidade. É a mesma pergunta
+ * ("este restaurante aceita isso?") e merece o mesmo formato de resposta.
+ */
+function assertFormaAceita(
+  restaurant: AcceptedPaymentFlags,
+  paymentMethod: PaymentMethod,
+): void {
+  if (!acceptedPaymentMethods(restaurant).includes(paymentMethod)) {
+    throw new ConflictError(
+      `Este restaurante não aceita ${NOME_DA_FORMA[paymentMethod]}`,
+    );
+  }
+}
+
+/**
+ * Recusa troco incoerente — **400**, porque é corpo malformado e não conflito
+ * de estado.
+ *
+ * ⚠️ A comparação é com o total calculado no SERVIDOR. O corpo não tem
+ * `totalInCents` (aceitá-lo deixaria quem paga escolher o preço), e comparar
+ * com um número do cliente deixaria esta validação sem sentido.
+ */
+function assertTrocoCoerente(
+  paymentMethod: PaymentMethod,
+  changeForInCents: number | undefined,
+  totalInCents: number,
+): void {
+  if (changeForInCents === undefined) return;
+
+  if (paymentMethod !== "cash") {
+    throw new ValidationError(
+      "Troco só faz sentido em pagamento com dinheiro",
+    );
+  }
+  if (changeForInCents < totalInCents) {
+    throw new ValidationError(
+      `O troco (${changeForInCents}) é menor que o total do pedido (${totalInCents})`,
     );
   }
 }
@@ -225,6 +278,7 @@ export async function create(
 ): Promise<CreatedOrder> {
   const restaurant = await restaurantsService.getById(restaurantId);
   assertRestauranteAceita(restaurant, input.type);
+  assertFormaAceita(restaurant, input.paymentMethod);
   assertEnderecoCoerente(input);
 
   // Duas linhas iguais (mesmo produto, mesmas opções) viram uma com a
@@ -308,6 +362,7 @@ export async function create(
       (sum, item) => sum + item.unitPriceInCents * item.quantity,
       0,
     );
+    assertTrocoCoerente(input.paymentMethod, input.changeForInCents, totalInCents);
 
     const customer = await customersRepository.upsertByPhone(
       input.customer,
@@ -323,6 +378,8 @@ export async function create(
         deliveryAddress: input.deliveryAddress,
         trackingTokenHash:
           trackingToken === null ? null : hashToken(trackingToken),
+        paymentMethod: input.paymentMethod,
+        changeForInCents: input.changeForInCents,
       },
       client,
     );

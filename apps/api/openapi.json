@@ -3557,7 +3557,8 @@
                 "required": [
                   "type",
                   "customer",
-                  "items"
+                  "items",
+                  "paymentMethod"
                 ],
                 "properties": {
                   "type": {
@@ -3666,6 +3667,19 @@
                         "minLength": 1
                       }
                     }
+                  },
+                  "paymentMethod": {
+                    "type": "string",
+                    "enum": [
+                      "cash",
+                      "card_on_delivery",
+                      "pix",
+                      "meal_voucher"
+                    ]
+                  },
+                  "changeForInCents": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 }
               }
@@ -3755,6 +3769,12 @@
                           "minLength": 1
                         }
                       }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -4080,6 +4100,12 @@
                               }
                             }
                           },
+                          "paymentMethod": {
+                            "type": "string"
+                          },
+                          "changeForInCents": {
+                            "type": "integer"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -4390,6 +4416,12 @@
                         }
                       }
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -4598,6 +4630,12 @@
                           "minLength": 1
                         }
                       }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -4808,6 +4846,12 @@
                         }
                       }
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -5016,6 +5060,12 @@
                           "minLength": 1
                         }
                       }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -5226,6 +5276,12 @@
                         }
                       }
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -5435,6 +5491,12 @@
                         }
                       }
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -5643,6 +5705,12 @@
                           "minLength": 1
                         }
                       }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -6089,6 +6157,12 @@
                       "type": "string"
                     },
                     "totalInCents": {
+                      "type": "integer"
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
                       "type": "integer"
                     },
                     "items": {

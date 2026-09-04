@@ -15,6 +15,7 @@ import type {
   OrderType,
 } from "../domain/order.ts";
 import type { Address } from "../domain/restaurant.ts";
+import type { PaymentMethod } from "../domain/payment.ts";
 
 /**
  * Repositório de pedidos: **só acesso a dados**. Ver `restaurants.ts` para as
@@ -40,6 +41,8 @@ type OrderRow = {
   city: string | null;
   state: string | null;
   zip_code: string | null;
+  payment_method: PaymentMethod;
+  change_for_in_cents: number | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -124,6 +127,12 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
     status: row.status,
     totalInCents: row.total_in_cents,
     deliveryAddress: toAddress(row),
+    paymentMethod: row.payment_method,
+    // ausente, não `null`: no dinheiro sem troco significa "tenho o valor
+    // certo", e o `fast-json-stringify` só omite o campo se ele faltar aqui
+    ...(row.change_for_in_cents === null
+      ? {}
+      : { changeForInCents: row.change_for_in_cents }),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -160,6 +169,8 @@ export type InsertOrderData = {
   deliveryAddress?: Address;
   /** Hash do token de acompanhamento. `null` em `dine_in`. */
   trackingTokenHash: string | null;
+  paymentMethod: PaymentMethod;
+  changeForInCents?: number;
 };
 
 /** Uma linha de `order_items` pronta para gravar, com os valores congelados. */
@@ -197,8 +208,9 @@ export async function insertOrder(
   const { rows } = await db.query<{ id: string }>(
     `insert into orders
        (restaurant_id, customer_id, type, total_in_cents, tracking_token_hash,
-        street, number, neighborhood, city, state, zip_code)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        street, number, neighborhood, city, state, zip_code,
+        payment_method, change_for_in_cents)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      returning id`,
     [
       restaurantId,
@@ -214,6 +226,8 @@ export async function insertOrder(
       address?.city ?? null,
       address?.state ?? null,
       address?.zipCode ?? null,
+      data.paymentMethod,
+      data.changeForInCents ?? null,
     ],
   );
   return rows[0].id;
