@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis e troca de senha, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status — e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis e troca de senha, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -262,6 +262,24 @@ A validação é construir um `Intl.DateTimeFormat` e ver se ele reclama, **não
 
 A resposta traz em `period` os instantes que o servidor usou. Sem eles, "por que o faturamento de hoje está zerado?" não tem como ser respondido sem abrir o banco.
 
+### Horário de funcionamento, pausa manual e forma de pagamento
+
+Duas lacunas que existiam desde o início: `restaurants` não tinha nenhuma coluna de horário (dava para pedir às 4 da manhã, e o restaurante só descobria o pedido ao abrir) e `orders` não tinha nenhuma coluna de pagamento (no delivery brasileiro o grosso é pago na entrega, e o entregador saía sem saber se precisava de troco). As duas seguem o formato de "o restaurante configura, e o pedido respeita" que `isDelivery`/`isTakeaway`/`isQrcode` já tinham consagrado.
+
+**A grade é faixas por dia da semana, `opening_hours`, e um dia pode ter várias.** É o que separa este desenho de "uma faixa por dia": o restaurante que fecha entre o almoço e o jantar declararia 11:00–23:00 numa faixa só e aceitaria pedido às 16:00, quando a cozinha está fechada. **Dia sem nenhuma faixa é dia fechado** — não existe coluna de "fechado": uma flag redundante junto das faixas permitiria o estado incoerente de "fechado, das 11 às 15", e a ausência já é informação suficiente.
+
+⚠️ **`closes_at < opens_at` não é erro de cadastro — é a faixa que atravessa a meia-noite.** `18:00–02:00` é a pizzaria que atende até as duas da manhã, metade do mercado de delivery noturno. Por isso só a *igualdade* entre `opens_at` e `closes_at` é proibida (faixa de duração zero não significa nada); a inversão tem significado próprio. É também a parte que exige teste dedicado: às 01:00 de terça, o restaurante está aberto por causa da faixa cadastrada em **segunda**, não em terça.
+
+**A checagem de "está aberto agora?" roda no Postgres, não no Node** — mesmo motivo do filtro de período do painel: ela depende do banco de fusos, que o `at time zone` já consulta, e refazer a conta em JavaScript seria uma segunda implementação da mesma regra, discordando da primeira exatamente nos dias de virada de horário de verão. `isOpenNow()` em `repositories/opening-hours.ts` compara o instante atual, convertido para o fuso do restaurante, contra as faixas — nos dois ramos (dentro do mesmo dia, e atravessando a meia-noite).
+
+⚠️ **`opens_at`/`closes_at` são `time`, não `timestamptz` — e isso NÃO viola a D13.** A D13 existe para *instantes*: `timestamp` sem fuso, usado para marcar um instante, é lido no fuso da máquina e vira horários diferentes em máquinas diferentes. Aqui não há instante — "18:00" é hora de parede, deliberadamente sem fuso e sem data, e o fuso só entra na hora de comparar, vindo de `restaurants.timezone`. Guardar como `timestamptz` exigiria inventar uma data para uma informação que não tem data.
+
+**A pausa manual, `restaurants.accepting_orders`, é uma segunda condição, não uma substituição da grade.** A loja está aberta quando está dentro de uma faixa **e** não está pausada — desligar os pedidos não mexe no horário cadastrado, então ninguém precisa lembrar de reativar a grade depois. O nome é positivo (`accepting_orders`, não `paused`) de propósito: é a leitura que o código faz o tempo todo (`if (!restaurant.acceptingOrders) recusa`), e negativa dupla dentro de uma condição é onde nasce erro de lógica. No cardápio público, `isOpen` já é o resultado das duas condições juntas; `acceptingOrders` sai separado para a tela distinguir "fechado agora, abre às 18h" (mensagem: espere) de "a loja pausou os pedidos" (mensagem: tente mais tarde) — e a criação do pedido recusa as duas com **409**, cada uma com sua mensagem, pelo mesmo motivo.
+
+**As formas de pagamento aceitas são quatro colunas booleanas no restaurante** (`accepts_cash`, `accepts_card_on_delivery`, `accepts_pix`, `accepts_meal_voucher`), espelhando de propósito o padrão de `is_delivery`/`is_takeaway`/`is_qrcode`: já resolveu esta forma de problema aqui, e um array ou jsonb não filtraria melhor nem custaria menos (D15). `accepts_meal_voucher` nasce `false` — vale-refeição exige credenciamento com a bandeira, e um "sim" que o restaurante não consegue honrar é pior que a ausência. O cardápio público não expõe as quatro flags cruas; deriva delas a lista `paymentMethods` que o cliente escolhe.
+
+**O troco tem duas regras, e as duas vivem no `check` do banco além do serviço:** `change_for_in_cents` só existe para pagamento em `cash` (pedir troco no pix não faz sentido, e o `check` garante isso mesmo se o serviço tiver um bug) e, quando informado, não pode ser menor que o total calculado no servidor — pedir troco para R$ 20 numa conta de R$ 45 não é um pedido, é engano que o entregador descobriria na porta. Ausência de `changeFor` em dinheiro é válida e significa "tenho o valor exato"; exigi-lo obrigaria quem paga certo a inventar um número.
+
 ### Documentação: OpenAPI derivado das rotas
 
 O `openapi.json` é **gerado**, nunca editado à mão: sai dos mesmos `schema` que validam a requisição e serializam a resposta. Consequência prática — campo esquecido no `schema.response` some da documentação **e** da resposta ao mesmo tempo, então documentação errada é sintoma de contrato errado.
@@ -314,7 +332,7 @@ Todos os números vivem em `src/limits.ts`, cada um com o porquê ao lado, e **n
 
 ### Banco: Postgres via `pg` (sem ORM)
 
-`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, usuários, sessões, categorias, produtos, grupos de opções, opções, clientes e pedidos vivem no Postgres — não há mais nada em memória.
+`apps/api/src/db/pool.ts` exporta um **`Pool` singleton** do driver `pg` (e o helper `withTransaction()`), configurado só por env (ver acima). Não há ORM, query builder nem plugin Fastify no meio: os **repositórios** (`src/repositories/`) importam `pool` direto e escrevem SQL na mão — e são o único lugar do código com SQL. Restaurantes, usuários, sessões, categorias, produtos, grupos de opções, opções, horário de funcionamento, clientes e pedidos vivem no Postgres — não há mais nada em memória.
 
 O `app.ts` fecha o pool no hook `onClose` (registrado no `buildApp()`, junto do error handler — não no `server.ts`) e o `server.ts` trata `SIGINT`/`SIGTERM` chamando `app.close()` (F26), que por sua vez dispara esse hook. A distinção importa para quem lê os testes: `buildTestApp()` + `app.close()` **encerra o pool singleton** de verdade — é por isso que cada arquivo de teste usa um único `describe` de topo (um segundo fecharia o pool que o primeiro ainda está usando). Requer **Postgres >= 13** (`gen_random_uuid()` nativo).
 
