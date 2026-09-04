@@ -35,6 +35,51 @@ values
    'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, false, true)
 on conflict (id) do nothing;
 
+-- O horário de funcionamento dos dois restaurantes. Dia sem faixa é dia
+-- fechado (não existe flag de "fechado" — ver CLAUDE.md), então o que NÃO
+-- está aqui já é parte do exemplo: nenhum dos dois tem faixa no domingo
+-- (weekday 0), então os dois nascem fechados nesse dia.
+--
+-- O Tokyo ganha uma faixa extra de sábado (18:00–02:00) além do jantar normal
+-- (18:00–23:00): faixas sobrepostas são permitidas (o `exists` do
+-- `isOpenNow` responde "aberto" com qualquer uma batendo), e é essa faixa que
+-- torna o atravessamento da meia-noite testável à mão — de madrugada de
+-- domingo, o Tokyo aparece aberto por causa dela, mesmo sem nenhuma faixa
+-- cadastrada no próprio domingo.
+insert into opening_hours (id, restaurant_id, weekday, opens_at, closes_at)
+values
+  -- Tokyo: almoço 11:00–15:00 e jantar 18:00–23:00, segunda a sábado
+  ('e59e0b97-d974-4d96-806f-6f66bcfd42b8', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 1, '11:00', '15:00'),
+  ('bd542521-42c2-4697-b6d3-5af8fc95c3f2', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 1, '18:00', '23:00'),
+  ('a670763f-32e1-4e09-a20d-7360f5e991aa', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 2, '11:00', '15:00'),
+  ('c65d1bfb-d409-4bc6-a414-c72cbea20b26', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 2, '18:00', '23:00'),
+  ('812d79bd-179e-43c5-a630-57a53d2b0da0', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 3, '11:00', '15:00'),
+  ('4ae8da55-ea0a-4738-98a6-f0007674774a', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 3, '18:00', '23:00'),
+  ('8a636699-18fb-432c-a5a2-3323d86ad225', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 4, '11:00', '15:00'),
+  ('ae82c548-b682-4c21-8ee6-5510c3543972', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 4, '18:00', '23:00'),
+  ('bf0ddff8-9f51-4d5b-9888-acfe5693c0f6', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 5, '11:00', '15:00'),
+  ('1a7b65d2-5082-455e-8c4d-7a25dfcc5e73', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 5, '18:00', '23:00'),
+  ('cfb79cd8-086b-4f4d-8193-37c52e16b2d2', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 6, '11:00', '15:00'),
+  ('47dc93ae-5a27-4da0-a65a-c999697264c0', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 6, '18:00', '23:00'),
+  -- a faixa que atravessa a meia-noite: sábado até as duas da manhã
+  ('1f606c2b-2dc0-4ac2-9f55-559a30c9258a', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e', 6, '18:00', '02:00'),
+
+  -- Cantina: almoço 12:00–15:00 e jantar 19:00–23:00, segunda a sábado —
+  -- fechada aos domingos (nenhuma faixa em weekday 0)
+  ('4a16a224-bdce-4ab9-a887-124e3753cdc6', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 1, '12:00', '15:00'),
+  ('b379a5b3-3aec-4dd2-8443-225413ea010a', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 1, '19:00', '23:00'),
+  ('6ae88bb3-80a1-4e1b-a435-dc9c7e006897', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 2, '12:00', '15:00'),
+  ('d725506e-fc71-4dfb-a1a9-87e6b5ace263', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 2, '19:00', '23:00'),
+  ('0d80be43-2b9f-4f96-b695-3bf8eecddd0b', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 3, '12:00', '15:00'),
+  ('3bf43c87-a7b9-421e-adb1-9181dff286fb', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 3, '19:00', '23:00'),
+  ('d1f9941b-74bc-43fd-ad68-ae693771b8ec', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 4, '12:00', '15:00'),
+  ('f13fe09e-bf40-45a3-b41d-ddbecdff3523', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 4, '19:00', '23:00'),
+  ('f52860fa-2209-4f2c-9c1f-f99a41dd0709', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 5, '12:00', '15:00'),
+  ('0ff10d86-8188-474f-815c-26182d59d15b', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 5, '19:00', '23:00'),
+  ('115491d3-a36a-45b5-a383-f80093bfb144', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 6, '12:00', '15:00'),
+  ('ab3ef214-9253-46d7-9b80-9afe4ca85a37', 'd05591dd-4c74-4d9e-9f62-cb8191d86ec8', 6, '19:00', '23:00')
+on conflict (id) do nothing;
+
 -- As seções do cardápio. A `position` é a ordem em que aparecem no cardápio
 -- público (a sequência da refeição), não a alfabética — por isso "Bebidas" é a
 -- última do Tokyo mesmo começando com B.
@@ -161,22 +206,33 @@ values
   ('8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'Ana Souza', '11999990000')
 on conflict (id) do nothing;
 
+-- `payment_method` passa a ser explícito nos três: sem isso o default
+-- `'cash'` cobriria os três em silêncio, e o exemplo do troco não existiria.
+-- O pendente é o único em dinheiro — e leva `change_for_in_cents` maior que o
+-- total (12270), para o troco aparecer numa leitura de exemplo (o "recibo" do
+-- cliente e a listagem do restaurante).
 insert into orders
   (id, restaurant_id, customer_id, type, status, total_in_cents,
-   street, number, neighborhood, city, state, zip_code)
+   street, number, neighborhood, city, state, zip_code,
+   payment_method, change_for_in_cents)
 values
-  -- entrega pendente: só ela leva endereço (ver orders_address_check)
+  -- entrega pendente: só ela leva endereço (ver orders_address_check), e é o
+  -- pedido em dinheiro com troco
   ('3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'delivery', 'pending', 12270,
-   'Rua Augusta', '1500', 'Consolação', 'São Paulo', 'SP', '01304-001'),
-  -- salão, já aceito
+   'Rua Augusta', '1500', 'Consolação', 'São Paulo', 'SP', '01304-001',
+   'cash', 15000),
+  -- salão, já aceito, pago no pix
   ('b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'dine_in', 'confirmed', 890,
-   null, null, null, null, null, null),
-  -- retirada em preparo: o próximo passo dela é `ready_for_pickup`
+   null, null, null, null, null, null,
+   'pix', null),
+  -- retirada em preparo: o próximo passo dela é `ready_for_pickup`, pago no
+  -- cartão na entrega
   ('5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'takeaway', 'preparing', 2490,
-   null, null, null, null, null, null)
+   null, null, null, null, null, null,
+   'card_on_delivery', null)
 on conflict (id) do nothing;
 
 -- name/price_in_cents são cópias congeladas do produto no momento do pedido —
