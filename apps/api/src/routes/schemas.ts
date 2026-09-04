@@ -132,6 +132,12 @@ export const createRestaurantBodySchema = {
     isQrcode: { type: "boolean" },
     // opcional: sem ele vale o default da coluna (America/Sao_Paulo)
     timezone: timezoneSchema,
+    // as quatro formas de pagamento: opcionais, sem elas vale o default da
+    // coluna (true nas três primeiras, false no vale-refeição)
+    acceptsCash: { type: "boolean" },
+    acceptsCardOnDelivery: { type: "boolean" },
+    acceptsPix: { type: "boolean" },
+    acceptsMealVoucher: { type: "boolean" },
   },
 };
 
@@ -154,6 +160,11 @@ export const updateRestaurantBodySchema = {
     // criação: restaurante nasce aceitando pedidos, e oferecer o campo no
     // cadastro convidaria a criar uma loja já pausada.
     acceptingOrders: { type: "boolean" },
+    // as quatro formas de pagamento: editáveis a qualquer momento
+    acceptsCash: { type: "boolean" },
+    acceptsCardOnDelivery: { type: "boolean" },
+    acceptsPix: { type: "boolean" },
+    acceptsMealVoucher: { type: "boolean" },
   },
 };
 
@@ -172,6 +183,10 @@ export const restaurantResponseSchema = {
     isQrcode: { type: "boolean" },
     timezone: { type: "string" },
     acceptingOrders: { type: "boolean" },
+    acceptsCash: { type: "boolean" },
+    acceptsCardOnDelivery: { type: "boolean" },
+    acceptsPix: { type: "boolean" },
+    acceptsMealVoucher: { type: "boolean" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

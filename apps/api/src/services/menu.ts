@@ -7,6 +7,7 @@ import type {
   MenuSection,
 } from "../domain/menu.ts";
 import type { OptionGroup } from "../domain/option.ts";
+import { acceptedPaymentMethods } from "../domain/payment.ts";
 import type { Product } from "../domain/product.ts";
 import type { Restaurant } from "../domain/restaurant.ts";
 import type { OpeningHour } from "../domain/opening-hours.ts";
@@ -66,6 +67,7 @@ function toMenuRestaurant(
       opensAt,
       closesAt,
     })),
+    paymentMethods: acceptedPaymentMethods(restaurant),
   };
 }
 

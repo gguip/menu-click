@@ -10,6 +10,7 @@
  */
 import type { Page } from "./pagination.ts";
 import type { PriceRule } from "./option.ts";
+import type { PaymentMethod } from "./payment.ts";
 import type { Product } from "./product.ts";
 import type { Restaurant } from "./restaurant.ts";
 import type { Weekday } from "./opening-hours.ts";
@@ -50,6 +51,12 @@ export type MenuRestaurant = Pick<
    * "fechado" é um beco sem saída para quem escaneou o QR code.
    */
   openingHours: { weekday: Weekday; opensAt: string; closesAt: string }[];
+  /**
+   * As formas de pagamento aceitas, já traduzidas das quatro flags para a
+   * lista que o cliente escolhe. As flags cruas (`acceptsCash` etc.) não
+   * entram aqui: são o formato de quem edita, não o de quem escolhe.
+   */
+  paymentMethods: PaymentMethod[];
 };
 
 /**

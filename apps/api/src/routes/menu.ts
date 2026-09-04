@@ -56,6 +56,9 @@ const menuRestaurantResponseSchema = {
         },
       },
     },
+    // a lista pronta, não as quatro flags: o cliente escolhe entre opções,
+    // não lê booleanos. `acceptsCash` e companhia NÃO entram aqui.
+    paymentMethods: { type: "array", items: { type: "string" } },
     // `timezone` NÃO entra: é operação do restaurante, não do cliente. O que
     // o fuso decide já chegou traduzido no `isOpen`.
   },

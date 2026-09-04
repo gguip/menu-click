@@ -161,6 +161,18 @@
                           "acceptingOrders": {
                             "type": "boolean"
                           },
+                          "acceptsCash": {
+                            "type": "boolean"
+                          },
+                          "acceptsCardOnDelivery": {
+                            "type": "boolean"
+                          },
+                          "acceptsPix": {
+                            "type": "boolean"
+                          },
+                          "acceptsMealVoucher": {
+                            "type": "boolean"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -275,6 +287,18 @@
                       "type": "string"
                     },
                     "acceptingOrders": {
+                      "type": "boolean"
+                    },
+                    "acceptsCash": {
+                      "type": "boolean"
+                    },
+                    "acceptsCardOnDelivery": {
+                      "type": "boolean"
+                    },
+                    "acceptsPix": {
+                      "type": "boolean"
+                    },
+                    "acceptsMealVoucher": {
                       "type": "boolean"
                     },
                     "createdAt": {
@@ -393,6 +417,18 @@
                   },
                   "acceptingOrders": {
                     "type": "boolean"
+                  },
+                  "acceptsCash": {
+                    "type": "boolean"
+                  },
+                  "acceptsCardOnDelivery": {
+                    "type": "boolean"
+                  },
+                  "acceptsPix": {
+                    "type": "boolean"
+                  },
+                  "acceptsMealVoucher": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -479,6 +515,18 @@
                       "type": "string"
                     },
                     "acceptingOrders": {
+                      "type": "boolean"
+                    },
+                    "acceptsCash": {
+                      "type": "boolean"
+                    },
+                    "acceptsCardOnDelivery": {
+                      "type": "boolean"
+                    },
+                    "acceptsPix": {
+                      "type": "boolean"
+                    },
+                    "acceptsMealVoucher": {
                       "type": "boolean"
                     },
                     "createdAt": {
@@ -5783,6 +5831,12 @@
                           }
                         }
                       }
+                    },
+                    "paymentMethods": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -6265,6 +6319,18 @@
                         "type": "string",
                         "pattern": "^[A-Za-z][A-Za-z0-9+_-]*(?:/[A-Za-z0-9+_-]+)*$",
                         "maxLength": 64
+                      },
+                      "acceptsCash": {
+                        "type": "boolean"
+                      },
+                      "acceptsCardOnDelivery": {
+                        "type": "boolean"
+                      },
+                      "acceptsPix": {
+                        "type": "boolean"
+                      },
+                      "acceptsMealVoucher": {
+                        "type": "boolean"
                       }
                     }
                   },
@@ -6367,6 +6433,18 @@
                           "type": "string"
                         },
                         "acceptingOrders": {
+                          "type": "boolean"
+                        },
+                        "acceptsCash": {
+                          "type": "boolean"
+                        },
+                        "acceptsCardOnDelivery": {
+                          "type": "boolean"
+                        },
+                        "acceptsPix": {
+                          "type": "boolean"
+                        },
+                        "acceptsMealVoucher": {
                           "type": "boolean"
                         },
                         "createdAt": {

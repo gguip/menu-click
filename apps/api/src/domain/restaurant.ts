@@ -54,6 +54,16 @@ export type CreateRestaurantInput = {
    * loja já pausada.
    */
   acceptingOrders?: boolean;
+  /**
+   * As quatro formas de pagamento aceitas na entrega. Todas opcionais aqui —
+   * sem elas, o insert cai no default da coluna (`true` nas três primeiras,
+   * `false` no vale-refeição, que exige credenciamento à parte com a
+   * bandeira).
+   */
+  acceptsCash?: boolean;
+  acceptsCardOnDelivery?: boolean;
+  acceptsPix?: boolean;
+  acceptsMealVoucher?: boolean;
 };
 
 /**
@@ -73,6 +83,11 @@ export type Restaurant = CreateRestaurantInput & {
   timezone: string;
   /** Idem: a coluna é `not null default true`. */
   acceptingOrders: boolean;
+  /** As quatro formas de pagamento: sempre presentes, a coluna é `not null`. */
+  acceptsCash: boolean;
+  acceptsCardOnDelivery: boolean;
+  acceptsPix: boolean;
+  acceptsMealVoucher: boolean;
   createdAt: string;
   updatedAt: string;
 };
