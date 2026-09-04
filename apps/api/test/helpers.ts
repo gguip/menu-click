@@ -268,6 +268,20 @@ export async function login(
   return response.json().token;
 }
 
+/** Define a grade de horário inteira de um restaurante, via API. */
+export function setOpeningHours(
+  app: FastifyInstance,
+  restaurant: TestRestaurant,
+  openingHours: { weekday: number; opensAt: string; closesAt: string }[],
+) {
+  return app.inject({
+    method: "PUT",
+    url: `/restaurants/${restaurant.id}/opening-hours`,
+    headers: restaurant.headers,
+    payload: { openingHours },
+  });
+}
+
 /** Header pronto para `app.inject({ headers })`. */
 export function authHeaders(token: string) {
   return { authorization: `Bearer ${token}` };
