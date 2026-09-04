@@ -29,9 +29,11 @@ import { acceptedPaymentMethods } from "../domain/payment.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as customersRepository from "../repositories/customers.ts";
+import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as ordersRepository from "../repositories/orders.ts";
 import * as productsRepository from "../repositories/products.ts";
 import type { Product } from "../domain/product.ts";
+import type { Restaurant } from "../domain/restaurant.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import { generateToken, hashToken } from "../tokens.ts";
 import * as orderEvents from "../events/orders.ts";
@@ -96,6 +98,31 @@ function assertRestauranteAceita(
     throw new ConflictError(
       `Este restaurante não aceita ${NOME_DA_MODALIDADE[type]}`,
     );
+  }
+}
+
+/**
+ * Recusa pedido com a loja fechada — **409**, conflito com o estado atual.
+ *
+ * As duas causas têm mensagens distintas de propósito: "fora do horário" e "a
+ * loja pausou" pedem reações diferentes de quem está do outro lado — esperar
+ * o horário, ou tentar de novo mais tarde.
+ *
+ * ⚠️ Isto NÃO é redundante com o `isOpen` do cardápio. O cardápio informa; a
+ * criação decide. Entre uma coisa e outra cabe o tempo de montar o carrinho, e
+ * cabe um cliente que chame a API direto, sem passar por tela nenhuma.
+ *
+ * Vale para as três modalidades, `dine_in` inclusive: com a loja fechada não
+ * há ninguém no salão para servir. Horário por modalidade é outro conceito.
+ */
+async function assertLojaAberta(restaurant: Restaurant): Promise<void> {
+  if (!restaurant.acceptingOrders) {
+    throw new ConflictError(
+      "A loja está pausada no momento. Tente de novo mais tarde",
+    );
+  }
+  if (!(await openingHoursRepository.isOpenNow(restaurant.id, restaurant.timezone))) {
+    throw new ConflictError("A loja está fechada agora");
   }
 }
 
@@ -277,6 +304,7 @@ export async function create(
   input: CreateOrderInput,
 ): Promise<CreatedOrder> {
   const restaurant = await restaurantsService.getById(restaurantId);
+  await assertLojaAberta(restaurant);
   assertRestauranteAceita(restaurant, input.type);
   assertFormaAceita(restaurant, input.paymentMethod);
   assertEnderecoCoerente(input);

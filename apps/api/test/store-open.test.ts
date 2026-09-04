@@ -1,7 +1,35 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.ts";
-import { buildTestApp, createRestaurant, setOpeningHours } from "./helpers.ts";
+import {
+  buildTestApp,
+  createProduct,
+  createRestaurant,
+  setOpeningHours,
+} from "./helpers.ts";
+
+/**
+ * Dia da semana e hora locais do restaurante, agora, direto do Postgres.
+ *
+ * Compartilhado entre os dois `describe` deste arquivo (o de `isOpenNow` e o
+ * do bloqueio na criação de pedido) — por isso mora no escopo do módulo, e
+ * não dentro de um `describe` só.
+ */
+async function agoraNoFuso(timezone: string) {
+  const { rows } = await pool.query<{ dow: number; hora: string }>(
+    `select extract(dow from now() at time zone $1)::int as dow,
+            to_char(now() at time zone $1, 'HH24:MI') as hora`,
+    [timezone],
+  );
+  return rows[0];
+}
+
+/** Soma minutos a "HH:MM", dando a volta na meia-noite. Compartilhado (ver acima). */
+function somaMinutos(hora: string, minutos: number): string {
+  const [h, m] = hora.split(":").map(Number);
+  const total = (h * 60 + m + minutos + 1440 * 2) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
 
 /**
  * "A loja está aberta agora?"
@@ -25,23 +53,6 @@ describe("está aberto agora?", () => {
   afterAll(async () => {
     await app.close();
   });
-
-  /** Dia da semana e hora locais do restaurante, agora, direto do Postgres. */
-  async function agoraNoFuso(timezone: string) {
-    const { rows } = await pool.query<{ dow: number; hora: string }>(
-      `select extract(dow from now() at time zone $1)::int as dow,
-              to_char(now() at time zone $1, 'HH24:MI') as hora`,
-      [timezone],
-    );
-    return rows[0];
-  }
-
-  /** Soma minutos a "HH:MM", dando a volta na meia-noite. */
-  function somaMinutos(hora: string, minutos: number): string {
-    const [h, m] = hora.split(":").map(Number);
-    const total = (h * 60 + m + minutos + 1440 * 2) % 1440;
-    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-  }
 
   /**
    * Um fuso fixo (sem horário de verão) cuja hora local é `horaAlvo` agora
@@ -213,8 +224,104 @@ describe("está aberto agora?", () => {
   });
 
   it("restaurante sem grade nenhuma está fechado", async () => {
-    await createRestaurant(app, { slug: "virgem" });
+    // desde a Task 6, `createRestaurant` nasce com a grade sempre-aberta (para
+    // não fechar sozinho todo restaurante de teste que não é sobre horário) —
+    // aqui o teste quer exatamente o estado "sem grade", então sobrescreve com
+    // uma grade vazia, o que dá o mesmo estado no banco (nenhuma linha viva).
+    const restaurant = await createRestaurant(app, { slug: "virgem" });
+    await setOpeningHours(app, restaurant, []);
 
     expect((await isOpen("virgem")).isOpen).toBe(false);
+  });
+
+  /**
+   * O bloqueio na criação de pedido — a Task 6.
+   *
+   * Aninhado neste `describe` (em vez de um segundo `describe` de topo) para
+   * reaproveitar `app`, `agoraNoFuso` e `somaMinutos` já montados aqui — o
+   * projeto usa um único `describe` de topo por arquivo de teste.
+   */
+  describe("a criação de pedido respeita o horário", () => {
+    /** Cria produto e devolve o que os testes precisam. */
+    async function lojaComProduto(slug: string) {
+      const restaurant = await createRestaurant(app, { slug });
+      const produto = await createProduct(app, restaurant, { stock: 10 });
+      return { restaurant, produto };
+    }
+
+    function pedir(restaurantId: string, produtoId: string) {
+      return app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurantId}/orders`,
+        payload: {
+          type: "takeaway",
+          customer: { name: "Ana", phone: "11999990000" },
+          items: [{ productId: produtoId, quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+    }
+
+    it("409 fora do horário", async () => {
+      const { restaurant, produto } = await lojaComProduto("fora-do-horario");
+      const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+      await setOpeningHours(app, restaurant, [
+        { weekday: dow, opensAt: somaMinutos(hora, 120), closesAt: somaMinutos(hora, 180) },
+      ]);
+
+      const response = await pedir(restaurant.id, produto.id);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("fechad");
+    });
+
+    it("409 com a loja pausada, mesmo dentro do horário", async () => {
+      const { restaurant, produto } = await lojaComProduto("pausada-pedido");
+      const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+      await setOpeningHours(app, restaurant, [
+        { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
+      ]);
+      await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { acceptingOrders: false },
+      });
+
+      const response = await pedir(restaurant.id, produto.id);
+
+      expect(response.statusCode).toBe(409);
+      // mensagem distinta da de "fora do horário"
+      expect(response.json().message).toContain("pausad");
+    });
+
+    it("201 dentro do horário", async () => {
+      const { restaurant, produto } = await lojaComProduto("aberta-pedido");
+      const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+      await setOpeningHours(app, restaurant, [
+        { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
+      ]);
+
+      expect((await pedir(restaurant.id, produto.id)).statusCode).toBe(201);
+    });
+
+    /** Se a loja está fechada, não há ninguém no salão para servir. */
+    it("409 também no pedido de salão", async () => {
+      const { restaurant, produto } = await lojaComProduto("salao-fechado");
+      await setOpeningHours(app, restaurant, []);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "dine_in",
+          customer: { name: "Ana", phone: "11999990000" },
+          items: [{ productId: produto.id, quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+    });
   });
 });
