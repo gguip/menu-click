@@ -9,6 +9,8 @@ import type {
 import type { OptionGroup } from "../domain/option.ts";
 import type { Product } from "../domain/product.ts";
 import type { Restaurant } from "../domain/restaurant.ts";
+import type { OpeningHour } from "../domain/opening-hours.ts";
+import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as categoriesService from "./categories.ts";
 import * as productsService from "./products.ts";
@@ -34,9 +36,37 @@ import * as restaurantsService from "./restaurants.ts";
  */
 const UNCATEGORIZED_SECTION_NAME = "Sem categoria";
 
-function toMenuRestaurant(restaurant: Restaurant): MenuRestaurant {
-  const { createdAt: _createdAt, updatedAt: _updatedAt, ...rest } = restaurant;
-  return rest;
+/**
+ * O restaurante como o público o vê, campo a campo.
+ *
+ * Copiar os campos é mais verboso que descartar dois, e é o ponto: o
+ * `timezone` e a data de cadastro ficam de fora porque ninguém os listou aqui,
+ * não porque alguém lembrou de subtraí-los (S10).
+ */
+function toMenuRestaurant(
+  restaurant: Restaurant,
+  isOpen: boolean,
+  openingHours: OpeningHour[],
+): MenuRestaurant {
+  return {
+    id: restaurant.id,
+    slug: restaurant.slug,
+    name: restaurant.name,
+    cuisineType: restaurant.cuisineType,
+    // logoUrl é opcional: quando não existe, a chave nem entra na resposta
+    ...(restaurant.logoUrl === undefined ? {} : { logoUrl: restaurant.logoUrl }),
+    address: restaurant.address,
+    isDelivery: restaurant.isDelivery,
+    isTakeaway: restaurant.isTakeaway,
+    isQrcode: restaurant.isQrcode,
+    isOpen,
+    acceptingOrders: restaurant.acceptingOrders,
+    openingHours: openingHours.map(({ weekday, opensAt, closesAt }) => ({
+      weekday,
+      opensAt,
+      closesAt,
+    })),
+  };
 }
 
 /**
@@ -100,8 +130,28 @@ function toMenuProduct(
   };
 }
 
+/**
+ * O restaurante do QR code, e se dá para pedir dele agora.
+ *
+ * A conta de "está aberto" roda no Postgres, no fuso do restaurante, pelo
+ * mesmo motivo do filtro de período do painel: refazê-la em JavaScript seria
+ * uma segunda implementação da mesma regra, discordando da primeira
+ * exatamente nos dias de virada de horário de verão.
+ */
 export async function getRestaurant(slug: string): Promise<MenuRestaurant> {
-  return toMenuRestaurant(await restaurantsService.getBySlug(slug));
+  const restaurant = await restaurantsService.getBySlug(slug);
+
+  const [dentroDaGrade, grade] = await Promise.all([
+    openingHoursRepository.isOpenNow(restaurant.id, restaurant.timezone),
+    openingHoursRepository.findByRestaurant(restaurant.id),
+  ]);
+
+  // a loja só está aberta se a grade permite E ninguém pausou
+  return toMenuRestaurant(
+    restaurant,
+    dentroDaGrade && restaurant.acceptingOrders,
+    grade,
+  );
 }
 
 /**

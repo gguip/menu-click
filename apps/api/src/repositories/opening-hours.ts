@@ -110,3 +110,51 @@ export async function softDeleteByRestaurant(
     [restaurantId],
   );
 }
+
+/**
+ * O restaurante está dentro de alguma faixa **agora**, no fuso dele?
+ *
+ * A conta roda no Postgres, e não no Node, pelo mesmo motivo do filtro de
+ * período do painel: ela depende do banco de fusos, que o `at time zone` já
+ * consulta. Refazê-la em JavaScript seria uma segunda implementação da mesma
+ * regra, discordando da primeira nos dias de virada de horário de verão.
+ *
+ * ⚠️ Isto responde só pela GRADE. A pausa manual é outra condição, e quem
+ * junta as duas é o serviço — misturá-las aqui esconderia da tela a diferença
+ * entre "fechado agora" e "a loja pausou os pedidos".
+ */
+export async function isOpenNow(
+  restaurantId: string,
+  timezone: string,
+  db: Queryable = pool,
+): Promise<boolean> {
+  const { rows } = await db.query<{ aberto: boolean }>(
+    `select exists (
+       select 1
+         from opening_hours h,
+              lateral (select now() at time zone $2 as local) agora
+        where h.restaurant_id = $1
+          and h.deleted_at is null
+          and (
+            -- faixa normal, dentro do mesmo dia
+            (h.closes_at > h.opens_at
+              and extract(dow from agora.local) = h.weekday
+              and agora.local::time >= h.opens_at
+              and agora.local::time <  h.closes_at)
+            or
+            -- faixa que atravessa a meia-noite: vale no fim do próprio dia e
+            -- na madrugada do dia seguinte
+            (h.closes_at < h.opens_at
+              and (
+                (extract(dow from agora.local) = h.weekday
+                  and agora.local::time >= h.opens_at)
+                or
+                (extract(dow from agora.local) = (h.weekday + 1) % 7
+                  and agora.local::time < h.closes_at)
+              ))
+          )
+     ) as aberto`,
+    [restaurantId, timezone],
+  );
+  return rows[0].aberto;
+}

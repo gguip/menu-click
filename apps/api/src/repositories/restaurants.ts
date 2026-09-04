@@ -37,6 +37,7 @@ type RestaurantRow = {
   is_takeaway: boolean;
   is_qrcode: boolean;
   timezone: string;
+  accepting_orders: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -62,6 +63,7 @@ function toRestaurant(row: RestaurantRow): Restaurant {
     isTakeaway: row.is_takeaway,
     isQrcode: row.is_qrcode,
     timezone: row.timezone,
+    acceptingOrders: row.accepting_orders,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -76,6 +78,7 @@ const restaurantColumns = {
   isTakeaway: "is_takeaway",
   isQrcode: "is_qrcode",
   timezone: "timezone",
+  acceptingOrders: "accepting_orders",
 } as const;
 
 /** O endereço mora em colunas planas: campo do value object → coluna. */
@@ -112,9 +115,9 @@ export async function insert(
       `insert into restaurants
          (name, slug, cuisine_type, logo_url,
           street, number, neighborhood, city, state, zip_code,
-          is_delivery, is_takeaway, is_qrcode, timezone)
+          is_delivery, is_takeaway, is_qrcode, timezone, accepting_orders)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-               coalesce($14, 'America/Sao_Paulo'))
+               coalesce($14, 'America/Sao_Paulo'), coalesce($15, true))
        returning *`,
       [
         input.name,
@@ -133,6 +136,11 @@ export async function insert(
         // null deixa o `coalesce` cair no default da coluna: o fuso é opcional
         // no cadastro, e repetir a constante aqui criaria um segundo default
         input.timezone ?? null,
+        // idem: hoje o corpo de criação não oferece o campo, então isto é
+        // sempre null. Vai como parâmetro mesmo assim porque o tipo de entrada
+        // aceita `acceptingOrders` — descartá-lo aqui faria o insert prometer
+        // no tipo o que não cumpre no SQL.
+        input.acceptingOrders ?? null,
       ],
     );
     return toRestaurant(rows[0]);

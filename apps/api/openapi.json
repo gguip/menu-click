@@ -158,6 +158,9 @@
                           "timezone": {
                             "type": "string"
                           },
+                          "acceptingOrders": {
+                            "type": "boolean"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -270,6 +273,9 @@
                     },
                     "timezone": {
                       "type": "string"
+                    },
+                    "acceptingOrders": {
+                      "type": "boolean"
                     },
                     "createdAt": {
                       "type": "string"
@@ -384,6 +390,9 @@
                     "type": "string",
                     "pattern": "^[A-Za-z][A-Za-z0-9+_-]*(?:/[A-Za-z0-9+_-]+)*$",
                     "maxLength": 64
+                  },
+                  "acceptingOrders": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -468,6 +477,9 @@
                     },
                     "timezone": {
                       "type": "string"
+                    },
+                    "acceptingOrders": {
+                      "type": "boolean"
                     },
                     "createdAt": {
                       "type": "string"
@@ -5748,6 +5760,29 @@
                     },
                     "isQrcode": {
                       "type": "boolean"
+                    },
+                    "isOpen": {
+                      "type": "boolean"
+                    },
+                    "acceptingOrders": {
+                      "type": "boolean"
+                    },
+                    "openingHours": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "weekday": {
+                            "type": "integer"
+                          },
+                          "opensAt": {
+                            "type": "string"
+                          },
+                          "closesAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -6330,6 +6365,9 @@
                         },
                         "timezone": {
                           "type": "string"
+                        },
+                        "acceptingOrders": {
+                          "type": "boolean"
                         },
                         "createdAt": {
                           "type": "string"

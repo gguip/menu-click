@@ -43,6 +43,17 @@ export type CreateRestaurantInput = {
    * já foi impresso.
    */
   timezone?: string;
+  /**
+   * A pausa manual: com `false`, ninguém consegue pedir, mesmo dentro da
+   * grade de horário. Opcional aqui porque a coluna tem default (`true`) —
+   * restaurante nasce aceitando pedidos.
+   *
+   * Mora neste tipo para chegar ao `Restaurant` e ao `UpdateRestaurantInput`,
+   * que derivam dele. Quem o mantém FORA do corpo de criação é o schema da
+   * rota, não este tipo: oferecer o campo no cadastro convidaria a criar uma
+   * loja já pausada.
+   */
+  acceptingOrders?: boolean;
 };
 
 /**
@@ -60,6 +71,8 @@ export type Restaurant = CreateRestaurantInput & {
   slug: string;
   /** Idem: a coluna é `not null`, então a leitura sempre traz um fuso. */
   timezone: string;
+  /** Idem: a coluna é `not null default true`. */
+  acceptingOrders: boolean;
   createdAt: string;
   updatedAt: string;
 };

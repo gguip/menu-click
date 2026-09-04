@@ -150,6 +150,10 @@ export const updateRestaurantBodySchema = {
     isQrcode: { type: "boolean" },
     // editável, ao contrário do slug: mudar o fuso não quebra QR code impresso
     timezone: timezoneSchema,
+    // a pausa manual. Só aparece aqui e na resposta, nunca no corpo de
+    // criação: restaurante nasce aceitando pedidos, e oferecer o campo no
+    // cadastro convidaria a criar uma loja já pausada.
+    acceptingOrders: { type: "boolean" },
   },
 };
 
@@ -167,6 +171,7 @@ export const restaurantResponseSchema = {
     isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
     timezone: { type: "string" },
+    acceptingOrders: { type: "boolean" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
