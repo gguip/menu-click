@@ -1,7 +1,15 @@
-import type { Page, Pagination } from "../domain/pagination.ts";
-import type { MenuProduct, MenuRestaurant, MenuSection } from "../domain/menu.ts";
+import type { Pagination } from "../domain/pagination.ts";
+import type {
+  MenuOptionGroup,
+  MenuProduct,
+  MenuProductsPage,
+  MenuRestaurant,
+  MenuSection,
+} from "../domain/menu.ts";
+import type { OptionGroup } from "../domain/option.ts";
 import type { Product } from "../domain/product.ts";
 import type { Restaurant } from "../domain/restaurant.ts";
+import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as categoriesService from "./categories.ts";
 import * as productsService from "./products.ts";
 import * as restaurantsService from "./restaurants.ts";
@@ -31,7 +39,52 @@ function toMenuRestaurant(restaurant: Restaurant): MenuRestaurant {
   return rest;
 }
 
-function toMenuProduct(product: Product): MenuProduct {
+/**
+ * Um grupo como o público o vê: sem opção indisponível.
+ *
+ * A opção some daqui, não só do carrinho — sem isso o cliente montaria um
+ * pedido que a criação recusaria com 400.
+ */
+function toMenuOptionGroup(group: OptionGroup): MenuOptionGroup {
+  return {
+    id: group.id,
+    name: group.name,
+    minOptions: group.minOptions,
+    maxOptions: group.maxOptions,
+    priceRule: group.priceRule,
+    options: group.options
+      .filter((option) => option.available)
+      .map((option) => ({
+        id: option.id,
+        name: option.name,
+        priceInCents: option.priceInCents,
+        maxQuantity: option.maxQuantity,
+      })),
+  };
+}
+
+/**
+ * O produto está à venda?
+ *
+ * Deixou de ser só `stock > 0`: um grupo obrigatório sem opção disponível
+ * suficiente torna o produto impossível de pedir, e o cardápio precisa dizer
+ * isso ANTES de a pessoa montar o carrinho — senão ela monta e a criação
+ * recusa. É a regra do iFood.
+ */
+function estaDisponivel(product: Product, grupos: MenuOptionGroup[]): boolean {
+  if (product.stock <= 0) return false;
+  return grupos.every(
+    (grupo) => grupo.minOptions === 0 || grupo.options.length >= grupo.minOptions,
+  );
+}
+
+function toMenuProduct(
+  product: Product,
+  grupos: OptionGroup[],
+  menuGroupsById: Map<string, MenuOptionGroup>,
+): MenuProduct {
+  // os grupos já filtrados (sem opção indisponível), na mesma ordem do produto
+  const gruposFiltrados = grupos.map((grupo) => menuGroupsById.get(grupo.id)!);
   return {
     id: product.id,
     name: product.name,
@@ -40,8 +93,10 @@ function toMenuProduct(product: Product): MenuProduct {
       ? {}
       : { description: product.description }),
     ...(product.photoUrl === undefined ? {} : { photoUrl: product.photoUrl }),
-    // o número exato não sai; o cliente só precisa saber se dá para pedir
-    available: product.stock > 0,
+    optionGroupIds: grupos.map((grupo) => grupo.id),
+    // o número exato de estoque não sai; o cliente só precisa saber se dá
+    // para pedir — e agora isso também depende dos grupos obrigatórios
+    available: estaDisponivel(product, gruposFiltrados),
   };
 }
 
@@ -68,7 +123,7 @@ export async function getRestaurant(slug: string): Promise<MenuRestaurant> {
 export async function listProducts(
   slug: string,
   pagination: Pagination,
-): Promise<Page<MenuSection>> {
+): Promise<MenuProductsPage> {
   const restaurant = await restaurantsService.getBySlug(slug);
 
   const categorias = await categoriesService.listByRestaurant(
@@ -81,26 +136,53 @@ export async function listProducts(
     categorias.data.map((categoria) => categoria.id),
   );
 
+  const ultimaPagina =
+    pagination.offset + categorias.data.length >= categorias.total;
+
+  const semCategoria = ultimaPagina
+    ? await productsService.listUncategorized(restaurant.id)
+    : [];
+
+  // uma chamada só para todos os produtos DESTA página (categorizados +
+  // "Sem categoria"), nunca uma por seção nem uma por produto
+  const gruposPorProduto = await optionGroupsRepository.findGroupsByProductIds(
+    restaurant.id,
+    [...produtos, ...semCategoria].map((produto) => produto.id),
+  );
+
+  // os grupos referenciados pela página, deduplicados e já sem opção
+  // indisponível — cada um convertido uma vez só, na primeira aparição
+  const menuGroupsById = new Map<string, MenuOptionGroup>();
+  for (const grupos of gruposPorProduto.values()) {
+    for (const grupo of grupos) {
+      if (!menuGroupsById.has(grupo.id)) {
+        menuGroupsById.set(grupo.id, toMenuOptionGroup(grupo));
+      }
+    }
+  }
+
+  const converteProduto = (produto: Product) =>
+    toMenuProduct(produto, gruposPorProduto.get(produto.id) ?? [], menuGroupsById);
+
   const sections: MenuSection[] = categorias.data.map((categoria) => ({
     id: categoria.id,
     name: categoria.name,
     products: produtos
       .filter((produto) => produto.categoryId === categoria.id)
-      .map(toMenuProduct),
+      .map(converteProduto),
   }));
 
-  const ultimaPagina =
-    pagination.offset + categorias.data.length >= categorias.total;
-
-  if (ultimaPagina) {
-    const semCategoria = await productsService.listUncategorized(restaurant.id);
-    if (semCategoria.length > 0) {
-      sections.push({
-        name: UNCATEGORIZED_SECTION_NAME,
-        products: semCategoria.map(toMenuProduct),
-      });
-    }
+  if (semCategoria.length > 0) {
+    sections.push({
+      name: UNCATEGORIZED_SECTION_NAME,
+      products: semCategoria.map(converteProduto),
+    });
   }
 
-  return { data: sections, ...pagination, total: categorias.total };
+  return {
+    data: sections,
+    ...pagination,
+    total: categorias.total,
+    optionGroups: [...menuGroupsById.values()],
+  };
 }

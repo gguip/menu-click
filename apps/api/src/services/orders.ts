@@ -8,6 +8,7 @@ import type {
   CreatedOrder,
   CreateOrderInput,
   Order,
+  OrderItemOption,
   OrderStatus,
   OrderSummary,
   OrderType,
@@ -21,11 +22,15 @@ import {
   isReachable,
   issuesTrackingToken,
 } from "../domain/order.ts";
+import type { OptionGroup, PricedGroup } from "../domain/option.ts";
+import { unitPrice } from "../domain/option.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as customersRepository from "../repositories/customers.ts";
 import * as ordersRepository from "../repositories/orders.ts";
 import * as productsRepository from "../repositories/products.ts";
+import type { Product } from "../domain/product.ts";
+import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import { generateToken, hashToken } from "../tokens.ts";
 import * as orderEvents from "../events/orders.ts";
 import * as restaurantsService from "./restaurants.ts";
@@ -105,6 +110,111 @@ function assertEnderecoCoerente(input: CreateOrderInput): void {
 }
 
 /**
+ * A chave de fusão de linhas.
+ *
+ * Era só o `productId`. Com opções isso passou a estar errado: "um hambúrguer
+ * com bacon" e "um sem bacon" viravam "dois hambúrgueres", e o cliente recebia
+ * dois iguais. A chave passa a incluir as escolhas, normalizadas — ordenadas
+ * por id para que a mesma seleção em ordem diferente continue fundindo.
+ */
+function chaveDeFusao(
+  productId: string,
+  escolhas: Map<string, number>,
+): string {
+  const partes = [...escolhas.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([optionId, quantity]) => `${optionId}:${quantity}`);
+  return [productId, ...partes].join("|");
+}
+
+/** Uma linha em montagem, antes de virar `InsertOrderItemData`. */
+type LinhaEmMontagem = {
+  productId: string;
+  quantity: number;
+  escolhas: Map<string, number>;
+};
+
+/**
+ * Confere as escolhas de um item contra os grupos ligados ao produto e devolve
+ * o que precisa ser congelado.
+ *
+ * Tudo aqui é 400 (`ValidationError`), não 404: o corpo do pedido é uma
+ * montagem que o cliente fez a partir do cardápio, então o que falha é a
+ * montagem, não um recurso ausente.
+ */
+function validarEscolhas(
+  produto: Product,
+  grupos: OptionGroup[],
+  escolhas: Map<string, number>,
+): { congeladas: OrderItemOption[]; grupos: PricedGroup[] } {
+  const opcaoPorId = new Map(
+    grupos.flatMap((grupo) =>
+      grupo.options.map((opcao) => [opcao.id, { grupo, opcao }] as const),
+    ),
+  );
+
+  for (const [optionId, quantity] of escolhas) {
+    const achado = opcaoPorId.get(optionId);
+    if (achado === undefined) {
+      throw new ValidationError(
+        `A opção "${optionId}" não pertence ao produto "${produto.name}"`,
+      );
+    }
+    if (!achado.opcao.available) {
+      throw new ValidationError(`A opção "${achado.opcao.name}" está indisponível`);
+    }
+    if (quantity > achado.opcao.maxQuantity) {
+      throw new ValidationError(
+        `"${achado.opcao.name}" aceita no máximo ${achado.opcao.maxQuantity} por item`,
+      );
+    }
+  }
+
+  const congeladas: OrderItemOption[] = [];
+  const precificados: PricedGroup[] = [];
+
+  for (const grupo of grupos) {
+    const doGrupo = grupo.options
+      .filter((opcao) => escolhas.has(opcao.id))
+      .map((opcao) => ({
+        opcao,
+        quantity: escolhas.get(opcao.id) as number,
+      }));
+
+    if (doGrupo.length < grupo.minOptions) {
+      throw new ValidationError(
+        `"${grupo.name}" exige ao menos ${grupo.minOptions} escolha(s)`,
+      );
+    }
+    if (doGrupo.length > grupo.maxOptions) {
+      throw new ValidationError(
+        `"${grupo.name}" aceita no máximo ${grupo.maxOptions} opção(ões)`,
+      );
+    }
+
+    for (const { opcao, quantity } of doGrupo) {
+      congeladas.push({
+        optionId: opcao.id,
+        groupName: grupo.name,
+        name: opcao.name,
+        priceInCents: opcao.priceInCents,
+        quantity,
+      });
+    }
+
+    precificados.push({
+      priceRule: grupo.priceRule,
+      choices: doGrupo.map(({ opcao, quantity }) => ({
+        priceInCents: opcao.priceInCents,
+        quantity,
+      })),
+    });
+  }
+
+  return { congeladas, grupos: precificados };
+}
+
+/**
  * Cria o pedido inteiro numa transação: cliente, pedido e itens valem juntos ou
  * nenhum vale. Sem ela, um erro na gravação dos itens deixaria um pedido órfão
  * com total já calculado e nenhuma linha.
@@ -117,18 +227,37 @@ export async function create(
   assertRestauranteAceita(restaurant, input.type);
   assertEnderecoCoerente(input);
 
-  // Duas linhas do mesmo produto viram uma com a quantidade somada. É o que um
-  // carrinho faz, e apaga de vez o caso em que a confirmação teria que travar e
-  // debitar o mesmo produto duas vezes na mesma transação.
-  const quantityByProduct = new Map<string, number>();
+  // Duas linhas iguais (mesmo produto, mesmas opções) viram uma com a
+  // quantidade somada. É o que um carrinho faz, e apaga de vez o caso em que a
+  // confirmação teria que travar e debitar o mesmo produto duas vezes na mesma
+  // transação. A chave de fusão NÃO é mais só o productId — ver `chaveDeFusao`.
+  const linhas = new Map<string, LinhaEmMontagem>();
   for (const item of input.items) {
     // S9: id fora do formato viraria `invalid input syntax for type uuid` (500)
     if (!isUuid(item.productId)) throw productNotFound(item.productId);
-    const current = quantityByProduct.get(item.productId) ?? 0;
-    quantityByProduct.set(item.productId, current + item.quantity);
+
+    // opções repetidas no MESMO item somam a quantidade antes de qualquer
+    // checagem de teto — igual já acontece com produto repetido no corpo
+    const escolhas = new Map<string, number>();
+    for (const escolha of item.options ?? []) {
+      const atual = escolhas.get(escolha.optionId) ?? 0;
+      escolhas.set(escolha.optionId, atual + escolha.quantity);
+    }
+
+    const chave = chaveDeFusao(item.productId, escolhas);
+    const linha = linhas.get(chave);
+    if (linha === undefined) {
+      linhas.set(chave, {
+        productId: item.productId,
+        quantity: item.quantity,
+        escolhas,
+      });
+    } else {
+      linha.quantity += item.quantity;
+    }
   }
 
-  const productIds = [...quantityByProduct.keys()];
+  const productIds = [...new Set([...linhas.values()].map((l) => l.productId))];
 
   // Quem acompanha o pedido recebe um token; quem está no salão, não. É por
   // não existir credencial que o pedido de mesa não tem como ser acompanhado —
@@ -143,23 +272,40 @@ export async function create(
     );
     const byId = new Map(products.map((product) => [product.id, product]));
 
-    const items = productIds.map((productId) => {
-      const product = byId.get(productId);
+    // uma consulta só para o pedido inteiro — nunca uma por item (Task 5)
+    const gruposByProduct = await optionGroupsRepository.findGroupsByProductIds(
+      restaurantId,
+      productIds,
+      client,
+    );
+
+    const items = [...linhas.values()].map((linha) => {
+      const product = byId.get(linha.productId);
       // some do cardápio (ou nunca foi deste restaurante) = não dá pra pedir
-      if (product === undefined) throw productNotFound(productId);
+      if (product === undefined) throw productNotFound(linha.productId);
+
+      const { congeladas, grupos } = validarEscolhas(
+        product,
+        gruposByProduct.get(linha.productId) ?? [],
+        linha.escolhas,
+      );
+
       return {
-        productId,
+        productId: linha.productId,
         // cópias congeladas: daqui pra frente o pedido não depende de `products`
         name: product.name,
         priceInCents: product.priceInCents,
-        quantity: quantityByProduct.get(productId) as number,
+        unitPriceInCents: unitPrice(product.priceInCents, grupos),
+        quantity: linha.quantity,
+        options: congeladas,
       };
     });
 
     // total sempre calculado aqui — aceitar do cliente seria deixar o preço
-    // ser escolhido por quem paga
+    // ser escolhido por quem paga. É o unitário (já com opções) vezes a
+    // quantidade: nunca soma-se contribuição de opção já arredondada.
     const totalInCents = items.reduce(
-      (sum, item) => sum + item.priceInCents * item.quantity,
+      (sum, item) => sum + item.unitPriceInCents * item.quantity,
       0,
     );
 
@@ -180,7 +326,33 @@ export async function create(
       },
       client,
     );
-    await ordersRepository.insertItems(orderId, items, client);
+    const itemIds = await ordersRepository.insertItems(orderId, items, client);
+
+    // Guarda contra o único jeito realista de o mapeamento por posição
+    // (comentado em `insertItems`) quebrar hoje: uma linha OMITIDA do
+    // `RETURNING`. Isso não prova que a ordem está certa — só transforma uma
+    // omissão silenciosa (que atribuiria a opção paga ao item errado) num
+    // erro alto, em vez de um pedido gravado errado sem ninguém notar.
+    if (itemIds.length !== items.length) {
+      throw new Error(
+        `insertItems devolveu ${itemIds.length} id(s) para ${items.length} item(ns) — ` +
+          "RETURNING veio mais curto que VALUES, o mapeamento por posição não é seguro",
+      );
+    }
+
+    // `itemIds[index]` depende de `insertItems` devolver uma linha do
+    // `RETURNING` por tupla do `VALUES`, na mesma ordem — ver o comentário lá.
+    const optionRows = items.flatMap((item, index) =>
+      item.options.map((option) => ({
+        orderItemId: itemIds[index],
+        optionId: option.optionId,
+        groupName: option.groupName,
+        name: option.name,
+        priceInCents: option.priceInCents,
+        quantity: option.quantity,
+      })),
+    );
+    await ordersRepository.insertItemOptions(optionRows, client);
 
     // relido pela mesma conexão da transação, então enxerga o que acabou de ser
     // gravado (e sai já no formato da resposta, com cliente e itens)
@@ -401,6 +573,21 @@ async function debitarEstoque(
   );
   const stockById = new Map(stocks.map((row) => [row.id, row.stock]));
 
+  // Soma as linhas do mesmo produto ANTES de conferir. Desde que o pedido pode
+  // ter mais de uma linha do mesmo produto (opções diferentes), conferir linha
+  // a linha deixaria cada uma enxergar o estoque inteiro — e duas linhas de 3
+  // passariam por uma checagem de "tem 4?" que ambas consideram suficiente.
+  //
+  // O débito abaixo continua por linha, e isso está certo: as linhas rodam na
+  // mesma transação, com a linha do produto já travada.
+  const pedidoPorProduto = new Map<string, number>();
+  for (const item of items) {
+    pedidoPorProduto.set(
+      item.productId,
+      (pedidoPorProduto.get(item.productId) ?? 0) + item.quantity,
+    );
+  }
+
   for (const item of items) {
     const stock = stockById.get(item.productId);
     // produto removido do cardápio entre o pedido e a confirmação
@@ -409,9 +596,10 @@ async function debitarEstoque(
         `O produto "${item.name}" saiu do cardápio e o pedido não pode ser confirmado`,
       );
     }
-    if (stock < item.quantity) {
+    const pedido = pedidoPorProduto.get(item.productId) as number;
+    if (stock < pedido) {
       throw new ConflictError(
-        `Estoque insuficiente de "${item.name}": ${item.quantity} pedidos, ${stock} disponíveis`,
+        `Estoque insuficiente de "${item.name}": ${pedido} pedidos, ${stock} disponíveis`,
       );
     }
   }

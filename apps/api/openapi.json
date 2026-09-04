@@ -644,6 +644,12 @@
                     "stock": {
                       "type": "integer"
                     },
+                    "optionGroupIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -684,7 +690,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "Lista plana e paginada — é a grade de edição, não a tela do cliente (o cardápio público é que vem agrupado por seção). Ao contrário dele, esta listagem traz o `stock` exato. `categoryId` recorta por seção e `search` procura por parte do nome, sem diferenciar maiúscula; os dois valem também para o `total`.",
+        "description": "Lista plana e paginada — é a grade de edição, não a tela do cliente (o cardápio público é que vem agrupado por seção). Ao contrário dele, esta listagem traz o `stock` exato. `categoryId` recorta por seção e `search` procura por parte do nome, sem diferenciar maiúscula; os dois valem também para o `total`. Cada produto traz `optionGroupIds`, na ordem de exibição — é o que o painel usa para reabrir a edição sem depender do `PUT` de vínculo para ler o que já está marcado.",
         "parameters": [
           {
             "schema": {
@@ -776,6 +782,12 @@
                           "stock": {
                             "type": "integer"
                           },
+                          "optionGroupIds": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -830,7 +842,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "Escopado pelo restaurante da URL: produto de outro restaurante é 404, mesmo com o id certo.",
+        "description": "Escopado pelo restaurante da URL: produto de outro restaurante é 404, mesmo com o id certo. Traz `optionGroupIds` na ordem de exibição (a mesma do cardápio público).",
         "parameters": [
           {
             "schema": {
@@ -885,6 +897,12 @@
                     },
                     "stock": {
                       "type": "integer"
+                    },
+                    "optionGroupIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     },
                     "createdAt": {
                       "type": "string"
@@ -1018,6 +1036,12 @@
                     },
                     "stock": {
                       "type": "integer"
+                    },
+                    "optionGroupIds": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     },
                     "createdAt": {
                       "type": "string"
@@ -1614,6 +1638,1236 @@
         }
       }
     },
+    "/restaurants/{restaurantId}/option-groups": {
+      "post": {
+        "operationId": "createOptionGroup",
+        "summary": "Cria um grupo de opções",
+        "tags": [
+          "Opções"
+        ],
+        "description": "Sem `minOptions`, o grupo nasce opcional. O nome é único dentro do restaurante e **não diferencia maiúscula**: com \"Sabores\" já criado, \"sabores\" é 409. `minOptions` maior que `maxOptions` é 400 — o grupo nunca poderia ser satisfeito.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "maxOptions",
+                  "priceRule"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "minOptions": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 0
+                  },
+                  "maxOptions": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "priceRule": {
+                    "type": "string",
+                    "enum": [
+                      "sum",
+                      "highest",
+                      "average"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "minOptions": {
+                      "type": "integer"
+                    },
+                    "maxOptions": {
+                      "type": "integer"
+                    },
+                    "priceRule": {
+                      "type": "string"
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "maxQuantity": {
+                            "type": "integer"
+                          },
+                          "available": {
+                            "type": "boolean"
+                          },
+                          "position": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listOptionGroups",
+        "summary": "Os grupos de opções do restaurante",
+        "tags": [
+          "Opções"
+        ],
+        "description": "Ordenados por nome — o grupo não tem posição própria; a ordem de exibição é por produto e mora na junção.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "in": "query",
+            "name": "limit",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "in": "query",
+            "name": "offset",
+            "required": false
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "restaurantId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "minOptions": {
+                            "type": "integer"
+                          },
+                          "maxOptions": {
+                            "type": "integer"
+                          },
+                          "priceRule": {
+                            "type": "string"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "maxQuantity": {
+                                  "type": "integer"
+                                },
+                                "available": {
+                                  "type": "boolean"
+                                },
+                                "position": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/option-groups/{id}": {
+      "get": {
+        "operationId": "getOptionGroup",
+        "summary": "Detalhe do grupo de opções",
+        "tags": [
+          "Opções"
+        ],
+        "description": "Escopado pelo restaurante da URL: grupo de outro restaurante é 404, mesmo com o id certo.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "minOptions": {
+                      "type": "integer"
+                    },
+                    "maxOptions": {
+                      "type": "integer"
+                    },
+                    "priceRule": {
+                      "type": "string"
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "maxQuantity": {
+                            "type": "integer"
+                          },
+                          "available": {
+                            "type": "boolean"
+                          },
+                          "position": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateOptionGroup",
+        "summary": "Renomeia ou muda os limites do grupo",
+        "tags": [
+          "Opções"
+        ],
+        "description": "A checagem de limites considera o valor resultante: baixar só o `maxOptions` para abaixo do `minOptions` já gravado é 400. Renomear para um nome que já existe no restaurante é 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "minOptions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "maxOptions": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "priceRule": {
+                    "type": "string",
+                    "enum": [
+                      "sum",
+                      "highest",
+                      "average"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "minOptions": {
+                      "type": "integer"
+                    },
+                    "maxOptions": {
+                      "type": "integer"
+                    },
+                    "priceRule": {
+                      "type": "string"
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "maxQuantity": {
+                            "type": "integer"
+                          },
+                          "available": {
+                            "type": "boolean"
+                          },
+                          "position": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteOptionGroup",
+        "summary": "Remove o grupo de opções",
+        "tags": [
+          "Opções"
+        ],
+        "description": "Soft delete, como todo DELETE da API.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/option-groups/{groupId}/options": {
+      "post": {
+        "operationId": "createOption",
+        "summary": "Cria uma opção dentro do grupo",
+        "tags": [
+          "Opções"
+        ],
+        "description": "Sem `priceInCents`, a opção nasce sem custo (cobre a escolha obrigatória, como o ponto da carne). Grupo de outro restaurante é 404.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "priceInCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 0
+                  },
+                  "maxQuantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1
+                  },
+                  "available": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "default": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "groupId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "priceInCents": {
+                      "type": "integer"
+                    },
+                    "maxQuantity": {
+                      "type": "integer"
+                    },
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "position": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/option-groups/{groupId}/options/{id}": {
+      "patch": {
+        "operationId": "updateOption",
+        "summary": "Muda preço, disponibilidade, teto ou posição da opção",
+        "tags": [
+          "Opções"
+        ],
+        "description": "Grupo ou opção de outro restaurante é 404 — a mesma checagem de escopo do grupo vale aqui.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 1,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "priceInCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "maxQuantity": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "available": {
+                    "type": "boolean"
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "groupId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "priceInCents": {
+                      "type": "integer"
+                    },
+                    "maxQuantity": {
+                      "type": "integer"
+                    },
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "position": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteOption",
+        "summary": "Remove a opção",
+        "tags": [
+          "Opções"
+        ],
+        "description": "Soft delete, como todo DELETE da API.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "groupId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/products/{id}/option-groups": {
+      "put": {
+        "operationId": "setProductOptionGroups",
+        "summary": "Define os grupos de opções do produto",
+        "tags": [
+          "Opções"
+        ],
+        "description": "Substitui a lista **inteira**, na ordem do array — uma rota em vez de três (vincular, desvincular, reordenar), porque é como uma tela faz. Lista vazia desvincula tudo. Id repetido é 400; grupo de outro restaurante é 404.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "optionGroupIds"
+                ],
+                "properties": {
+                  "optionGroupIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "optionGroups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "restaurantId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "minOptions": {
+                            "type": "integer"
+                          },
+                          "maxOptions": {
+                            "type": "integer"
+                          },
+                          "priceRule": {
+                            "type": "string"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "maxQuantity": {
+                                  "type": "integer"
+                                },
+                                "available": {
+                                  "type": "boolean"
+                                },
+                                "position": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/restaurants/{restaurantId}/users": {
       "post": {
         "operationId": "createRestaurantUser",
@@ -2010,7 +3264,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome e preço do produto, então reajuste de cardápio não muda pedido já feito. Duas linhas do mesmo produto viram uma, com a quantidade somada. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
+        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
         "requestBody": {
           "required": true,
           "content": {
@@ -2068,6 +3322,27 @@
                         "quantity": {
                           "type": "integer",
                           "minimum": 1
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "optionId",
+                              "quantity"
+                            ],
+                            "properties": {
+                              "optionId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "minimum": 1
+                              }
+                            }
+                          }
                         }
                       }
                     }
@@ -2222,8 +3497,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -2830,8 +4131,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -3013,8 +4340,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -3196,8 +4549,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -3379,8 +4758,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -3562,8 +4967,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -3745,8 +5176,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -3928,8 +5385,34 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -4080,7 +5563,7 @@
         "tags": [
           "Cardápio público"
         ],
-        "description": "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir.",
+        "description": "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir — e que agora também leva em conta os grupos de opções obrigatórios do produto. Os grupos referenciados pelos produtos desta página vêm uma vez cada em `optionGroups`, no topo; cada produto aponta para eles por `optionGroupIds`. Opção indisponível não aparece.",
         "parameters": [
           {
             "schema": {
@@ -4155,6 +5638,12 @@
                                 },
                                 "available": {
                                   "type": "boolean"
+                                },
+                                "optionGroupIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
                                 }
                               }
                             }
@@ -4170,6 +5659,49 @@
                     },
                     "total": {
                       "type": "integer"
+                    },
+                    "optionGroups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "minOptions": {
+                            "type": "integer"
+                          },
+                          "maxOptions": {
+                            "type": "integer"
+                          },
+                          "priceRule": {
+                            "type": "string"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "maxQuantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -4262,8 +5794,31 @@
                           "priceInCents": {
                             "type": "integer"
                           },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
                           "quantity": {
                             "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
                           }
                         }
                       }
@@ -4964,6 +6519,10 @@
     {
       "name": "Categorias",
       "description": "As seções do cardápio. A ordem é a que o restaurante definir em `position` — não a alfabética, porque cardápio segue a sequência da refeição."
+    },
+    {
+      "name": "Opções",
+      "description": "Os grupos de opções do cardápio — tamanho, sabores, adicionais. O grupo pertence ao restaurante e se liga a vários produtos, porque \"Sabores\" vale para todas as pizzas."
     },
     {
       "name": "Pedidos",

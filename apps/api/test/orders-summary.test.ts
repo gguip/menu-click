@@ -165,7 +165,16 @@ describe("resumo dos pedidos", () => {
       expect(body.counts.confirmed).toBe(1);
     });
 
-    /** Sem os limites, um faturamento zerado não tem como ser explicado. */
+    /**
+     * Sem os limites, um faturamento zerado não tem como ser explicado.
+     *
+     * A asserção antiga comparava os dois `from` e exigia 1h de diferença —
+     * verdade na maior parte do dia, mas falsa entre 00h e 01h em São Paulo,
+     * quando Manaus ainda está no dia anterior e a diferença vira −23h. A
+     * propriedade que vale sempre é outra: cada `from`, lido no fuso do
+     * PRÓPRIO restaurante, é meia-noite em ponto — não importa quantas horas
+     * de distância há entre os dois fusos no instante em que o teste roda.
+     */
     it("devolve os instantes que usou, no fuso do restaurante", async () => {
       const sp = await cenario("America/Sao_Paulo");
       const manaus = await cenario("America/Manaus");
@@ -174,11 +183,25 @@ describe("resumo dos pedidos", () => {
       const emManaus = (await resumo(manaus.restaurant, "period=today")).body;
 
       expect(emSp.period.from).toBeTruthy();
-      // o dia de Manaus começa uma hora depois do de São Paulo
-      const diferenca =
-        new Date(emManaus.period.from).getTime() -
-        new Date(emSp.period.from).getTime();
-      expect(diferenca).toBe(60 * 60 * 1000);
+      expect(emManaus.period.from).toBeTruthy();
+
+      const horaLocal = (iso: string, timezone: string) =>
+        new Intl.DateTimeFormat("pt-BR", {
+          timeZone: timezone,
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hourCycle: "h23",
+        }).format(new Date(iso));
+
+      expect(horaLocal(emSp.period.from, "America/Sao_Paulo")).toBe("00:00:00");
+      expect(horaLocal(emManaus.period.from, "America/Manaus")).toBe(
+        "00:00:00",
+      );
+
+      // e são instantes de verdade diferentes — senão a coluna `timezone`
+      // não estaria fazendo nada
+      expect(emSp.period.from).not.toBe(emManaus.period.from);
     });
 
     it("sem período, não há limites a reportar", async () => {

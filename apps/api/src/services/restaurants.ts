@@ -12,6 +12,7 @@ import { isUuid } from "../domain/uuid.ts";
 import { isValidTimezone } from "../domain/timezone.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
+import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as productsRepository from "../repositories/products.ts";
 import * as restaurantsRepository from "../repositories/restaurants.ts";
 
@@ -192,8 +193,9 @@ export async function update(
 }
 
 /**
- * Remove o restaurante **e o cardápio dele** — produtos e categorias (soft
- * delete em cascata, D3).
+ * Remove o restaurante **e o cardápio dele** — produtos, categorias, grupos de
+ * opções, opções e os vínculos entre produto e grupo (soft delete em
+ * cascata, D3).
  *
  * Os updates valem juntos ou não valem: se um falhar, o rollback
  * traz o restaurante de volta. Lançar o `NotFoundError` de dentro da transação
@@ -208,5 +210,12 @@ export async function remove(id: string): Promise<void> {
 
     await productsRepository.softDeleteByRestaurant(id, client);
     await categoriesRepository.softDeleteByRestaurant(id, client);
+
+    // vínculos e opções são marcados antes dos grupos — a mesma ordem em que
+    // a cascata é descrita: cada um é alcançado pela subconsulta que sobe até
+    // o pai (produto ou grupo), nunca por um `restaurant_id` próprio deles.
+    await optionGroupsRepository.softDeleteLinksByRestaurant(id, client);
+    await optionGroupsRepository.softDeleteOptionsByRestaurant(id, client);
+    await optionGroupsRepository.softDeleteByRestaurant(id, client);
   });
 }

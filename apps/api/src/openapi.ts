@@ -50,6 +50,13 @@ export const OPENAPI_TAGS = [
       "refeição.",
   },
   {
+    name: "Opções",
+    description:
+      "Os grupos de opções do cardápio — tamanho, sabores, adicionais. O " +
+      "grupo pertence ao restaurante e se liga a vários produtos, porque " +
+      '"Sabores" vale para todas as pizzas.',
+  },
+  {
     name: "Pedidos",
     description:
       "Criar um pedido é público (o cliente do QR não tem conta); listar, " +

@@ -8,6 +8,8 @@
  * rotas de gestão e **não** aqui, porque este tipo (e o `schema.response` que o
  * espelha) lista o que sai, não o que existe (S10).
  */
+import type { Page } from "./pagination.ts";
+import type { PriceRule } from "./option.ts";
 import type { Product } from "./product.ts";
 import type { Restaurant } from "./restaurant.ts";
 
@@ -26,6 +28,33 @@ export type MenuProduct = Omit<
   "stock" | "restaurantId" | "createdAt" | "updatedAt" | "categoryId"
 > & {
   available: boolean;
+  /**
+   * Os grupos deste produto, na ordem que ele os usa. Só os ids: o conteúdo
+   * (nome, opções) vem uma vez só em `optionGroups`, no topo da página — ver
+   * `MenuOptionGroup`.
+   */
+  optionGroupIds: string[];
+};
+
+/**
+ * Um grupo de opções como o público o vê.
+ *
+ * Vem **fora** dos produtos, uma vez cada. Embutir repetiria "Sabores" com
+ * vinte opções dentro de cada pizza; como os grupos são reutilizáveis, eles são
+ * poucos, e incluir cada um uma vez é barato.
+ */
+export type MenuOptionGroup = {
+  id: string;
+  name: string;
+  minOptions: number;
+  maxOptions: number;
+  priceRule: PriceRule;
+  options: {
+    id: string;
+    name: string;
+    priceInCents: number;
+    maxQuantity: number;
+  }[];
 };
 
 /**
@@ -41,4 +70,12 @@ export type MenuSection = {
   id?: string;
   name: string;
   products: MenuProduct[];
+};
+
+/**
+ * A página do cardápio: o envelope de seções de sempre, mais os grupos de
+ * opções referenciados pelos produtos **desta página**, cada um uma vez.
+ */
+export type MenuProductsPage = Page<MenuSection> & {
+  optionGroups: MenuOptionGroup[];
 };
