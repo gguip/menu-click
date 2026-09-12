@@ -146,6 +146,38 @@ describe("recuperação de senha", () => {
     expect(await tokensVivos(staffEmail)).toBe(0);
   });
 
+  /**
+   * O segundo nível do filtro, que o teste acima NÃO cobre.
+   *
+   * `findActiveByEmail` filtra `u.deleted_at is null` **e**
+   * `r.deleted_at is null`. O teste de cima remove o usuário; este remove o
+   * RESTAURANTE e deixa o usuário intacto. Sem ele, alguém que apagasse a
+   * segunda condição num refactor não veria teste nenhum ficar vermelho — e a
+   * recuperação viraria o caminho de volta para um restaurante que alguém
+   * removeu de propósito.
+   */
+  it("não manda para dono de restaurante removido", async () => {
+    const restaurant = await createRestaurant(app, { slug: "recupera-rest-removido" });
+
+    const removed = await app.inject({
+      method: "DELETE",
+      url: `/restaurants/${restaurant.id}`,
+      headers: restaurant.headers,
+    });
+    expect(removed.statusCode).toBe(204);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/forgot-password",
+      payload: { email: restaurant.ownerEmail },
+    });
+    expect(response.statusCode).toBe(202);
+
+    await aguardaTrabalhoEmSegundoPlano();
+    expect(outbox.some((e) => e.to === restaurant.ownerEmail)).toBe(false);
+    expect(await tokensVivos(restaurant.ownerEmail)).toBe(0);
+  });
+
   it("um pedido novo invalida o token anterior", async () => {
     const restaurant = await createRestaurant(app, { slug: "recupera-duplo" });
 
