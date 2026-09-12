@@ -6396,7 +6396,7 @@
         "operationId": "quoteMenuDelivery",
         "summary": "Cota o frete antes de montar o pedido",
         "tags": [
-          "Cardápio público"
+          "Entrega"
         ],
         "description": "Informa se a loja entrega no endereço e por quanto, ANTES de o cliente montar o carrinho. Não decide nada: a criação do pedido confere de novo no servidor. O endereço vai no corpo, nunca na querystring, pelo mesmo motivo do S21 sobre credencial em URL.",
         "requestBody": {

@@ -240,7 +240,7 @@ export async function menuRoutes(app: FastifyInstance) {
         },
       },
       schema: {
-        tags: ["Cardápio público"],
+        tags: ["Entrega"],
         operationId: "quoteMenuDelivery",
         summary: "Cota o frete antes de montar o pedido",
         description:
