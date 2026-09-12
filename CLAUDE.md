@@ -150,7 +150,13 @@ A marcação é `config: { ownerOnly: true }`, lida pelo **mesmo hook** que já 
 
 A sessão de um usuário removido morre sozinha — a resolução do token junta `restaurant_users` filtrando `deleted_at is null`. Há teste para essa propriedade não se perder numa refatoração da query.
 
-⚠️ **Não há recuperação de senha por e-mail**, e isso ainda é um buraco: se o último `owner` perder a senha, o restaurante continua sem caminho de volta. Fechá-lo exige serviço de envio de e-mail — dependência e infra novas.
+**`POST /auth/forgot-password` e `POST /auth/reset-password` fecham esse buraco.** O pedido gera um token de uso único, válido por uma hora — o banco guarda só o **hash** dele, nunca o token, a mesma decisão de `sessions` e do `trackingToken`. `used_at` (a recuperação aconteceu) e `deleted_at` (o token foi invalidado sem ser usado — por um pedido novo, ou por troca pelo caminho comum) são colunas diferentes de propósito: colapsá-las apagaria, numa investigação de acesso indevido, a distinção entre as duas coisas.
+
+⚠️ **`/auth/forgot-password` sempre responde 202, e responde ANTES de fazer o trabalho.** Responder o mesmo corpo para e-mail que existe e que não existe não bastaria sozinho — se buscar o usuário, criar o token e mandar o e-mail acontecessem antes da resposta, o TEMPO de resposta seria o oráculo: e-mail inexistente voltaria na hora, por não haver usuário para buscar nem e-mail para mandar; existente esperaria a criação do token e a ida ao SMTP. O trabalho roda depois, fora do que o cliente aguarda — nem um provedor de SMTP lento segura a requisição —, e falha de envio vai só para o log: contar ao cliente que o envio falhou também diria que aquele e-mail existe.
+
+A troca (`POST /auth/reset-password`) revoga **todas** as sessões do usuário, sem poupar nenhuma — ao contrário do `change-password`, aqui não existe sessão atual para proteger, e qualquer sessão viva pertence a quem tinha a senha antiga. E não devolve sessão: quem recuperou entra por `/auth/login`, como qualquer login — devolver token ali trocaria a prova de "conhece a senha nova" por só possuir o link.
+
+🚨 **O e-mail sai por `nodemailer` (SMTP) ou por um driver de console, e o de console é recusado em produção — falha ao subir.** Ele escreve o link no log para dev e teste rodarem sem provedor nenhum, mas o link **é** o token: logar isso em produção derramaria credencial de recuperação de senha em log de aplicação, exatamente o que o S13 proíbe. Falhar no boot é a resposta certa — um aviso seria ignorado até o dia em que fizesse falta.
 
 ### Cardápio público e o slug
 
