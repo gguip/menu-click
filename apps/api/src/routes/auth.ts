@@ -161,6 +161,31 @@ const forgotPasswordResponseSchema = {
   },
 };
 
+const resetPasswordBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["token", "newPassword"],
+  properties: {
+    // o token não tem `format` nem regra de tamanho fixa: é opaco para quem
+    // valida, e um valor fora do formato esperado simplesmente não bate com
+    // hash nenhum no banco — a mesma mensagem de "inválido" cobre os dois
+    token: { type: "string", minLength: 1 },
+    newPassword: passwordSchema,
+  },
+};
+
+/**
+ * Sem token e sem dado de usuário — a rota é o gêmeo do `/auth/forgot-
+ * password` na barreira de saída (S10): devolver sessão aqui trocaria a
+ * segunda barreira (a senha nova) por só possuir o link.
+ */
+const resetPasswordResponseSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string" },
+  },
+};
+
 // ===================== Rotas =====================
 
 export async function authRoutes(app: FastifyInstance) {
@@ -266,6 +291,35 @@ export async function authRoutes(app: FastifyInstance) {
       });
 
       return reply;
+    },
+  );
+
+  // Consome o token de `/auth/forgot-password`. Pública pelo mesmo motivo:
+  // quem está aqui não tem sessão para provar quem é — é o próprio token que
+  // prova.
+  app.post<{ Body: { token: string; newPassword: string } }>(
+    "/auth/reset-password",
+    {
+      config: { public: true },
+      schema: {
+        tags: ["Autenticação"],
+        operationId: "resetPassword",
+        summary: "Troca a senha com o token de recuperação",
+        description:
+          "Mensagem única para token inválido, expirado ou já usado — distinguir diria a quem guarda um link velho se ele um dia existiu. Não devolve sessão: quem recuperou entra como todo mundo, por `/auth/login` — devolver token aqui trocaria a segunda barreira (a senha nova) por só possuir o link. Derruba TODAS as sessões do usuário, sem exceção: não há sessão atual a poupar, e qualquer sessão viva pertence a quem tinha a senha antiga.",
+        body: resetPasswordBodySchema,
+        response: {
+          200: resetPasswordResponseSchema,
+          400: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      await authService.resetPassword(
+        request.body.token,
+        request.body.newPassword,
+      );
+      return { message: "Senha alterada. Entre com a senha nova" };
     },
   );
 

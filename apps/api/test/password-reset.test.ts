@@ -2,7 +2,12 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.ts";
 import { clearOutbox, outbox } from "../src/email.ts";
-import { buildTestApp, createRestaurant, uniqueEmail } from "./helpers.ts";
+import {
+  buildTestApp,
+  createRestaurant,
+  uniqueEmail,
+  validUserBody,
+} from "./helpers.ts";
 
 /**
  * `POST /auth/forgot-password`.
@@ -223,5 +228,219 @@ describe("recuperação de senha", () => {
     // ao contrário do soft delete da API) corre com o `insert` ainda em
     // voo e produz um erro de chave estrangeira só de artefato de teste.
     await esperaEmail(restaurant.ownerEmail);
+  });
+
+  /**
+   * `POST /auth/reset-password` — a outra ponta do fluxo: trocar a senha com
+   * o token que `/auth/forgot-password` mandou por e-mail.
+   */
+  describe("troca via POST /auth/reset-password", () => {
+    /**
+     * Extrai o token do link dentro do corpo do e-mail. O banco só guarda o
+     * hash (ver `tokens.ts`), então o token só existe aqui — no texto que o
+     * driver de console "enviou".
+     */
+    function extraiToken(texto: string): string {
+      const encontrado = texto.match(/token=([^\s&]+)/);
+      if (encontrado === null) {
+        throw new Error("e-mail sem link de recuperação");
+      }
+      return decodeURIComponent(encontrado[1]);
+    }
+
+    /** Pede a recuperação e devolve o token já extraído do e-mail. */
+    async function pedeTokenDeRecuperacao(email: string): Promise<string> {
+      await app.inject({
+        method: "POST",
+        url: "/auth/forgot-password",
+        payload: { email },
+      });
+      const enviado = await esperaEmail(email);
+      return extraiToken(enviado.text);
+    }
+
+    function trocaSenha(token: string, newPassword: string) {
+      return app.inject({
+        method: "POST",
+        url: "/auth/reset-password",
+        payload: { token, newPassword },
+      });
+    }
+
+    it("troca a senha com o token e deixa entrar com a nova", async () => {
+      const restaurant = await createRestaurant(app, { slug: "reseta-com-token" });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+      const reset = await trocaSenha(token, "senha-recuperada-123");
+      expect(reset.statusCode).toBe(200);
+
+      const loginNovo = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: {
+          email: restaurant.ownerEmail,
+          password: "senha-recuperada-123",
+        },
+      });
+      expect(loginNovo.statusCode).toBe(200);
+    });
+
+    it("a senha antiga para de funcionar", async () => {
+      const restaurant = await createRestaurant(app, {
+        slug: "reseta-senha-antiga-para",
+      });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+      await trocaSenha(token, "senha-recuperada-123");
+
+      const loginAntigo = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: restaurant.ownerEmail, password: validUserBody.password },
+      });
+      expect(loginAntigo.statusCode).toBe(401);
+    });
+
+    it("o token não serve duas vezes", async () => {
+      const restaurant = await createRestaurant(app, {
+        slug: "reseta-token-nao-repete",
+      });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+      const primeira = await trocaSenha(token, "senha-recuperada-123");
+      expect(primeira.statusCode).toBe(200);
+
+      const segunda = await trocaSenha(token, "outra-senha-456");
+      expect(segunda.statusCode).toBe(400);
+    });
+
+    /**
+     * Envelhece a linha no BANCO em vez de esperar uma hora — esperar de
+     * verdade é impossível, e manipular o relógio do processo seria frágil
+     * (ver o aviso no topo do arquivo/no brief da Task 4).
+     */
+    it("token expirado não serve", async () => {
+      const restaurant = await createRestaurant(app, {
+        slug: "reseta-token-expirado",
+      });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+      await pool.query(
+        `update password_reset_tokens set expires_at = now() - interval '1 minute'
+          where restaurant_user_id = (
+            select id from restaurant_users where email = $1
+          )`,
+        [restaurant.ownerEmail],
+      );
+
+      const response = await trocaSenha(token, "senha-recuperada-123");
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("token inventado não serve", async () => {
+      const response = await trocaSenha(
+        "token-que-nunca-existiu",
+        "senha-recuperada-123",
+      );
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("a troca derruba TODAS as sessões", async () => {
+      const restaurant = await createRestaurant(app, {
+        slug: "reseta-derruba-sessoes",
+      });
+      // sessão aberta ANTES da recuperação — é ela que precisa parar de valer
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+      await trocaSenha(token, "senha-recuperada-123");
+
+      const me = await app.inject({
+        method: "GET",
+        url: "/auth/me",
+        headers: restaurant.headers,
+      });
+      expect(me.statusCode).toBe(401);
+    });
+
+    it("a troca NÃO devolve sessão", async () => {
+      const restaurant = await createRestaurant(app, {
+        slug: "reseta-sem-sessao-na-resposta",
+      });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+      const reset = await trocaSenha(token, "senha-recuperada-123");
+      // devolver token aqui transformaria um e-mail interceptado em acesso
+      // imediato, sem a segunda barreira de precisar usar a senha nova
+      expect(JSON.stringify(reset.json())).not.toContain("token");
+    });
+
+    it("recusa senha maior que 72 bytes de forma honesta", async () => {
+      const restaurant = await createRestaurant(app, {
+        slug: "reseta-senha-longa-demais",
+      });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+      // 40 letras "ç" são 80 bytes: o bcrypt ignoraria o resto em silêncio (S20)
+      const response = await trocaSenha(token, "ç".repeat(40));
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("trocar a senha pelo caminho comum invalida o token pendente", async () => {
+      const restaurant = await createRestaurant(app, {
+        slug: "reseta-invalidado-por-troca-comum",
+      });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+      const trocaComum = await app.inject({
+        method: "POST",
+        url: "/auth/change-password",
+        headers: restaurant.headers,
+        payload: {
+          currentPassword: validUserBody.password,
+          newPassword: "senha-trocada-normal-123",
+        },
+      });
+      expect(trocaComum.statusCode).toBe(204);
+
+      const reset = await trocaSenha(token, "senha-recuperada-123");
+      expect(reset.statusCode).toBe(400);
+    });
+
+    /**
+     * Extra (além do brief): o usuário some DEPOIS do token emitido (removido
+     * do restaurante), antes de o link ser usado. Sem checar o retorno de
+     * `updatePasswordHash`, a troca responderia 200 mesmo sem gravar nada —
+     * uma "senha trocada" que nunca aconteceu.
+     */
+    it("token de usuário removido depois de emitido não serve", async () => {
+      const restaurant = await createRestaurant(app, {
+        slug: "reseta-usuario-removido",
+      });
+      const staffEmail = uniqueEmail();
+
+      const created = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/users`,
+        headers: restaurant.headers,
+        payload: {
+          name: "Atendente",
+          email: staffEmail,
+          password: "senha-do-atendente-123",
+        },
+      });
+      expect(created.statusCode).toBe(201);
+      const staffId = created.json().id as string;
+
+      const token = await pedeTokenDeRecuperacao(staffEmail);
+
+      const removed = await app.inject({
+        method: "DELETE",
+        url: `/restaurants/${restaurant.id}/users/${staffId}`,
+        headers: restaurant.headers,
+      });
+      expect(removed.statusCode).toBe(204);
+
+      const response = await trocaSenha(token, "senha-recuperada-123");
+      expect(response.statusCode).toBe(400);
+    });
   });
 });

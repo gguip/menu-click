@@ -27,6 +27,7 @@ const OPERACOES_PUBLICAS = new Set([
   "POST /auth/register",
   "POST /auth/login",
   "POST /auth/forgot-password",
+  "POST /auth/reset-password",
   "POST /restaurants/{restaurantId}/orders",
   // a leitura do pedido pelo token: quem pediu não tem conta, e quem autoriza
   // é o token devolvido na criação — não a sessão

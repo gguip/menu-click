@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
-import { withTransaction } from "../db/pool.ts";
+import { pool, withTransaction } from "../db/pool.ts";
 import type { CreateRestaurantInput, Restaurant } from "../domain/restaurant.ts";
 import type {
   CreateRestaurantUserInput,
@@ -222,6 +222,75 @@ export async function requestPasswordReset(email: string): Promise<void> {
   });
 }
 
+/**
+ * Troca a senha usando o token de recuperação por e-mail — a outra ponta de
+ * `requestPasswordReset`.
+ *
+ * Não devolve sessão: quem recuperou entra como todo mundo, por
+ * `/auth/login`. Devolver um token aqui trocaria a segunda barreira (provar
+ * que conhece a senha nova) por só possuir o link — um e-mail interceptado
+ * viraria acesso imediato.
+ *
+ * Uma mensagem só para token inválido, expirado ou já usado: distinguir diria
+ * a quem guarda um link velho se ele um dia existiu. `findLiveByHash` já
+ * filtra os três casos no SQL (ver `repositories/password-reset.ts`); a
+ * conferência aqui é redundante de propósito — defesa em profundidade, não
+ * proteção que falta.
+ */
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<void> {
+  assertPasswordFits(newPassword);
+
+  const linkInvalido = () =>
+    new ValidationError("Link de recuperação inválido ou expirado");
+
+  await withTransaction(async (client) => {
+    const linha = await passwordResetRepository.findLiveByHash(
+      hashToken(token),
+      client,
+    );
+    if (
+      linha === null ||
+      linha.usedAt !== null ||
+      new Date(linha.expiresAt).getTime() <= Date.now()
+    ) {
+      throw linkInvalido();
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    // `false` = o usuário foi removido depois de o token ser emitido (o
+    // `findLiveByHash` não junta com `restaurant_users`, então um token de
+    // conta já removida ainda passa pelo filtro acima). Trata como se o link
+    // nunca tivesse existido — a mesma mensagem genérica.
+    const atualizou = await restaurantUsersRepository.updatePasswordHash(
+      linha.restaurantUserId,
+      passwordHash,
+      client,
+    );
+    if (!atualizou) throw linkInvalido();
+
+    // `false` = outra troca com o MESMO token venceu a corrida entre a
+    // leitura de cima e este ponto. O `update ... where used_at is null` é a
+    // linha que serializa as duas tentativas: a perdedora cai aqui, e o
+    // rollback da transação desfaz o `updatePasswordHash` que ela acabou de
+    // fazer.
+    const marcou = await passwordResetRepository.markUsed(linha.id, client);
+    if (!marcou) throw linkInvalido();
+
+    // TODAS, sem exceção: não há sessão atual a poupar aqui — a pessoa está
+    // trancada para fora, e qualquer sessão viva pertence a quem tem (ou
+    // tinha) a senha antiga, que é exatamente quem está sendo trancado.
+    await sessionsRepository.revokeAllForUser(
+      linha.restaurantUserId,
+      undefined,
+      client,
+    );
+  });
+}
+
 /** Dados do usuário da sessão atual (`GET /auth/me`). */
 /** Erro padrão de usuário inexistente — mesma mensagem em toda a API. */
 function userNotFound(id: string): NotFoundError {
@@ -252,6 +321,10 @@ export async function getUser(userId: string): Promise<RestaurantUser> {
  * A senha errada aqui é **401**, não 400: o corpo é válido, o que falhou foi a
  * credencial. Diferente do login, não há oráculo a defender — quem chega aqui
  * já provou quem é, e a existência da conta não é segredo para ela mesma.
+ *
+ * Também invalida qualquer token de recuperação pendente (`resetPassword`):
+ * se a pessoa lembrou a senha e trocou por aqui, um link pedido antes não
+ * pode continuar valendo pela próxima hora.
  */
 export async function changePassword(
   auth: AuthContext,
@@ -269,6 +342,10 @@ export async function changePassword(
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
   await restaurantUsersRepository.updatePasswordHash(auth.userId, passwordHash);
+  // Se a pessoa lembrou da senha e a trocou pelo caminho comum, um token de
+  // recuperação pedido antes (por ela mesma, ou por quem tinha acesso à caixa
+  // de entrada) não pode continuar valendo pela próxima hora.
+  await passwordResetRepository.softDeleteLiveForUser(auth.userId, pool);
   await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId);
 }
 
