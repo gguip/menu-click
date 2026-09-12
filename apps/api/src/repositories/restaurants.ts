@@ -7,6 +7,7 @@ import type {
   Restaurant,
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
+import type { DeliveryFeeMode } from "../domain/delivery.ts";
 
 /**
  * Repositório de restaurantes: **só acesso a dados**.
@@ -42,6 +43,10 @@ type RestaurantRow = {
   accepts_card_on_delivery: boolean;
   accepts_pix: boolean;
   accepts_meal_voucher: boolean;
+  delivery_fee_mode: DeliveryFeeMode;
+  delivery_fixed_fee_in_cents: number;
+  free_delivery_above_in_cents: number | null;
+  delivery_fee_to_arrange: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -72,6 +77,14 @@ function toRestaurant(row: RestaurantRow): Restaurant {
     acceptsCardOnDelivery: row.accepts_card_on_delivery,
     acceptsPix: row.accepts_pix,
     acceptsMealVoucher: row.accepts_meal_voucher,
+    deliveryFeeMode: row.delivery_fee_mode,
+    deliveryFixedFeeInCents: row.delivery_fixed_fee_in_cents,
+    // freeDeliveryAboveInCents é opcional: quando é NULL no banco (a promoção
+    // não existe), a chave nem entra na resposta — mesmo padrão do logoUrl.
+    ...(row.free_delivery_above_in_cents === null
+      ? {}
+      : { freeDeliveryAboveInCents: row.free_delivery_above_in_cents }),
+    deliveryFeeToArrange: row.delivery_fee_to_arrange,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -91,6 +104,10 @@ const restaurantColumns = {
   acceptsCardOnDelivery: "accepts_card_on_delivery",
   acceptsPix: "accepts_pix",
   acceptsMealVoucher: "accepts_meal_voucher",
+  deliveryFeeMode: "delivery_fee_mode",
+  deliveryFixedFeeInCents: "delivery_fixed_fee_in_cents",
+  freeDeliveryAboveInCents: "free_delivery_above_in_cents",
+  deliveryFeeToArrange: "delivery_fee_to_arrange",
 } as const;
 
 /** O endereço mora em colunas planas: campo do value object → coluna. */

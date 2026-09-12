@@ -1,4 +1,5 @@
 import { SLUG_MAX_LENGTH } from "../domain/slug.ts";
+import { SELECTABLE_DELIVERY_FEE_MODES } from "../domain/delivery.ts";
 
 /**
  * Schema de resposta de erro, compartilhado pelas rotas.
@@ -165,6 +166,15 @@ export const updateRestaurantBodySchema = {
     acceptsCardOnDelivery: { type: "boolean" },
     acceptsPix: { type: "boolean" },
     acceptsMealVoucher: { type: "boolean" },
+    // configurar frete é ato posterior ao cadastro, então só entra aqui —
+    // nunca no corpo de criação. `enum` restrito a SELECTABLE_..., não ao
+    // DELIVERY_FEE_MODES inteiro: o banco aceita `distance`, mas a Parte 1
+    // não implementa (sem faixa de km ele não calcula nada).
+    deliveryFeeMode: { type: "string", enum: [...SELECTABLE_DELIVERY_FEE_MODES] },
+    deliveryFixedFeeInCents: { type: "integer", minimum: 0 },
+    // nulo/ausente = a promoção "grátis acima de X" não existe
+    freeDeliveryAboveInCents: { type: "integer", minimum: 0 },
+    deliveryFeeToArrange: { type: "boolean" },
   },
 };
 
@@ -187,6 +197,13 @@ export const restaurantResponseSchema = {
     acceptsCardOnDelivery: { type: "boolean" },
     acceptsPix: { type: "boolean" },
     acceptsMealVoucher: { type: "boolean" },
+    // resposta usa a lista completa de modos: um restaurante já configurado
+    // por fora (ou numa Parte 2 futura) pode estar em `distance`, e o
+    // response schema não pode esconder o estado real do restaurante.
+    deliveryFeeMode: { type: "string" },
+    deliveryFixedFeeInCents: { type: "integer" },
+    freeDeliveryAboveInCents: { type: "integer" },
+    deliveryFeeToArrange: { type: "boolean" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

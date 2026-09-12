@@ -173,6 +173,18 @@
                           "acceptsMealVoucher": {
                             "type": "boolean"
                           },
+                          "deliveryFeeMode": {
+                            "type": "string"
+                          },
+                          "deliveryFixedFeeInCents": {
+                            "type": "integer"
+                          },
+                          "freeDeliveryAboveInCents": {
+                            "type": "integer"
+                          },
+                          "deliveryFeeToArrange": {
+                            "type": "boolean"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -299,6 +311,18 @@
                       "type": "boolean"
                     },
                     "acceptsMealVoucher": {
+                      "type": "boolean"
+                    },
+                    "deliveryFeeMode": {
+                      "type": "string"
+                    },
+                    "deliveryFixedFeeInCents": {
+                      "type": "integer"
+                    },
+                    "freeDeliveryAboveInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryFeeToArrange": {
                       "type": "boolean"
                     },
                     "createdAt": {
@@ -429,6 +453,24 @@
                   },
                   "acceptsMealVoucher": {
                     "type": "boolean"
+                  },
+                  "deliveryFeeMode": {
+                    "type": "string",
+                    "enum": [
+                      "neighborhood",
+                      "fixed"
+                    ]
+                  },
+                  "deliveryFixedFeeInCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "freeDeliveryAboveInCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "deliveryFeeToArrange": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -527,6 +569,18 @@
                       "type": "boolean"
                     },
                     "acceptsMealVoucher": {
+                      "type": "boolean"
+                    },
+                    "deliveryFeeMode": {
+                      "type": "string"
+                    },
+                    "deliveryFixedFeeInCents": {
+                      "type": "integer"
+                    },
+                    "freeDeliveryAboveInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryFeeToArrange": {
                       "type": "boolean"
                     },
                     "createdAt": {
@@ -6519,6 +6573,18 @@
                           "type": "boolean"
                         },
                         "acceptsMealVoucher": {
+                          "type": "boolean"
+                        },
+                        "deliveryFeeMode": {
+                          "type": "string"
+                        },
+                        "deliveryFixedFeeInCents": {
+                          "type": "integer"
+                        },
+                        "freeDeliveryAboveInCents": {
+                          "type": "integer"
+                        },
+                        "deliveryFeeToArrange": {
                           "type": "boolean"
                         },
                         "createdAt": {

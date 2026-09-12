@@ -227,4 +227,79 @@ describe("CRUD /restaurants", () => {
       expect(response.json().acceptsCash).toBeUndefined();
     });
   });
+
+  describe("configuração de frete", () => {
+    it("configura o frete por PATCH e devolve na leitura", async () => {
+      const restaurant = await createRestaurant(app, { slug: "com-frete" });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: {
+          // `neighborhood`, e não `fixed`, de propósito: `fixed` É o default da
+          // coluna, então a leitura bateria mesmo que o PATCH nunca escrevesse
+          // a coluna — o teste passaria sem testar nada. Todo campo aqui manda
+          // valor diferente do default pelo mesmo motivo.
+          deliveryFeeMode: "neighborhood",
+          deliveryFixedFeeInCents: 700,
+          freeDeliveryAboveInCents: 5000,
+          deliveryFeeToArrange: true,
+        },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        deliveryFeeMode: "neighborhood",
+        deliveryFixedFeeInCents: 700,
+        freeDeliveryAboveInCents: 5000,
+        deliveryFeeToArrange: true,
+      });
+    });
+
+    it("restaurante nasce com entrega grátis, como era antes", async () => {
+      const restaurant = await createRestaurant(app, { slug: "novo-frete" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+      });
+
+      // o default da coluna é o comportamento de hoje: delivery de graça
+      expect(response.json()).toMatchObject({
+        deliveryFeeMode: "fixed",
+        deliveryFixedFeeInCents: 0,
+        deliveryFeeToArrange: false,
+      });
+      expect(response.json().freeDeliveryAboveInCents).toBeUndefined();
+    });
+
+    it("recusa modo de cobrança inventado com 400", async () => {
+      const restaurant = await createRestaurant(app, { slug: "modo-ruim" });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { deliveryFeeMode: "por_lua" },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("ainda não deixa escolher o modo por distância", async () => {
+      const restaurant = await createRestaurant(app, { slug: "modo-distancia" });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { deliveryFeeMode: "distance" },
+      });
+
+      // o banco aceitaria; quem recusa é o schema da rota, até a Parte 2
+      expect(response.statusCode).toBe(400);
+    });
+  });
 });
