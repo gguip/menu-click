@@ -411,6 +411,45 @@ describe("recuperação de senha", () => {
      * `updatePasswordHash`, a troca responderia 200 mesmo sem gravar nada —
      * uma "senha trocada" que nunca aconteceu.
      */
+    /**
+     * 🚨 A corrida que só a concorrência genuína alcança.
+     *
+     * Todo teste sequencial de "não serve duas vezes" é barrado antes, pelo
+     * filtro `used_at is null` do `findLiveByHash`. Quem fecha a corrida de
+     * verdade é o `update ... where used_at is null` do `markUsed`, mais a
+     * checagem do retorno dele — e nenhum teste da suíte falhava se essa
+     * checagem fosse removida.
+     *
+     * ⚠️ O pool é aquecido ANTES da corrida. Com o pool frio, cada requisição
+     * espera o handshake de uma conexão nova, e isso é lento o bastante para a
+     * primeira transação inteira terminar antes de a segunda começar — o teste
+     * passaria mesmo sem a proteção. É o alerta que o CLAUDE.md dá sobre o
+     * teste de concorrência da confirmação de pedido.
+     */
+    it("duas trocas simultâneas com o mesmo token: só uma vence", async () => {
+      const restaurant = await createRestaurant(app, { slug: "recupera-corrida" });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+      const novaSenha = "nova-senha-da-corrida-123";
+
+      await Promise.all(
+        Array.from({ length: 4 }, () => pool.query("select 1")),
+      );
+      const respostas = await Promise.all([
+        trocaSenha(token, novaSenha),
+        trocaSenha(token, novaSenha),
+      ]);
+
+      expect(respostas.map((r) => r.statusCode).sort()).toEqual([200, 400]);
+
+      // a perdedora fez rollback: não sobrou meio-estado, e a senha nova entra
+      const login = await app.inject({
+        method: "POST",
+        url: "/auth/login",
+        payload: { email: restaurant.ownerEmail, password: novaSenha },
+      });
+      expect(login.statusCode).toBe(200);
+    });
+
     it("token de usuário removido depois de emitido não serve", async () => {
       const restaurant = await createRestaurant(app, {
         slug: "reseta-usuario-removido",
@@ -443,4 +482,5 @@ describe("recuperação de senha", () => {
       expect(response.statusCode).toBe(400);
     });
   });
+
 });
