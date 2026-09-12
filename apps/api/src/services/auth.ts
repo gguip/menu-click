@@ -251,13 +251,13 @@ export async function resetPassword(
       hashToken(token),
       client,
     );
-    if (
-      linha === null ||
-      linha.usedAt !== null ||
-      new Date(linha.expiresAt).getTime() <= Date.now()
-    ) {
-      throw linkInvalido();
-    }
+    // O filtro mora inteiro no `findLiveByHash`: ele já exige `deleted_at is
+    // null`, `used_at is null` e `expires_at > now()`. Repetir as duas últimas
+    // aqui seria código inalcançável — a consulta nunca devolve linha que
+    // falhe nelas —, e três condições fariam o leitor supor três modos de
+    // falha que ele conseguiria exercitar. Um filtro, um lugar, e a mutação
+    // que o remove derruba teste de verdade.
+    if (linha === null) throw linkInvalido();
 
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 

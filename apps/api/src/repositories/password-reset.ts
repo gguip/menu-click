@@ -57,6 +57,21 @@ export async function insert(
  * token expirado ou já usado tem que se comportar como token inexistente,
  * exatamente como uma sessão expirada em `sessions.findActiveByTokenHash`.
  */
+/**
+ * O token vivo de um hash, ou `null`.
+ *
+ * As três condições são o filtro inteiro — o serviço não repete nenhuma.
+ *
+ * ⚠️ `used_at is null` aqui é saída antecipada, NÃO é o que garante uso único.
+ * Verificado por mutação: removendo esta condição, a suíte continua verde,
+ * porque quem de fato impede a segunda troca é o `update ... where used_at is
+ * null` do `markUsed` — e é ele, e só ele, que serializa duas trocas correndo
+ * no mesmo token. Está escrito porque um leitor veria as duas e suporia que
+ * qualquer uma bastasse; só a segunda basta.
+ *
+ * `expires_at > now()` é diferente: removê-la derruba teste, porque é a única
+ * coisa que recusa token vencido.
+ */
 export async function findLiveByHash(
   tokenHash: string,
   db: Queryable = pool,
