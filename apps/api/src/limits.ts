@@ -81,6 +81,16 @@ export const LOGIN_RATE_LIMIT_MAX = 5;
  */
 export const DELIVERY_QUOTE_RATE_LIMIT_MAX = 20;
 
+/**
+ * Teto do `/auth/forgot-password`, mesmo motivo do login (S25): rota anônima
+ * e cara. Aqui o custo não é bcrypt, é o e-mail — cada tentativa dispara um
+ * envio, que gasta dinheiro e reputação de domínio (provedores de SMTP
+ * suspendem quem manda volume demais). Por IP e não por e-mail, pela mesma
+ * razão do login: por e-mail viraria uma forma de impedir que o dono
+ * legítimo recupere a própria conta.
+ */
+export const PASSWORD_RESET_RATE_LIMIT_MAX = 5;
+
 export const RATE_LIMIT_WINDOW = "1 minute";
 
 /**

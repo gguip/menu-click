@@ -3,7 +3,11 @@ import { createRequire } from "node:module";
 import type { CreateRestaurantInput } from "../domain/restaurant.ts";
 import type { CreateRestaurantUserInput } from "../domain/restaurant-user.ts";
 import { PASSWORD_MIN_LENGTH } from "../domain/restaurant-user.ts";
-import { LOGIN_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW } from "../limits.ts";
+import {
+  LOGIN_RATE_LIMIT_MAX,
+  PASSWORD_RESET_RATE_LIMIT_MAX,
+  RATE_LIMIT_WINDOW,
+} from "../limits.ts";
 import * as authService from "../services/auth.ts";
 import { requireAuth } from "./authenticate.ts";
 import {
@@ -136,6 +140,27 @@ const loginResponseSchema = {
   },
 };
 
+const forgotPasswordBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["email"],
+  properties: {
+    email: { type: "string", format: "email", maxLength: 254 },
+  },
+};
+
+/**
+ * Mensagem genérica, de propósito: nada aqui distingue "existe" de "não
+ * existe". O schema também é a barreira que impede o token de vazar por
+ * engano na resposta (S10) — ele nunca esteve num campo deste objeto.
+ */
+const forgotPasswordResponseSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string" },
+  },
+};
+
 // ===================== Rotas =====================
 
 export async function authRoutes(app: FastifyInstance) {
@@ -198,6 +223,49 @@ export async function authRoutes(app: FastifyInstance) {
     async (request) => {
       const { email, password } = request.body;
       return authService.login(email, password);
+    },
+  );
+
+  // Pede o link de recuperação de senha. Pública pelo mesmo motivo do
+  // login: quem esqueceu a senha não tem sessão para provar quem é.
+  app.post<{ Body: { email: string } }>(
+    "/auth/forgot-password",
+    {
+      config: {
+        public: true,
+        // teto próprio, bem abaixo do global — ver PASSWORD_RESET_RATE_LIMIT_MAX
+        rateLimit: {
+          max: PASSWORD_RESET_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+        },
+      },
+      schema: {
+        tags: ["Autenticação"],
+        operationId: "requestPasswordReset",
+        summary: "Pede o link de recuperação de senha",
+        description:
+          "Sempre responde 202, exista ou não o e-mail: dizer que não existe seria um oráculo de quais contas estão cadastradas. O trabalho (achar o usuário, criar o token, mandar o e-mail) acontece DEPOIS desta resposta, então nem o tempo de resposta denuncia — e um provedor de SMTP lento deixa de segurar a requisição. Limite de 5 por minuto por IP (429 ao estourar), mesmo motivo do `/auth/login`.",
+        body: forgotPasswordBodySchema,
+        response: {
+          202: forgotPasswordResponseSchema,
+          429: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      reply.code(202).send({
+        message: "Se o e-mail estiver cadastrado, enviamos um link de recuperação",
+      });
+
+      // Depois de responder, e sem `await` — ver o comentário de
+      // `requestPasswordReset` em `services/auth.ts`. Falha de envio vai só
+      // para o log, sem o token (S13): contar ao cliente que o envio falhou
+      // também diria que o e-mail existe.
+      void authService.requestPasswordReset(request.body.email).catch((error) => {
+        request.log.error({ err: error }, "falha ao processar recuperação de senha");
+      });
+
+      return reply;
     },
   );
 

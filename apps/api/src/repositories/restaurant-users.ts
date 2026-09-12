@@ -133,6 +133,29 @@ export async function findByIdInRestaurant(
 }
 
 /**
+ * Usuário vivo com esse e-mail, **e com o restaurante dele também vivo** — só
+ * a recuperação de senha usa.
+ *
+ * O filtro duplo importa: sem o do restaurante, recuperar a senha viraria um
+ * caminho de volta para uma conta cujo restaurante foi removido de propósito
+ * — o soft delete do restaurante sozinho não bastaria para fechar essa porta.
+ */
+export async function findActiveByEmail(
+  email: string,
+  db: Queryable = pool,
+): Promise<RestaurantUser | null> {
+  const { rows } = await db.query<RestaurantUserRow>(
+    `select u.* from restaurant_users u
+       join restaurants r on r.id = u.restaurant_id
+      where u.email = $1
+        and u.deleted_at is null
+        and r.deleted_at is null`,
+    [email],
+  );
+  return rows.length === 0 ? null : toRestaurantUser(rows[0]);
+}
+
+/**
  * Troca o hash da senha. `false` quando o usuário não existe mais.
  *
  * Recebe o hash pronto pelo mesmo motivo do `insert`: o custo do bcrypt e o

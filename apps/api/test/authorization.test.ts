@@ -33,6 +33,8 @@ const ROTAS_PUBLICAS = new Set([
   "POST /menu/:slug/delivery-quote",
   "POST /auth/register",
   "POST /auth/login",
+  // quem esqueceu a senha não tem sessão para provar quem é
+  "POST /auth/forgot-password",
   "POST /restaurants/:restaurantId/orders",
   // o acompanhamento: quem pediu não tem conta, e quem autoriza é o token
   // devolvido na criação do pedido — não a sessão. A rota HTTP é o gêmeo do

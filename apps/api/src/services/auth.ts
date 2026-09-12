@@ -9,12 +9,15 @@ import type {
 import { PASSWORD_MAX_BYTES } from "../domain/restaurant-user.ts";
 import { isUuid } from "../domain/uuid.ts";
 import type { AuthContext, IssuedSession } from "../domain/session.ts";
+import { PASSWORD_RESET_TOKEN_TTL_MS } from "../domain/password-reset.ts";
 import {
   ConflictError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
 } from "../errors.ts";
+import { sendEmail } from "../email.ts";
+import * as passwordResetRepository from "../repositories/password-reset.ts";
 import * as restaurantUsersRepository from "../repositories/restaurant-users.ts";
 import * as sessionsRepository from "../repositories/sessions.ts";
 import { generateToken, hashToken } from "../tokens.ts";
@@ -157,6 +160,66 @@ export async function resolve(token: string): Promise<AuthContext | null> {
 /** Logout: revoga a sessão atual. Idempotente do ponto de vista do cliente. */
 export async function logout(sessionId: string): Promise<void> {
   await sessionsRepository.revoke(sessionId);
+}
+
+/**
+ * Base da URL do link de recuperação, e o link em si.
+ *
+ * Lida do ambiente a cada chamada — não uma constante de módulo — pelo mesmo
+ * motivo do `corsOrigins()` de `limits.ts`: permite variar o valor sem
+ * reiniciar o processo (e testar os dois). O default de desenvolvimento
+ * aponta para o front local; produção configura `PASSWORD_RESET_URL` (ver
+ * `.env.example`).
+ */
+function passwordResetLink(token: string): string {
+  const base =
+    process.env.PASSWORD_RESET_URL ?? "http://localhost:5173/recuperar-senha";
+  return `${base}?token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * Pede a recuperação de senha: acha o usuário, cria o token e manda o link
+ * por e-mail.
+ *
+ * ⚠️ **Chamada sem `await` pela rota**, que já respondeu 202 antes disso.
+ * Responder antes de fazer este trabalho é o que fecha o oráculo de tempo:
+ * com o trabalho no caminho da resposta, um e-mail inexistente voltaria mais
+ * rápido que um existente, e a diferença diria quais e-mails estão
+ * cadastrados — o mesmo problema que o login fecha rodando bcrypt contra um
+ * hash descartável, com uma saída melhor aqui: um SMTP lento também deixa de
+ * segurar a requisição. Por isso esta função nunca precisa lançar para quem
+ * chamou responder — quem chamou já respondeu, e é a própria rota que
+ * encapsula a chamada num `.catch()` (ver `routes/auth.ts`).
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  // filtra removido nos dois níveis: usuário e restaurante. Sem isso a
+  // recuperação viraria o caminho de volta para uma conta que alguém removeu
+  const user = await restaurantUsersRepository.findActiveByEmail(email);
+  if (user === null) return;
+
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
+
+  await withTransaction(async (client) => {
+    // um pedido novo invalida os anteriores: sem isso, três tentativas
+    // deixariam três tokens vivos espalhados pela caixa de entrada
+    await passwordResetRepository.softDeleteLiveForUser(user.id, client);
+    await passwordResetRepository.insert(
+      { restaurantUserId: user.id, tokenHash: hashToken(token), expiresAt },
+      client,
+    );
+  });
+
+  // FORA da transação, e depois do commit: mandar de dentro dela seguraria
+  // uma conexão do pool durante a ida e volta do SMTP — que é rede, e pode
+  // levar segundos com um provedor ruim. Se o envio falhar, sobra um token
+  // que ninguém recebeu e que expira sozinho em uma hora — o mesmo resultado
+  // prático de um e-mail que caiu no spam.
+  await sendEmail({
+    to: user.email,
+    subject: "Recupere sua senha do MenuClick",
+    text: `Pediram a troca da senha da sua conta MenuClick. Use o link abaixo em até 1 hora:\n\n${passwordResetLink(token)}\n\nSe não foi você, ignore este e-mail.`,
+  });
 }
 
 /** Dados do usuário da sessão atual (`GET /auth/me`). */

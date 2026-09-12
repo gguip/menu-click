@@ -7178,6 +7178,76 @@
         }
       }
     },
+    "/auth/forgot-password": {
+      "post": {
+        "operationId": "requestPasswordReset",
+        "summary": "Pede o link de recuperação de senha",
+        "tags": [
+          "Autenticação"
+        ],
+        "description": "Sempre responde 202, exista ou não o e-mail: dizer que não existe seria um oráculo de quais contas estão cadastradas. O trabalho (achar o usuário, criar o token, mandar o e-mail) acontece DEPOIS desta resposta, então nem o tempo de resposta denuncia — e um provedor de SMTP lento deixa de segurar a requisição. Limite de 5 por minuto por IP (429 ao estourar), mesmo motivo do `/auth/login`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 254
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/logout": {
       "post": {
         "operationId": "logout",

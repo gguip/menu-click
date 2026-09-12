@@ -65,15 +65,26 @@ const GRADE_SEMPRE_ABERTA = Array.from({ length: 7 }, (_, weekday) => weekday).f
  * grade está fechado, e um restaurante de teste que não é sobre horário não
  * deveria precisar saber disso para conseguir criar um pedido. Um teste que
  * precise de loja fechada sobrescreve com `setOpeningHours`.
+ *
+ * Devolve `ownerEmail` junto: é aditivo (nenhuma chave existente muda), e
+ * existe para os testes de recuperação de senha — que precisam do e-mail do
+ * dono para pedir a recuperação — sem perder a grade de horário que este
+ * helper já registra (chamar `registerAndLogin` direto perderia isso, e aí
+ * nenhum pedido passaria).
  */
 export async function createRestaurant(
   app: FastifyInstance,
   overrides: Record<string, unknown> = {},
 ) {
-  const { restaurant, token } = await registerAndLogin(app, {
+  const { restaurant, user, token } = await registerAndLogin(app, {
     restaurant: overrides,
   });
-  const withHeaders = { ...restaurant, token, headers: authHeaders(token) };
+  const withHeaders = {
+    ...restaurant,
+    token,
+    headers: authHeaders(token),
+    ownerEmail: user.email as string,
+  };
   await setOpeningHours(app, withHeaders, GRADE_SEMPRE_ABERTA);
   return withHeaders;
 }
@@ -82,7 +93,11 @@ export async function createRestaurant(
 export type TestRestaurant = { id: string; slug: string } & Record<
   string,
   unknown
-> & { token: string; headers: { authorization: string } };
+> & {
+    token: string;
+    headers: { authorization: string };
+    ownerEmail: string;
+  };
 
 export const validProductBody = {
   name: "Ramen Shoyu",
