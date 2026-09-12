@@ -6,6 +6,7 @@ import {
   createProduct,
   createRestaurant,
   setOpeningHours,
+  validDeliveryAddress,
 } from "./helpers.ts";
 
 /**
@@ -341,6 +342,65 @@ describe("está aberto agora?", () => {
     });
 
     /** Se a loja está fechada, não há ninguém no salão para servir. */
+    /**
+     * A terceira modalidade, e a de caminho mais longo: `delivery` exige
+     * `deliveryAddress`, e `assertEnderecoCoerente` roda DEPOIS de
+     * `assertLojaAberta`. Sem este teste, uma inversão dessa ordem trocaria o
+     * 409 de "loja fechada" por um 400 de endereço e ninguém veria.
+     */
+    it("409 também no pedido de entrega", async () => {
+      const { restaurant, produto } = await lojaComProduto("entrega-fechada");
+      await setOpeningHours(app, restaurant, []);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "delivery",
+          customer: { name: "Ana", phone: "11999990000" },
+          deliveryAddress: validDeliveryAddress,
+          items: [{ productId: produto.id, quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+    });
+
+    /**
+     * O troco é comparado com o total que o SERVIDOR calculou, e quem paga não
+     * escolhe esse número. Mandar `totalInCents` no corpo é recusado antes de
+     * qualquer conta, pelo `additionalProperties: false` do schema.
+     */
+    it("400 quando o corpo tenta mandar o próprio total", async () => {
+      const timezone = fusoSeguro();
+      const { restaurant, produto } = await lojaComProduto(
+        "total-forjado",
+        timezone,
+      );
+      const { dow, hora } = await agoraNoFuso(timezone);
+      await setOpeningHours(app, restaurant, [
+        { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
+      ]);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "takeaway",
+          customer: { name: "Ana", phone: "11999990000" },
+          items: [{ productId: produto.id, quantity: 1 }],
+          paymentMethod: "cash",
+          changeForInCents: 100,
+          // o item custa mais que isto: se o total viesse do corpo, o troco de
+          // R$ 1,00 passaria na checagem
+          totalInCents: 1,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
     it("409 também no pedido de salão", async () => {
       const { restaurant, produto } = await lojaComProduto("salao-fechado");
       await setOpeningHours(app, restaurant, []);
