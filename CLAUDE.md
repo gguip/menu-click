@@ -282,6 +282,101 @@ Duas lacunas que existiam desde o início: `restaurants` não tinha nenhuma colu
 
 **O troco tem duas regras, e elas moram em lugares diferentes — a distinção importa.** A primeira, `change_for_in_cents` só existe para pagamento em `cash`, está no `check` do banco **e** no serviço: pedir troco no pix não faz sentido, e o `check` garante isso mesmo se o serviço tiver um bug. A segunda, o troco informado não pode ser menor que o total calculado no servidor, existe **só no serviço** (`assertTrocoCoerente`) — o `check` não enxerga `total_in_cents` para comparar. Pedir troco para R$ 20 numa conta de R$ 45 não é um pedido, é engano que o entregador descobriria na porta; e quem for refatorar `assertTrocoCoerente` precisa saber que não há rede embaixo dela. Ausência de `changeFor` em dinheiro é válida e significa "tenho o valor exato"; exigi-lo obrigaria quem paga certo a inventar um número.
 
+### Taxa de entrega
+
+`delivery` existe desde a migration `add-order-type-and-status`, e até esta
+feature **era de graça**: o restaurante não tinha onde dizer quanto cobra para
+entregar, nem até onde entrega, e o pedido não tinha onde guardar isso. Na
+prática, todo delivery saía com frete zero e a loja acertava por fora, ou
+desistia de usar o sistema para entrega. Por isso o default das colunas novas
+(`delivery_fee_mode = 'fixed'`, `delivery_fixed_fee_in_cents = 0`) preserva
+**exatamente** esse comportamento — restaurante já cadastrado continua de graça
+até o dono configurar, o mesmo cuidado de backfill que a grade de horário já
+tinha ensinado do jeito caro.
+
+**O modo mora no restaurante, um só por vez.** `neighborhood` cota por bairro
+do endereço (casado por `neighborhood`, normalizado do mesmo jeito que o
+`slug` — sem acento, sem caixa, sem espaço sobrando), `fixed` é uma taxa única
+para qualquer endereço, e `distance` (faixas de km) é o terceiro valor que a
+**coluna** aceita. Permitir mais de um modo simultâneo exigiria uma regra de
+precedência que ninguém pediu e que o dono não saberia explicar ao cliente.
+
+⚠️ **`distance` existe no banco, mas a API não deixa a loja escolhê-lo — ainda.**
+`SELECTABLE_DELIVERY_FEE_MODES` (`domain/delivery.ts`) é a allowlist que o
+schema de `PATCH /restaurants/:id` usa, e ela lista só `neighborhood` e
+`fixed`. `distance` vai precisar de faixas de km cadastradas e de
+geocodificação (Nominatim — que será a primeira dependência externa em
+runtime do projeto, com cache e teto de 1 req/s) para calcular alguma coisa, e
+nada disso existe ainda. Selecioná-lo hoje deixaria a loja num modo que
+**nunca** consegue determinar o frete, sempre caindo no caminho de "a
+combinar" ou de recusa — oferecer o modo já seria oferecer um estado quebrado.
+Ele chega na Parte 2.
+
+⚠️ **Configuração ausente não é frete zero.** Modo bairro sem nenhum bairro
+cadastrado, ou endereço num bairro fora da lista, não é "grátis" — é "não
+consegue determinar", o mesmo princípio de "dia sem faixa é dia fechado" do
+horário de funcionamento. Tratar o vazio como zero faria a loja entregar de
+graça para a cidade inteira por esquecimento, que é o erro mais caro que este
+desenho evita. Quando o cálculo não consegue decidir, quem resolve é
+`delivery_fee_to_arrange`: ligado, o pedido é aceito com frete `null` (o
+cliente e a loja combinam por fora); desligado, a criação recusa com **409**.
+
+**O frete gravado no pedido tem três estados, e eles são distintos de propósito:**
+
+| `deliveryFeeInCents` | Significa |
+| --- | --- |
+| um valor > 0 | o frete cobrado |
+| `0` | entrega grátis |
+| `null` | "a combinar", ou pedido que **não** é `delivery` |
+
+Confundir `0` com `null` entregaria de graça por acidente (o primeiro) ou
+esconderia uma promoção genuína atrás de "não sei calcular" (o segundo) — por
+isso o schema das respostas usa `nullable: true` (F12), nunca omite o campo.
+
+**"Grátis acima de X" (`free_delivery_above_in_cents`) compara com o
+SUBTOTAL dos itens, nunca com o total.** Comparar com o total seria circular:
+o total inclui o frete, que é justamente o que está sendo decidido. Vale nos
+três modos — é promoção do restaurante, não propriedade de um jeito de
+calcular —, e o limite é inclusivo (pedido de exatamente R$ 50 com "grátis
+acima de R$ 50" é grátis; exclusivo faria o cliente de R$ 50,00 pagar frete e o
+de R$ 50,01 não, o que ninguém explica no balcão).
+
+⚠️ **Isto muda o significado de `total_in_cents`, e é *breaking* — a
+invariante da soma dos itens mudou.** Até aqui, todo pedido satisfazia
+`Σ(unitPrice × quantity) = total`. De agora em diante, pedido de entrega
+satisfaz `Σ(unitPrice × quantity) + frete = total`; salão e retirada continuam
+na regra antiga, porque não têm frete. **Toda superfície que mostra o pedido
+precisa mostrar o frete**, senão a conta não fecha para quem confere — é a
+mesma categoria de defeito que motivou o cuidado com arredondamento em
+`unitPrice()` na feature de grupos de opções: um recibo cuja conta não bate é
+lido como erro por quem confere, mesmo sendo só um centavo. O troco
+(`change_for_in_cents`) já é conferido contra esse total com frete embutido:
+seria o entregador descobrindo na porta que faltou dinheiro se a checagem
+comparasse com o subtotal.
+
+**O endpoint de cotação informa; a criação decide.**
+`POST /menu/:slug/delivery-quote` é público como o resto do cardápio, recebe o
+endereço no **corpo** (nunca na querystring — endereço de cliente não deve
+morar em log de proxy, o mesmo raciocínio do S21), e devolve `deliversTo`,
+`feeInCents`, `isFree`, `toArrange` e `servedNeighborhoods` (só populada no
+modo bairro, para a tela oferecer um seletor em vez de texto livre). Ele
+**não é autoridade**: a criação do pedido recalcula a cotação no servidor, do
+zero, e recusa com 409 se a loja não entrega naquele endereço. Entre cotar e
+montar o carrinho cabe tempo de sobra, e cabe um cliente batendo direto na API
+sem nunca ter chamado a cotação — a mesma separação que `isOpen` (informa) e o
+409 da pausa manual (decide) já tinham. `deliveryFeeInCents` que venha no corpo
+da criação é ignorado, pela mesma razão de `totalInCents` nunca existir lá.
+
+Só duas colunas cruas de configuração chegam ao cardápio público —
+`deliveryFeeMode` e `freeDeliveryAboveInCents`, o suficiente para a tela
+anunciar "frete grátis acima de R$ 50" antes do carrinho. `MenuRestaurant`
+(`domain/menu.ts`) é um `Pick` explícito do `Restaurant`, não um `Omit` — coluna
+nova não chega ao cardápio sozinha, precisa entrar no `Pick`, no
+`toMenuRestaurant()` e no `schema.response` da rota, os três (S10).
+`deliveryFixedFeeInCents` e `deliveryFeeToArrange` ficam de fora **de
+propósito**: a cotação já devolve o número certo para o endereço do cliente, e
+a política de "a combinar" é operação interna da loja, não informação dele.
+
 ### Documentação: OpenAPI derivado das rotas
 
 O `openapi.json` é **gerado**, nunca editado à mão: sai dos mesmos `schema` que validam a requisição e serializam a resposta. Consequência prática — campo esquecido no `schema.response` some da documentação **e** da resposta ao mesmo tempo, então documentação errada é sintoma de contrato errado.
