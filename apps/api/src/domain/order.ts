@@ -245,7 +245,17 @@ export type OrderSummary = {
   customer: Customer;
   type: OrderType;
   status: OrderStatus;
+  /** Em `delivery`, já com o frete somado: `Σ(unitPrice × quantity) + frete`. */
   totalInCents: number;
+  /**
+   * O frete, congelado no momento da criação — nunca recalculado do cadastro
+   * atual do restaurante (o pedido congela o que foi combinado).
+   *
+   * Sempre presente, e `null` — não ausente — nos dois casos em que não há
+   * frete a mostrar: pedido que não é `delivery`, e entrega em modo "a
+   * combinar" (a cotação não sabe cobrar, então não há valor a congelar).
+   */
+  deliveryFeeInCents: number | null;
   /** Preenchido só em `delivery`; `null` nas outras duas modalidades. */
   deliveryAddress: Address | null;
   paymentMethod: PaymentMethod;

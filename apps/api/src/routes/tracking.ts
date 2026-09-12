@@ -71,7 +71,13 @@ const trackedOrderResponseSchema = {
     id: { type: "string" },
     type: { type: "string" },
     status: { type: "string" },
+    // em `delivery`, já inclui o frete — ver `deliveryFeeInCents` abaixo
     totalInCents: { type: "integer" },
+    // ⚠️ schema SEPARADO do detalhe/listagem (`orderSummaryProperties`, em
+    // `routes/orders.ts`) — é o que ficou pra trás na PR anterior. `nullable`
+    // (F12): `null` é a informação fora de `delivery` e no "a combinar", não
+    // um campo ausente.
+    deliveryFeeInCents: { type: "integer", nullable: true },
     paymentMethod: { type: "string" },
     // ausente = "tenho o valor certo"; ver o mesmo campo em `routes/orders.ts`
     changeForInCents: { type: "integer" },

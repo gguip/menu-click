@@ -1,6 +1,8 @@
+import type { PoolClient } from "pg";
 import type { DeliveryQuote } from "../domain/delivery.ts";
 import { quoteDelivery } from "../domain/delivery.ts";
-import type { Address } from "../domain/restaurant.ts";
+import type { OrderType } from "../domain/order.ts";
+import type { Address, Restaurant } from "../domain/restaurant.ts";
 import * as deliveryNeighborhoodsRepository from "../repositories/delivery-neighborhoods.ts";
 import * as restaurantsService from "./restaurants.ts";
 
@@ -59,4 +61,53 @@ export async function quote(
     ...result,
     servedNeighborhoods: neighborhoods.map((neighborhood) => neighborhood.name),
   };
+}
+
+/**
+ * Cota o frete para a CRIAÇÃO do pedido — a irmã de `quote()`.
+ *
+ * A diferença não é estilo, é o contexto em que cada uma roda: `quote()` serve
+ * o endpoint público, que só tem o `slug` e nenhuma transação aberta.
+ * `quoteForOrder` roda dentro da transação de `services/orders.ts`, que já
+ * resolveu o `restaurant` — buscá-lo de novo pelo slug seria uma query a mais
+ * e uma leitura fora da transação (poderia enxergar uma config diferente da
+ * que o resto da criação está usando).
+ *
+ * ⚠️ Pedido que não é `delivery` devolve `{ deliversTo: true, feeInCents: null }`
+ * SEM consultar nada: salão e retirada não têm frete, e o `check` do banco
+ * (`orders_delivery_fee_check`) recusaria um valor ali de qualquer jeito.
+ *
+ * `address` só é lido quando `type === "delivery"` — nas outras duas
+ * modalidades ele vem `undefined` (o serviço de pedidos já confirmou isso em
+ * `assertEnderecoCoerente`, antes de abrir a transação).
+ */
+export async function quoteForOrder(
+  restaurant: Restaurant,
+  type: OrderType,
+  address: Address | undefined,
+  subtotalInCents: number,
+  client: PoolClient,
+): Promise<DeliveryQuote> {
+  if (type !== "delivery") {
+    return { deliversTo: true, feeInCents: null, isFree: false, toArrange: false };
+  }
+
+  const neighborhoods =
+    restaurant.deliveryFeeMode === "neighborhood"
+      ? await deliveryNeighborhoodsRepository.findByRestaurant(
+          restaurant.id,
+          client,
+        )
+      : [];
+
+  return quoteDelivery({
+    mode: restaurant.deliveryFeeMode,
+    fixedFeeInCents: restaurant.deliveryFixedFeeInCents,
+    freeAboveInCents: restaurant.freeDeliveryAboveInCents,
+    toArrange: restaurant.deliveryFeeToArrange,
+    neighborhoods,
+    // `assertEnderecoCoerente` já garantiu `address` presente em `delivery`
+    addressNeighborhood: (address as Address).neighborhood,
+    subtotalInCents,
+  });
 }
