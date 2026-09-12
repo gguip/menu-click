@@ -18,9 +18,18 @@
 -- `on conflict do nothing` não toca na linha existente, e o slug continua
 -- sendo o que o backfill da migration gerou (`tokyo-ramen-house-cb95db58`).
 -- Isso é o certo: o seed não sobrescreve dado que já está lá.
+--
+-- Os dois ganham formas DIFERENTES de cobrar frete, de propósito: quem
+-- explora a API à mão (Insomnia/curl) esbarra nos dois caminhos sem precisar
+-- cadastrar nada. O Tokyo cota por bairro (ver os três bairros logo abaixo); a
+-- Cantina cobra taxa fixa com "grátis acima de X" — as duas colunas que
+-- `delivery_fee_mode = 'neighborhood'` não usa (`delivery_fixed_fee_in_cents`)
+-- ficam com o `0` do default, e não é enganoso: naquele modo elas são
+-- ignoradas pelo cálculo (`quoteDelivery`), não uma taxa escondida.
 insert into restaurants
   (id, name, slug, cuisine_type, street, number, neighborhood, city, state, zip_code,
-   is_delivery, is_takeaway, is_qrcode)
+   is_delivery, is_takeaway, is_qrcode,
+   delivery_fee_mode, delivery_fixed_fee_in_cents, free_delivery_above_in_cents)
 values
   -- O Tokyo aceita as três modalidades (dá para exercitar as três trilhas de
   -- status sem cadastrar nada) e a Cantina recusa retirada (dá para ver o 409
@@ -29,10 +38,27 @@ values
   -- existente, e `is_takeaway` fica com o `false` que o backfill da migration
   -- deixou. É o certo — o seed não sobrescreve dado que já está lá.
   ('cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Tokyo Ramen House', 'tokyo-ramen-house', 'Japonesa',
-   'Avenida Paulista', '2300', 'Bela Vista', 'São Paulo', 'SP', '01310-300', true, true, true),
-  -- a Cantina não faz retirada: serve para ver o 409 de modalidade recusada
+   'Avenida Paulista', '2300', 'Bela Vista', 'São Paulo', 'SP', '01310-300', true, true, true,
+   'neighborhood', 0, null),
+  -- a Cantina não faz retirada: serve para ver o 409 de modalidade recusada.
+  -- Taxa fixa de R$ 8,00, grátis para pedido de R$ 60,00 ou mais.
   ('d05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Cantina da Nona', 'cantina-da-nona', 'Italiana',
-   'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, false, true)
+   'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, false, true,
+   'fixed', 800, 6000)
+on conflict (id) do nothing;
+
+-- Os bairros que o Tokyo atende, só ele (a Cantina está em modo `fixed`, que
+-- não consulta esta tabela). "Consolação" é de propósito o mesmo bairro do
+-- endereço do pedido pendente lá embaixo — é o que faz o `delivery_fee_in_cents`
+-- daquele pedido ser uma taxa real desta lista, não um número solto.
+insert into delivery_neighborhoods (id, restaurant_id, name, normalized_name, fee_in_cents)
+values
+  ('2ba8704a-b85a-4d18-9529-cddf937a28c5', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Bela Vista', 'bela vista', 700),
+  ('02521b27-92f0-4557-b263-c52688bb4377', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Consolação', 'consolacao', 900),
+  ('60b33b20-aaff-4cf5-9c79-223238bd516c', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Jardim Paulista', 'jardim paulista', 1200)
 on conflict (id) do nothing;
 
 -- O horário de funcionamento dos dois restaurantes. Dia sem faixa é dia
@@ -211,26 +237,32 @@ on conflict (id) do nothing;
 -- O pendente é o único em dinheiro — e leva `change_for_in_cents` maior que o
 -- total (12270), para o troco aparecer numa leitura de exemplo (o "recibo" do
 -- cliente e a listagem do restaurante).
+-- O pedido de entrega leva `delivery_fee_in_cents = 900`: é a taxa real do
+-- bairro "Consolação" na lista acima, não um número escolhido à parte — e
+-- `total_in_cents` (13170) é o subtotal dos itens (12270) MAIS essa taxa,
+-- porque `total_in_cents` inclui o frete (ver CLAUDE.md). Os outros dois
+-- pedidos não são `delivery`, então `delivery_fee_in_cents` fica `null` neles
+-- (o `check orders_delivery_fee_check` recusaria qualquer outro valor).
 insert into orders
-  (id, restaurant_id, customer_id, type, status, total_in_cents,
+  (id, restaurant_id, customer_id, type, status, total_in_cents, delivery_fee_in_cents,
    street, number, neighborhood, city, state, zip_code,
    payment_method, change_for_in_cents)
 values
   -- entrega pendente: só ela leva endereço (ver orders_address_check), e é o
   -- pedido em dinheiro com troco
   ('3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'delivery', 'pending', 12270,
+   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'delivery', 'pending', 13170, 900,
    'Rua Augusta', '1500', 'Consolação', 'São Paulo', 'SP', '01304-001',
    'cash', 15000),
   -- salão, já aceito, pago no pix
   ('b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'dine_in', 'confirmed', 890,
+   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'dine_in', 'confirmed', 890, null,
    null, null, null, null, null, null,
    'pix', null),
   -- retirada em preparo: o próximo passo dela é `ready_for_pickup`, pago no
   -- cartão na entrega
   ('5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
-   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'takeaway', 'preparing', 2490,
+   '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'takeaway', 'preparing', 2490, null,
    null, null, null, null, null, null,
    'card_on_delivery', null)
 on conflict (id) do nothing;
