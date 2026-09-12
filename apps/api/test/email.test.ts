@@ -87,4 +87,27 @@ describe("porta de e-mail", () => {
       process.env = anterior;
     }
   });
+
+  it("recusa subir com SMTP_URL malformada, não só no primeiro envio", () => {
+    const anterior = { ...process.env };
+    try {
+      process.env.EMAIL_FROM = "nao-responda@exemplo.com";
+      process.env.PASSWORD_RESET_URL = "https://painel.exemplo.com/recuperar";
+      process.env.SMTP_URL = "smtp://usuario:SENHA_SECRETA@host:porta-invalida";
+
+      // sem esta guarda o processo sobe e só quebra no primeiro envio — ou
+      // seja, quando alguém já está trancado para fora e precisa dele
+      let erro: Error | undefined;
+      try {
+        configureEmail("smtp", "production", () => {});
+      } catch (e) {
+        erro = e as Error;
+      }
+      expect(erro?.message).toMatch(/SMTP_URL/);
+      // e a mensagem não carrega o valor (S13)
+      expect(`${erro?.message} ${erro?.stack}`).not.toContain("SENHA_SECRETA");
+    } finally {
+      process.env = anterior;
+    }
+  });
 });

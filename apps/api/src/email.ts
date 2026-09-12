@@ -76,13 +76,6 @@ function readDriver(): EmailDriver {
 }
 
 /**
- * A fiação de boot, numa chamada só: valida o driver e injeta o log.
- *
- * `assertEmailDriverIsSafe` fica PURA de propósito — é o que permite testá-la
- * sem subir app nem mexer em `process.env`. Quem guarda o resultado é esta
- * função, e é o resultado guardado que o envio usa depois.
- */
-/**
  * 🚨 Com `smtp`, as três variáveis do fluxo precisam existir NO BOOT.
  *
  * `SMTP_URL` e `EMAIL_FROM` já falhavam — mas só no primeiro envio, o que
@@ -100,6 +93,13 @@ function assertSmtpConfigIsComplete(): void {
   const faltando = (["SMTP_URL", "EMAIL_FROM", "PASSWORD_RESET_URL"] as const)
     .filter((nome) => !process.env[nome]);
 
+  if (faltando.length === 0) {
+    // e a URL tem que ser PARSEÁVEL, não só existir: sem isto o processo sobe
+    // e só quebra no primeiro envio — ou seja, quando alguém já está trancado
+    // para fora e precisa dela. O validador já existia; faltava chamá-lo aqui.
+    assertSmtpUrlIsParseable(process.env.SMTP_URL as string);
+  }
+
   if (faltando.length > 0) {
     // só os NOMES, nunca os valores (S13)
     throw new Error(
@@ -108,6 +108,13 @@ function assertSmtpConfigIsComplete(): void {
   }
 }
 
+/**
+ * A fiação de boot, numa chamada só: valida o driver e injeta o log.
+ *
+ * `assertEmailDriverIsSafe` fica PURA de propósito — é o que permite testá-la
+ * sem subir app nem mexer em `process.env`. Quem guarda o resultado é esta
+ * função, e é o resultado guardado que o envio usa depois.
+ */
 export function configureEmail(
   driver: string,
   nodeEnv: string | undefined,

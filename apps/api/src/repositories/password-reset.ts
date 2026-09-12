@@ -117,7 +117,7 @@ export async function markUsed(
  */
 export async function softDeleteLiveForUser(
   restaurantUserId: string,
-  db: Queryable,
+  db: Queryable = pool,
 ): Promise<void> {
   await db.query(
     `update password_reset_tokens set deleted_at = now(), updated_at = now()

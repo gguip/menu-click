@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
-import { pool, withTransaction } from "../db/pool.ts";
+import { withTransaction } from "../db/pool.ts";
 import type { CreateRestaurantInput, Restaurant } from "../domain/restaurant.ts";
 import type {
   CreateRestaurantUserInput,
@@ -246,30 +246,39 @@ export async function resetPassword(
   const linkInvalido = () =>
     new ValidationError("Link de recuperação inválido ou expirado");
 
-  // o hash sai da transação pelo mesmo motivo do `register()` acima: bcrypt a
+  // 🚨 A ORDEM aqui é a defesa, e ela já esteve errada.
+  //
+  // O token é conferido ANTES do bcrypt. Trocar os dois faria toda tentativa
+  // com token inventado queimar um hash inteiro — medido em 190 ms — numa rota
+  // pública, anônima e que ninguém precisa de credencial para chamar. Quem
+  // quisesse derrubar a recuperação só precisaria mandar lixo em volume, e
+  // derrubaria justamente a rota que tem de funcionar quando alguém está
+  // trancado para fora.
+  //
+  // E o bcrypt continua FORA da transação, pelo mesmo motivo do `register()`:
   // custo 12 leva centenas de milissegundos, e segurar uma conexão do pool por
-  // esse tempo é desperdício. Aqui pesa mais ainda — a rota é pública e sem
-  // sessão, então é alvo natural de tentativa em lote depois de uma campanha
-  // de e-mail. Não depende de nada lido lá dentro: só da senha, já validada.
+  // esse tempo é desperdício. As duas exigências juntas dão esta ordem:
+  // consulta barata -> recusa cedo -> hash caro -> transação curta.
+  const linha = await passwordResetRepository.findLiveByHash(hashToken(token));
+  // O filtro mora inteiro no `findLiveByHash`: ele já exige `deleted_at is
+  // null`, `used_at is null` e `expires_at > now()`. Repetir as duas últimas
+  // aqui seria código inalcançável — a consulta nunca devolve linha que falhe
+  // nelas —, e três condições fariam o leitor supor três modos de falha que
+  // ele conseguiria exercitar.
+  if (linha === null) throw linkInvalido();
+
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
   await withTransaction(async (client) => {
-    const linha = await passwordResetRepository.findLiveByHash(
-      hashToken(token),
-      client,
-    );
-    // O filtro mora inteiro no `findLiveByHash`: ele já exige `deleted_at is
-    // null`, `used_at is null` e `expires_at > now()`. Repetir as duas últimas
-    // aqui seria código inalcançável — a consulta nunca devolve linha que
-    // falhe nelas —, e três condições fariam o leitor supor três modos de
-    // falha que ele conseguiria exercitar. Um filtro, um lugar, e a mutação
-    // que o remove derruba teste de verdade.
-    if (linha === null) throw linkInvalido();
-
-    // `false` = o usuário foi removido depois de o token ser emitido (o
-    // `findLiveByHash` não junta com `restaurant_users`, então um token de
-    // conta já removida ainda passa pelo filtro acima). Trata como se o link
-    // nunca tivesse existido — a mesma mensagem genérica.
+    // `false` = o usuário foi removido depois de o token ser emitido.
+    //
+    // ⚠️ Isto cobre o USUÁRIO removido, não o restaurante dele. Um token
+    // emitido antes de `DELETE /restaurants/:id` ainda troca a senha — o que
+    // é coerente com o login, que hoje também deixa entrar nesse caso, e
+    // inofensivo porque todo recurso do restaurante removido responde 404. O
+    // `findActiveByEmail` filtra os dois níveis na hora de EMITIR; aqui só o
+    // usuário. A assimetria está escrita porque um comentário anterior
+    // prometia os dois e a revisão da branch pegou a promessa falsa.
     const atualizou = await restaurantUsersRepository.updatePasswordHash(
       linha.restaurantUserId,
       passwordHash,
@@ -346,12 +355,20 @@ export async function changePassword(
   }
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-  await restaurantUsersRepository.updatePasswordHash(auth.userId, passwordHash);
-  // Se a pessoa lembrou da senha e a trocou pelo caminho comum, um token de
-  // recuperação pedido antes (por ela mesma, ou por quem tinha acesso à caixa
-  // de entrada) não pode continuar valendo pela próxima hora.
-  await passwordResetRepository.softDeleteLiveForUser(auth.userId, pool);
-  await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId);
+
+  // As três numa transação só: sem ela, falhar no meio deixa a senha trocada
+  // com um token de recuperação ainda vivo pela próxima hora — que é
+  // exatamente o estado que a invalidação foi acrescentada para impedir. Duas
+  // das três já corriam soltas antes desta feature; a terceira entrou no meio,
+  // e é ela que torna o meio-estado perigoso em vez de só inconsistente.
+  await withTransaction(async (client) => {
+    await restaurantUsersRepository.updatePasswordHash(auth.userId, passwordHash, client);
+    // Se a pessoa lembrou da senha e a trocou pelo caminho comum, um token de
+    // recuperação pedido antes (por ela mesma, ou por quem tinha acesso à caixa
+    // de entrada) não pode continuar valendo pela próxima hora.
+    await passwordResetRepository.softDeleteLiveForUser(auth.userId, client);
+    await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId, client);
+  });
 }
 
 /** Os usuários com acesso ao painel do restaurante. */

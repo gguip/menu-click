@@ -273,6 +273,9 @@ export async function authRoutes(app: FastifyInstance) {
         body: forgotPasswordBodySchema,
         response: {
           202: forgotPasswordResponseSchema,
+          // o corpo tem `format: "email"`: 400 é resposta real, e sem o schema
+          // o corpo do erro sai com campos que nenhum outro 400 da API expõe
+          400: errorResponseSchema,
           429: errorResponseSchema,
         },
       },
@@ -300,7 +303,18 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { token: string; newPassword: string } }>(
     "/auth/reset-password",
     {
-      config: { public: true },
+      config: {
+        public: true,
+        // teto próprio: desde que a conferência do token passou a vir ANTES do
+        // bcrypt, token inventado sai barato — mas a rota segue anônima e cara
+        // no caminho feliz, e é o perfil que o S25 descreve. Compartilhar o
+        // teto global de 100/min a deixaria de fora da proteção que as duas
+        // rotas irmãs de autenticação já têm.
+        rateLimit: {
+          max: PASSWORD_RESET_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+        },
+      },
       schema: {
         tags: ["Autenticação"],
         operationId: "resetPassword",
