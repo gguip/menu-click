@@ -26,8 +26,13 @@ function duplicateNeighborhood(name: string): ConflictError {
   return new ConflictError(`O bairro "${name}" está duplicado na lista enviada`);
 }
 
-function nomeVazio(name: string): ValidationError {
-  return new ValidationError(`O bairro "${name}" não tem nome`);
+function nomeVazio(posicao: number): ValidationError {
+  // A posição, e não o nome: interpolar o nome cru produziria
+  // `O bairro "   " não tem nome`, que lê como defeito do sistema em vez de
+  // apontar o que quem enviou precisa corrigir.
+  return new ValidationError(
+    `O bairro na posição ${posicao} da lista não tem nome`,
+  );
 }
 
 /**
@@ -39,14 +44,14 @@ function nomeVazio(name: string): ValidationError {
  */
 function assertSemDuplicatas(neighborhoods: DeliveryNeighborhoodInput[]): void {
   const vistos = new Set<string>();
-  for (const neighborhood of neighborhoods) {
+  for (const [indice, neighborhood] of neighborhoods.entries()) {
     const chave = normalizeNeighborhood(neighborhood.name);
     // Nome que normaliza para vazio é nome sem conteúdo — só espaço, ou só
     // pontuação que a normalização descarta. O `minLength: 1` do schema não
     // pega: três espaços têm tamanho 3. Barrar aqui importa porque a chave
     // vazia casaria com todo endereço cujo bairro viesse em branco, e a loja
     // acabaria cobrando essa taxa sem nunca ter escolhido isso.
-    if (chave === "") throw nomeVazio(neighborhood.name);
+    if (chave === "") throw nomeVazio(indice + 1);
     if (vistos.has(chave)) throw duplicateNeighborhood(neighborhood.name);
     vistos.add(chave);
   }
