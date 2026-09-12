@@ -71,7 +71,13 @@ const trackedOrderResponseSchema = {
     id: { type: "string" },
     type: { type: "string" },
     status: { type: "string" },
+    // em `delivery`, já inclui o frete — ver `deliveryFeeInCents` abaixo
     totalInCents: { type: "integer" },
+    // ⚠️ schema SEPARADO do detalhe/listagem (`orderSummaryProperties`, em
+    // `routes/orders.ts`) — é o que ficou pra trás na PR anterior. `nullable`
+    // (F12): `null` é a informação fora de `delivery` e no "a combinar", não
+    // um campo ausente.
+    deliveryFeeInCents: { type: "integer", nullable: true },
     paymentMethod: { type: "string" },
     // ausente = "tenho o valor certo"; ver o mesmo campo em `routes/orders.ts`
     changeForInCents: { type: "integer" },
@@ -85,8 +91,13 @@ const trackedOrderResponseSchema = {
           name: { type: "string" },
           priceInCents: { type: "integer" },
           // preço de UMA unidade já com as opções escolhidas; `priceInCents`
-          // acima continua sendo só o preço do produto. É a dupla que fecha a
-          // conta do recibo: unitPriceInCents × quantity === totalInCents.
+          // acima continua sendo só o preço do produto.
+          //
+          // ⚠️ A conta do recibo mudou com a taxa de entrega: hoje é
+          // `Σ(unitPriceInCents × quantity) + deliveryFeeInCents === totalInCents`.
+          // Sem o frete a soma NÃO fecha em pedido de entrega — e quem tentar
+          // "consertar" o total para bater só com os itens vai reintroduzir
+          // exatamente o defeito que este arquivo já embarcou uma vez.
           unitPriceInCents: { type: "integer" },
           quantity: { type: "integer" },
           options: {

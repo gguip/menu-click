@@ -7,6 +7,7 @@ import type {
   Restaurant,
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
+import type { DeliveryFeeMode } from "../domain/delivery.ts";
 
 /**
  * Repositório de restaurantes: **só acesso a dados**.
@@ -42,6 +43,10 @@ type RestaurantRow = {
   accepts_card_on_delivery: boolean;
   accepts_pix: boolean;
   accepts_meal_voucher: boolean;
+  delivery_fee_mode: DeliveryFeeMode;
+  delivery_fixed_fee_in_cents: number;
+  free_delivery_above_in_cents: number | null;
+  delivery_fee_to_arrange: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -72,6 +77,14 @@ function toRestaurant(row: RestaurantRow): Restaurant {
     acceptsCardOnDelivery: row.accepts_card_on_delivery,
     acceptsPix: row.accepts_pix,
     acceptsMealVoucher: row.accepts_meal_voucher,
+    deliveryFeeMode: row.delivery_fee_mode,
+    deliveryFixedFeeInCents: row.delivery_fixed_fee_in_cents,
+    // freeDeliveryAboveInCents é opcional: quando é NULL no banco (a promoção
+    // não existe), a chave nem entra na resposta — mesmo padrão do logoUrl.
+    ...(row.free_delivery_above_in_cents === null
+      ? {}
+      : { freeDeliveryAboveInCents: row.free_delivery_above_in_cents }),
+    deliveryFeeToArrange: row.delivery_fee_to_arrange,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -91,6 +104,10 @@ const restaurantColumns = {
   acceptsCardOnDelivery: "accepts_card_on_delivery",
   acceptsPix: "accepts_pix",
   acceptsMealVoucher: "accepts_meal_voucher",
+  deliveryFeeMode: "delivery_fee_mode",
+  deliveryFixedFeeInCents: "delivery_fixed_fee_in_cents",
+  freeDeliveryAboveInCents: "free_delivery_above_in_cents",
+  deliveryFeeToArrange: "delivery_fee_to_arrange",
 } as const;
 
 /** O endereço mora em colunas planas: campo do value object → coluna. */
@@ -128,11 +145,15 @@ export async function insert(
          (name, slug, cuisine_type, logo_url,
           street, number, neighborhood, city, state, zip_code,
           is_delivery, is_takeaway, is_qrcode, timezone, accepting_orders,
-          accepts_cash, accepts_card_on_delivery, accepts_pix, accepts_meal_voucher)
+          accepts_cash, accepts_card_on_delivery, accepts_pix, accepts_meal_voucher,
+          delivery_fee_mode, delivery_fixed_fee_in_cents, delivery_fee_to_arrange,
+          free_delivery_above_in_cents)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
                coalesce($14, 'America/Sao_Paulo'), coalesce($15, true),
                coalesce($16, true), coalesce($17, true), coalesce($18, true),
-               coalesce($19, false))
+               coalesce($19, false),
+               coalesce($20, 'fixed'), coalesce($21, 0), coalesce($22, false),
+               $23)
        returning *`,
       [
         input.name,
@@ -162,6 +183,15 @@ export async function insert(
         input.acceptsCardOnDelivery ?? null,
         input.acceptsPix ?? null,
         input.acceptsMealVoucher ?? null,
+        // os quatro do frete: mesmo raciocínio do `acceptingOrders` acima — o
+        // corpo de criação não os oferece hoje, então isto é sempre null, mas
+        // descartá-los aqui faria o insert prometer no tipo o que não cumpre
+        // no SQL. `free_delivery_above_in_cents` vai sem `coalesce`: a coluna é
+        // nulável de verdade, e null ali significa "não há promoção".
+        input.deliveryFeeMode ?? null,
+        input.deliveryFixedFeeInCents ?? null,
+        input.deliveryFeeToArrange ?? null,
+        input.freeDeliveryAboveInCents ?? null,
       ],
     );
     return toRestaurant(rows[0]);

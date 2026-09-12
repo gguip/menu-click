@@ -60,6 +60,12 @@ function toMenuRestaurant(
     isDelivery: restaurant.isDelivery,
     isTakeaway: restaurant.isTakeaway,
     isQrcode: restaurant.isQrcode,
+    deliveryFeeMode: restaurant.deliveryFeeMode,
+    // freeDeliveryAboveInCents é opcional: quando a promoção não existe (NULL
+    // no banco), a chave nem entra na resposta — mesmo tratamento do logoUrl
+    ...(restaurant.freeDeliveryAboveInCents === undefined
+      ? {}
+      : { freeDeliveryAboveInCents: restaurant.freeDeliveryAboveInCents }),
     isOpen,
     acceptingOrders: restaurant.acceptingOrders,
     openingHours: openingHours.map(({ weekday, opensAt, closesAt }) => ({

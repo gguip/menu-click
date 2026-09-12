@@ -139,6 +139,10 @@ const orderSummaryProperties = {
   type: { type: "string" },
   status: { type: "string" },
   totalInCents: { type: "integer" },
+  // congelado na criação; `nullable` (F12) porque `null` É a informação fora
+  // de `delivery` e no modo "a combinar" — não é campo ausente como
+  // `changeForInCents` abaixo, é sempre presente e às vezes `null`
+  deliveryFeeInCents: { type: "integer", nullable: true },
   // `nullable` em vez de `anyOf: [..., {type:"null"}]` (F12); null fora de delivery
   deliveryAddress: {
     type: "object",
@@ -287,7 +291,7 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "createOrder",
         summary: "Cria um pedido (público)",
         description:
-          "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409. Loja fora do horário de funcionamento ou com os pedidos pausados também é 409, com mensagens distintas para cada causa — vale para as três modalidades, `dine_in` inclusive.",
+          "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409. Loja fora do horário de funcionamento ou com os pedidos pausados também é 409, com mensagens distintas para cada causa — vale para as três modalidades, `dine_in` inclusive. Em `delivery`, o frete é cotado no servidor (mesma regra da cotação pública) e somado ao `totalInCents`; `deliveryFeeInCents` sai `null` quando a loja está em modo \"a combinar\" e vai a 409 quando ela não entrega naquele endereço. `deliveryFeeInCents` do corpo é ignorado pelo mesmo motivo do `totalInCents`.",
         params: restaurantIdParamsSchema,
         body: createOrderBodySchema,
         response: {

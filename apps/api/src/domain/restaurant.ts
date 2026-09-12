@@ -6,6 +6,8 @@
  * Postgres (snake_case) para ele. Nada aqui conhece Fastify nem SQL.
  */
 
+import type { DeliveryFeeMode } from "./delivery.ts";
+
 /** Endereço de um restaurante (value object: quando vem, vem inteiro). */
 export type Address = {
   street: string;
@@ -64,6 +66,20 @@ export type CreateRestaurantInput = {
   acceptsCardOnDelivery?: boolean;
   acceptsPix?: boolean;
   acceptsMealVoucher?: boolean;
+  /**
+   * Como o restaurante cobra o frete. Opcional aqui porque a coluna tem default
+   * (`fixed` com taxa 0 = entrega grátis, o comportamento de antes da feature).
+   *
+   * Mora neste tipo para chegar ao `Restaurant` e ao `UpdateRestaurantInput`,
+   * que derivam dele.
+   */
+  deliveryFeeMode?: DeliveryFeeMode;
+  /** Usada só no modo `fixed`. Zero é entrega grátis, não ausência de config. */
+  deliveryFixedFeeInCents?: number;
+  /** Nulo/ausente = a promoção não existe. Vale nos três modos. */
+  freeDeliveryAboveInCents?: number;
+  /** Aceita o pedido mesmo sem conseguir cotar, para acertar por fora. */
+  deliveryFeeToArrange?: boolean;
 };
 
 /**
@@ -72,7 +88,14 @@ export type CreateRestaurantInput = {
  */
 export type UpdateRestaurantInput = Partial<
   Omit<CreateRestaurantInput, "slug">
->;
+> & {
+  /**
+   * `null` DESLIGA a promoção de frete grátis, e é o único campo do PATCH em
+   * que o nulo é intenção e não ausência. Sem ele a promoção seria de mão
+   * única: dá para ligar e mudar o limite, nunca para acabar com ela.
+   */
+  freeDeliveryAboveInCents?: number | null;
+};
 
 /** Restaurante completo, como é guardado e devolvido na resposta. */
 export type Restaurant = CreateRestaurantInput & {
@@ -88,6 +111,12 @@ export type Restaurant = CreateRestaurantInput & {
   acceptsCardOnDelivery: boolean;
   acceptsPix: boolean;
   acceptsMealVoucher: boolean;
+  /** A coluna é `not null default 'fixed'`. */
+  deliveryFeeMode: DeliveryFeeMode;
+  /** Idem: `not null default 0`. */
+  deliveryFixedFeeInCents: number;
+  /** Idem: `not null default false`. */
+  deliveryFeeToArrange: boolean;
   createdAt: string;
   updatedAt: string;
 };

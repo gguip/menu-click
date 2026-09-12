@@ -173,6 +173,18 @@
                           "acceptsMealVoucher": {
                             "type": "boolean"
                           },
+                          "deliveryFeeMode": {
+                            "type": "string"
+                          },
+                          "deliveryFixedFeeInCents": {
+                            "type": "integer"
+                          },
+                          "freeDeliveryAboveInCents": {
+                            "type": "integer"
+                          },
+                          "deliveryFeeToArrange": {
+                            "type": "boolean"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -299,6 +311,18 @@
                       "type": "boolean"
                     },
                     "acceptsMealVoucher": {
+                      "type": "boolean"
+                    },
+                    "deliveryFeeMode": {
+                      "type": "string"
+                    },
+                    "deliveryFixedFeeInCents": {
+                      "type": "integer"
+                    },
+                    "freeDeliveryAboveInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryFeeToArrange": {
                       "type": "boolean"
                     },
                     "createdAt": {
@@ -429,6 +453,25 @@
                   },
                   "acceptsMealVoucher": {
                     "type": "boolean"
+                  },
+                  "deliveryFeeMode": {
+                    "type": "string",
+                    "enum": [
+                      "neighborhood",
+                      "fixed"
+                    ]
+                  },
+                  "deliveryFixedFeeInCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "freeDeliveryAboveInCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "nullable": true
+                  },
+                  "deliveryFeeToArrange": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -527,6 +570,18 @@
                       "type": "boolean"
                     },
                     "acceptsMealVoucher": {
+                      "type": "boolean"
+                    },
+                    "deliveryFeeMode": {
+                      "type": "string"
+                    },
+                    "deliveryFixedFeeInCents": {
+                      "type": "integer"
+                    },
+                    "freeDeliveryAboveInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryFeeToArrange": {
                       "type": "boolean"
                     },
                     "createdAt": {
@@ -3150,6 +3205,232 @@
         }
       }
     },
+    "/restaurants/{restaurantId}/delivery-neighborhoods": {
+      "put": {
+        "operationId": "replaceDeliveryNeighborhoods",
+        "summary": "Define os bairros atendidos e o preço de cada um",
+        "tags": [
+          "Entrega"
+        ],
+        "description": "Troca a lista inteira pela enviada — como a tela faz: a pessoa edita e salva. Lista vazia é válida e limpa a configuração. `feeInCents: 0` é entrega grátis, estado legítimo e diferente de não configurado. Dois bairros que só diferem por acento ou caixa são o mesmo bairro e respondem 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "neighborhoods"
+                ],
+                "properties": {
+                  "neighborhoods": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "feeInCents"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "feeInCents": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "neighborhoods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "feeInCents": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getDeliveryNeighborhoods",
+        "summary": "Os bairros atendidos atualmente",
+        "tags": [
+          "Entrega"
+        ],
+        "description": "A lista viva do restaurante, em ordem alfabética.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "neighborhoods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "feeInCents": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/restaurants/{restaurantId}/users": {
       "post": {
         "operationId": "createRestaurantUser",
@@ -3546,7 +3827,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409. Loja fora do horário de funcionamento ou com os pedidos pausados também é 409, com mensagens distintas para cada causa — vale para as três modalidades, `dine_in` inclusive.",
+        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409. Loja fora do horário de funcionamento ou com os pedidos pausados também é 409, com mensagens distintas para cada causa — vale para as três modalidades, `dine_in` inclusive. Em `delivery`, o frete é cotado no servidor (mesma regra da cotação pública) e somado ao `totalInCents`; `deliveryFeeInCents` sai `null` quando a loja está em modo \"a combinar\" e vai a 409 quando ela não entrega naquele endereço. `deliveryFeeInCents` do corpo é ignorado pelo mesmo motivo do `totalInCents`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3739,6 +4020,10 @@
                     },
                     "totalInCents": {
                       "type": "integer"
+                    },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
                     },
                     "deliveryAddress": {
                       "type": "object",
@@ -4070,6 +4355,10 @@
                           "totalInCents": {
                             "type": "integer"
                           },
+                          "deliveryFeeInCents": {
+                            "type": "integer",
+                            "nullable": true
+                          },
                           "deliveryAddress": {
                             "type": "object",
                             "nullable": true,
@@ -4386,6 +4675,10 @@
                     "totalInCents": {
                       "type": "integer"
                     },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
+                    },
                     "deliveryAddress": {
                       "type": "object",
                       "nullable": true,
@@ -4600,6 +4893,10 @@
                     },
                     "totalInCents": {
                       "type": "integer"
+                    },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
                     },
                     "deliveryAddress": {
                       "type": "object",
@@ -4816,6 +5113,10 @@
                     "totalInCents": {
                       "type": "integer"
                     },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
+                    },
                     "deliveryAddress": {
                       "type": "object",
                       "nullable": true,
@@ -5030,6 +5331,10 @@
                     },
                     "totalInCents": {
                       "type": "integer"
+                    },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
                     },
                     "deliveryAddress": {
                       "type": "object",
@@ -5246,6 +5551,10 @@
                     "totalInCents": {
                       "type": "integer"
                     },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
+                    },
                     "deliveryAddress": {
                       "type": "object",
                       "nullable": true,
@@ -5460,6 +5769,10 @@
                     },
                     "totalInCents": {
                       "type": "integer"
+                    },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
                     },
                     "deliveryAddress": {
                       "type": "object",
@@ -5676,6 +5989,10 @@
                     "totalInCents": {
                       "type": "integer"
                     },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
+                    },
                     "deliveryAddress": {
                       "type": "object",
                       "nullable": true,
@@ -5876,6 +6193,12 @@
                     },
                     "isQrcode": {
                       "type": "boolean"
+                    },
+                    "deliveryFeeMode": {
+                      "type": "string"
+                    },
+                    "freeDeliveryAboveInCents": {
+                      "type": "integer"
                     },
                     "isOpen": {
                       "type": "boolean"
@@ -6111,6 +6434,141 @@
         }
       }
     },
+    "/menu/{slug}/delivery-quote": {
+      "post": {
+        "operationId": "quoteMenuDelivery",
+        "summary": "Cota o frete antes de montar o pedido",
+        "tags": [
+          "Entrega"
+        ],
+        "description": "Informa se a loja entrega no endereço e por quanto, ANTES de o cliente montar o carrinho. Não decide nada: a criação do pedido confere de novo no servidor. O endereço vai no corpo, nunca na querystring, pelo mesmo motivo do S21 sobre credencial em URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "address",
+                  "subtotalInCents"
+                ],
+                "properties": {
+                  "address": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "street",
+                      "number",
+                      "neighborhood",
+                      "city",
+                      "state",
+                      "zipCode"
+                    ],
+                    "properties": {
+                      "street": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "number": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "neighborhood": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "city": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "zipCode": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "subtotalInCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deliversTo": {
+                      "type": "boolean"
+                    },
+                    "feeInCents": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "isFree": {
+                      "type": "boolean"
+                    },
+                    "toArrange": {
+                      "type": "boolean"
+                    },
+                    "servedNeighborhoods": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/orders/{orderId}": {
       "get": {
         "operationId": "getTrackedOrder",
@@ -6158,6 +6616,10 @@
                     },
                     "totalInCents": {
                       "type": "integer"
+                    },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
                     },
                     "paymentMethod": {
                       "type": "string"
@@ -6519,6 +6981,18 @@
                           "type": "boolean"
                         },
                         "acceptsMealVoucher": {
+                          "type": "boolean"
+                        },
+                        "deliveryFeeMode": {
+                          "type": "string"
+                        },
+                        "deliveryFixedFeeInCents": {
+                          "type": "integer"
+                        },
+                        "freeDeliveryAboveInCents": {
+                          "type": "integer"
+                        },
+                        "deliveryFeeToArrange": {
                           "type": "boolean"
                         },
                         "createdAt": {
@@ -6939,6 +7413,10 @@
     {
       "name": "Horário",
       "description": "As faixas em que o restaurante aceita pedido, no fuso dele. Dia sem faixa é dia fechado, e uma faixa pode atravessar a meia-noite."
+    },
+    {
+      "name": "Entrega",
+      "description": "Os bairros atendidos e o preço de cada um. Nome repetido (por acento ou caixa) é 409 — foi digitado por quem edita o cardápio, então não ganha sufixo automático."
     },
     {
       "name": "Pedidos",

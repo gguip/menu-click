@@ -35,6 +35,8 @@ type OrderRow = {
   type: OrderType;
   status: OrderStatus;
   total_in_cents: number;
+  /** `null` fora de `delivery`, e também em `delivery` "a combinar". */
+  delivery_fee_in_cents: number | null;
   street: string | null;
   number: string | null;
   neighborhood: string | null;
@@ -126,6 +128,10 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
     type: row.type,
     status: row.status,
     totalInCents: row.total_in_cents,
+    // presente e `null` (não ausente) fora de delivery e no "a combinar" —
+    // diferente de `changeForInCents` logo abaixo, cuja ausência É a
+    // informação. Aqui `null` já é a informação: "sem frete a mostrar".
+    deliveryFeeInCents: row.delivery_fee_in_cents,
     deliveryAddress: toAddress(row),
     paymentMethod: row.payment_method,
     // ausente, não `null`: no dinheiro sem troco significa "tenho o valor
@@ -166,6 +172,8 @@ export type InsertOrderData = {
   customerId: string;
   type: OrderType;
   totalInCents: number;
+  /** O frete já decidido pelo serviço. `null` fora de `delivery` e no "a combinar". */
+  deliveryFeeInCents: number | null;
   deliveryAddress?: Address;
   /** Hash do token de acompanhamento. `null` em `dine_in`. */
   trackingTokenHash: string | null;
@@ -207,16 +215,19 @@ export async function insertOrder(
   const address = data.deliveryAddress;
   const { rows } = await db.query<{ id: string }>(
     `insert into orders
-       (restaurant_id, customer_id, type, total_in_cents, tracking_token_hash,
-        street, number, neighborhood, city, state, zip_code,
+       (restaurant_id, customer_id, type, total_in_cents, delivery_fee_in_cents,
+        tracking_token_hash, street, number, neighborhood, city, state, zip_code,
         payment_method, change_for_in_cents)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      returning id`,
     [
       restaurantId,
       data.customerId,
       data.type,
       data.totalInCents,
+      // o check `orders_delivery_fee_check` garante a coerência com `type`:
+      // só delivery pode ter valor não-nulo aqui
+      data.deliveryFeeInCents,
       data.trackingTokenHash,
       // o check do banco garante a coerência com `type`: as seis colunas vêm
       // preenchidas em delivery e NULL nas outras duas modalidades

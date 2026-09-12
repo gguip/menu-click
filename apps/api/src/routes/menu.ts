@@ -1,13 +1,18 @@
 import type { FastifyInstance } from "fastify";
+import type { Address } from "../domain/restaurant.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import { SLUG_MAX_LENGTH } from "../domain/slug.ts";
+import { DELIVERY_QUOTE_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW } from "../limits.ts";
+import * as deliveryService from "../services/delivery.ts";
 import * as menuService from "../services/menu.ts";
 import {
   addressProperties,
+  addressSchema,
   errorResponseSchema,
   pageResponseSchema,
   paginationQuerystringSchema,
 } from "./schemas.ts";
+import { installRouteValidators } from "./validators.ts";
 
 /**
  * Cardápio público — o que o QR code aponta. **Sem login.**
@@ -40,6 +45,12 @@ const menuRestaurantResponseSchema = {
     isDelivery: { type: "boolean" },
     isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
+    // exatamente o que a tela precisa para anunciar "frete grátis acima de
+    // R$ 50" antes do carrinho. `deliveryFixedFeeInCents` e
+    // `deliveryFeeToArrange` NÃO entram: a cotação já devolve o número certo
+    // para o endereço do cliente, e a segunda é política interna da loja (S10)
+    deliveryFeeMode: { type: "string" },
+    freeDeliveryAboveInCents: { type: "integer" },
     // a grade E a pausa, juntas: é o que decide se a tela mostra o botão
     isOpen: { type: "boolean" },
     // a pausa sozinha, para separar "fechado agora" de "a loja pausou"
@@ -134,7 +145,50 @@ const menuSectionPageResponseSchema = {
   },
 };
 
+/**
+ * Corpo da cotação: endereço completo (value object, ver `addressSchema`) e o
+ * subtotal dos itens.
+ *
+ * ⚠️ O endereço vai no CORPO, nunca na querystring: URL entra em log de
+ * acesso, de proxy e no histórico do navegador, e endereço de cliente não deve
+ * morar lá — o mesmo raciocínio do S21 sobre credencial em URL.
+ */
+const deliveryQuoteBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["address", "subtotalInCents"],
+  properties: {
+    address: addressSchema,
+    // só o subtotal dos itens, nunca o total: o frete ainda está sendo
+    // decidido, então ele não pode entrar na própria conta
+    subtotalInCents: { type: "integer", minimum: 0 },
+  },
+};
+
+/**
+ * Exatamente os cinco campos que a tela precisa — nem um a mais (S10). Sem
+ * `servedNeighborhoods` ela não teria como oferecer o seletor de bairro; com
+ * mais do que isso, vazaria detalhe de configuração que não é do cliente.
+ */
+const deliveryQuoteResponseSchema = {
+  type: "object",
+  properties: {
+    deliversTo: { type: "boolean" },
+    // null quando não entrega ou quando é "a combinar"; 0 é grátis
+    feeInCents: { type: "integer", nullable: true },
+    isFree: { type: "boolean" },
+    toArrange: { type: "boolean" },
+    // só populada no modo `neighborhood` — nos demais modos vem vazia
+    servedNeighborhoods: { type: "array", items: { type: "string" } },
+  },
+};
+
 export async function menuRoutes(app: FastifyInstance) {
+  // O validador ESTRITO para o corpo. Sem ele vale o Ajv padrão do Fastify,
+  // que coage tipo: `subtotalInCents: null` na cotação viraria 0, e a decisão
+  // de "grátis acima de X" sairia calculada sobre um pedido de valor zero.
+  installRouteValidators(app);
+
   app.get<{ Params: { slug: string } }>(
     "/menu/:slug",
     {
@@ -178,6 +232,45 @@ export async function menuRoutes(app: FastifyInstance) {
     },
     async (request) => {
       return menuService.listProducts(request.params.slug, request.query);
+    },
+  );
+
+  app.post<{
+    Params: { slug: string };
+    Body: { address: Address; subtotalInCents: number };
+  }>(
+    "/menu/:slug/delivery-quote",
+    {
+      // pública como o resto do cardápio: entre cotar e pedir cabe o tempo de
+      // montar um carrinho, e o cliente precisa saber antes disso
+      config: {
+        public: true,
+        // teto próprio, bem abaixo do global — ver DELIVERY_QUOTE_RATE_LIMIT_MAX
+        rateLimit: {
+          max: DELIVERY_QUOTE_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+        },
+      },
+      schema: {
+        tags: ["Entrega"],
+        operationId: "quoteMenuDelivery",
+        summary: "Cota o frete antes de montar o pedido",
+        description:
+          "Informa se a loja entrega no endereço e por quanto, ANTES de o cliente montar o carrinho. Não decide nada: a criação do pedido confere de novo no servidor. O endereço vai no corpo, nunca na querystring, pelo mesmo motivo do S21 sobre credencial em URL.",
+        params: slugParamsSchema,
+        body: deliveryQuoteBodySchema,
+        response: {
+          200: deliveryQuoteResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      return deliveryService.quote(
+        request.params.slug,
+        request.body.address,
+        request.body.subtotalInCents,
+      );
     },
   );
 }

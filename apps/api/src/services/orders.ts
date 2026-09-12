@@ -37,6 +37,7 @@ import type { Restaurant } from "../domain/restaurant.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import { generateToken, hashToken } from "../tokens.ts";
 import * as orderEvents from "../events/orders.ts";
+import * as deliveryService from "./delivery.ts";
 import * as restaurantsService from "./restaurants.ts";
 
 /**
@@ -383,13 +384,33 @@ export async function create(
       };
     });
 
-    // total sempre calculado aqui — aceitar do cliente seria deixar o preço
-    // ser escolhido por quem paga. É o unitário (já com opções) vezes a
-    // quantidade: nunca soma-se contribuição de opção já arredondada.
-    const totalInCents = items.reduce(
+    // subtotal sempre calculado aqui — aceitar do cliente seria deixar o
+    // preço ser escolhido por quem paga. É o unitário (já com opções) vezes a
+    // quantidade: nunca soma-se contribuição de opção já arredondada. Chama-se
+    // "subtotal" porque em `delivery` ainda falta somar o frete — ver abaixo.
+    const subtotalInCents = items.reduce(
       (sum, item) => sum + item.unitPriceInCents * item.quantity,
       0,
     );
+
+    // O frete sai da mesma cotação que o endpoint público usa, recalculada
+    // aqui: aquele endpoint informa, esta criação decide. Entre cotar e pedir
+    // cabe o tempo de montar o carrinho, e cabe um cliente batendo direto na
+    // API sem nunca ter chamado a cotação.
+    const frete = await deliveryService.quoteForOrder(
+      restaurant,
+      input.type,
+      input.deliveryAddress,
+      subtotalInCents,
+      client,
+    );
+
+    if (!frete.deliversTo) {
+      throw new ConflictError("A loja não entrega neste endereço");
+    }
+
+    // null quando é "a combinar" ou quando não é entrega: não há o que somar
+    const totalInCents = subtotalInCents + (frete.feeInCents ?? 0);
     assertTrocoCoerente(input.paymentMethod, input.changeForInCents, totalInCents);
 
     const customer = await customersRepository.upsertByPhone(
@@ -403,6 +424,9 @@ export async function create(
         customerId: customer.id,
         type: input.type,
         totalInCents,
+        // congelado no momento da criação; nunca recalculado a partir do
+        // cadastro atual do restaurante numa leitura futura
+        deliveryFeeInCents: frete.feeInCents,
         deliveryAddress: input.deliveryAddress,
         trackingTokenHash:
           trackingToken === null ? null : hashToken(trackingToken),

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { UpdateRestaurantInput } from "../domain/restaurant.ts";
 import * as restaurantsService from "../services/restaurants.ts";
 import { requireAuth } from "./authenticate.ts";
+import { installRouteValidators } from "./validators.ts";
 import type { Pagination } from "../domain/pagination.ts";
 import {
   errorResponseSchema,
@@ -43,6 +44,12 @@ const restaurantIdParamsSchema = {
 // ===================== Rotas =====================
 
 export async function restaurantRoutes(app: FastifyInstance) {
+  // O validador ESTRITO para o corpo: sem ele vale o Ajv padrão do Fastify,
+  // que coage tipo — e aí `null` num campo de dinheiro vira 0. Em
+  // `freeDeliveryAboveInCents` isso significaria "frete grátis acima de
+  // R$ 0,00", ou seja, grátis em todo pedido, com 200 na resposta.
+  installRouteValidators(app);
+
   // Listar. Devolve o restaurante da SESSÃO, não todos: uma listagem geral
   // entregaria a qualquer usuário logado o cadastro dos concorrentes. Continua
   // paginada (mesmo envelope) porque um usuário em várias lojas é o próximo

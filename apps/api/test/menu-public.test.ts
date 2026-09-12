@@ -10,6 +10,20 @@ import {
   linkOptionGroups,
 } from "./helpers.ts";
 
+/** Atualiza a configuração de frete de um restaurante de teste via PATCH. */
+function setDeliveryFeeConfig(
+  app: FastifyInstance,
+  restaurant: { id: string; headers: { authorization: string } },
+  config: Record<string, unknown>,
+) {
+  return app.inject({
+    method: "PATCH",
+    url: `/restaurants/${restaurant.id}`,
+    headers: restaurant.headers,
+    payload: config,
+  });
+}
+
 /**
  * Cardápio público — o que o QR code aponta, sem login.
  *
@@ -79,6 +93,63 @@ describe("cardápio público", () => {
       });
 
       expect(response.statusCode).toBe(404);
+    });
+
+    it("anuncia o modo de frete e o limite de frete grátis", async () => {
+      const restaurant = await createRestaurant(app, { slug: "com-frete-gratis" });
+      await setDeliveryFeeConfig(app, restaurant, {
+        deliveryFeeMode: "fixed",
+        deliveryFixedFeeInCents: 990,
+        freeDeliveryAboveInCents: 5000,
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/com-frete-gratis",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.deliveryFeeMode).toBe("fixed");
+      expect(body.freeDeliveryAboveInCents).toBe(5000);
+    });
+
+    it("omite freeDeliveryAboveInCents quando a promoção não existe", async () => {
+      // configuração default: deliveryFeeMode 'fixed', sem "grátis acima de X"
+      await createRestaurant(app, { slug: "sem-promocao-de-frete" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/sem-promocao-de-frete",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.deliveryFeeMode).toBe("fixed");
+      expect(body.freeDeliveryAboveInCents).toBeUndefined();
+    });
+
+    it("NÃO vaza a configuração crua de frete nem o timezone", async () => {
+      const restaurant = await createRestaurant(app, { slug: "sem-vazamento" });
+      await setDeliveryFeeConfig(app, restaurant, {
+        deliveryFeeMode: "fixed",
+        deliveryFixedFeeInCents: 1234,
+        deliveryFeeToArrange: true,
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/sem-vazamento",
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      // a tela só recebe o modo e o limite de "grátis acima de X" — a taxa
+      // base e a política de "a combinar" são o suficiente para pedir a
+      // cotação, não para expor a configuração interna da loja (S10)
+      expect(body.deliveryFixedFeeInCents).toBeUndefined();
+      expect(body.deliveryFeeToArrange).toBeUndefined();
+      expect(body.timezone).toBeUndefined();
     });
   });
 
