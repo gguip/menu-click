@@ -481,6 +481,207 @@ describe("recuperação de senha", () => {
       const response = await trocaSenha(token, "senha-recuperada-123");
       expect(response.statusCode).toBe(400);
     });
+
+    /**
+     * 🚨 Ponta a ponta, adversarial — o objetivo desta task.
+     *
+     * Cada peça do fluxo já tem teste isolado acima; o que falta é o passeio
+     * INTEIRO como quem perdeu o acesso de verdade faria, encadeado numa
+     * história só, seguido dos três ataques que o brief pede por nome: reusar
+     * o link, tentar o link de outra pessoa, e pedir duas vezes e tentar o
+     * primeiro link. Um teste isolado de "reuso" não prova que a senha final
+     * continua sendo a que o dono escolheu — só que a segunda tentativa deu
+     * 400. Aqui a prova é o login, não o status code.
+     */
+    describe("ponta a ponta: quem perdeu o acesso, e quem tenta abusar dele", () => {
+      it("pede, lê o link, troca, entra com a nova — e a sessão de antes morre", async () => {
+        const restaurant = await createRestaurant(app, {
+          slug: "e2e-recupera-passeio-completo",
+        });
+        // a sessão que `createRestaurant` já abriu É a sessão "de antes da
+        // recuperação" que precisa morrer — não precisa logar de novo para tê-la
+        const sessaoDeAntes = restaurant.headers;
+
+        const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+        const reset = await trocaSenha(token, "senha-recuperada-e2e-123");
+        expect(reset.statusCode).toBe(200);
+
+        const loginNovo = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: {
+            email: restaurant.ownerEmail,
+            password: "senha-recuperada-e2e-123",
+          },
+        });
+        expect(loginNovo.statusCode).toBe(200);
+        const sessaoNova = {
+          authorization: `Bearer ${loginNovo.json().token as string}`,
+        };
+
+        const loginAntigo = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: { email: restaurant.ownerEmail, password: validUserBody.password },
+        });
+        expect(loginAntigo.statusCode).toBe(401);
+
+        const meComSessaoDeAntes = await app.inject({
+          method: "GET",
+          url: "/auth/me",
+          headers: sessaoDeAntes,
+        });
+        expect(meComSessaoDeAntes.statusCode).toBe(401);
+
+        // sanidade: a sessão NOVA de fato funciona (não é só a antiga que morreu)
+        const meComSessaoNova = await app.inject({
+          method: "GET",
+          url: "/auth/me",
+          headers: sessaoNova,
+        });
+        expect(meComSessaoNova.statusCode).toBe(200);
+
+        // ataque 1: reusar o link já consumido
+        const reuso = await trocaSenha(token, "senha-do-invasor-123");
+        expect(reuso.statusCode).toBe(400);
+
+        // a prova de verdade não é o 400 do reuso — é que a senha continua
+        // sendo a que o dono escolheu, e a do ataque nunca passou a valer
+        const loginComSenhaDoAtaque = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: { email: restaurant.ownerEmail, password: "senha-do-invasor-123" },
+        });
+        expect(loginComSenhaDoAtaque.statusCode).toBe(401);
+
+        const loginAindaComANova = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: {
+            email: restaurant.ownerEmail,
+            password: "senha-recuperada-e2e-123",
+          },
+        });
+        expect(loginAindaComANova.statusCode).toBe(200);
+      });
+
+      /**
+       * Ataque 2: o link de outra pessoa. Como o corpo de `reset-password` é só
+       * `{ token, newPassword }` — não existe campo de "qual conta" —, o único
+       * jeito de um token abrir a conta errada seria um bug na consulta que o
+       * resolve (ex.: esquecer o `where` e pegar a primeira linha). Duas contas
+       * pedem recuperação quase ao mesmo tempo, e usar o token de uma nunca
+       * pode mexer na senha nem nas sessões da outra.
+       */
+      it("o token de uma conta não abre nem mexe na de outra", async () => {
+        const restauranteA = await createRestaurant(app, { slug: "e2e-conta-a" });
+        const restauranteB = await createRestaurant(app, { slug: "e2e-conta-b" });
+
+        const tokenA = await pedeTokenDeRecuperacao(restauranteA.ownerEmail);
+        const tokenB = await pedeTokenDeRecuperacao(restauranteB.ownerEmail);
+
+        const resetA = await trocaSenha(tokenA, "senha-nova-da-conta-a-123");
+        expect(resetA.statusCode).toBe(200);
+
+        // B não pediu nada ainda além do próprio token: a senha original
+        // continua valendo, e a sessão que `createRestaurant` abriu para B
+        // continua viva — o reset de A não pode ter tocado em nada de B
+        const loginBComSenhaOriginal = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: { email: restauranteB.ownerEmail, password: validUserBody.password },
+        });
+        expect(loginBComSenhaOriginal.statusCode).toBe(200);
+
+        const meDeB = await app.inject({
+          method: "GET",
+          url: "/auth/me",
+          headers: restauranteB.headers,
+        });
+        expect(meDeB.statusCode).toBe(200);
+
+        // o token de B continua vivo e serve — não foi consumido pelo reset de A
+        const resetB = await trocaSenha(tokenB, "senha-nova-da-conta-b-123");
+        expect(resetB.statusCode).toBe(200);
+
+        const loginBComSenhaNova = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: {
+            email: restauranteB.ownerEmail,
+            password: "senha-nova-da-conta-b-123",
+          },
+        });
+        expect(loginBComSenhaNova.statusCode).toBe(200);
+
+        // e A continua com a senha que o reset dela definiu, não a de B
+        const loginAComSenhaDeB = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: {
+            email: restauranteA.ownerEmail,
+            password: "senha-nova-da-conta-b-123",
+          },
+        });
+        expect(loginAComSenhaDeB.statusCode).toBe(401);
+      });
+
+      /**
+       * Ataque 3: pede duas vezes e tenta o link antigo.
+       *
+       * `"um pedido novo invalida o token anterior"`, lá em cima, só confere a
+       * CONTAGEM de tokens vivos no banco — nunca chega a TENTAR trocar a senha
+       * com o primeiro token. Esta é a diferença: tenta de verdade, e prova
+       * pelo login que o ataque não teve efeito nenhum.
+       */
+      it("pede duas vezes: o primeiro link morre mesmo sem nunca ter sido usado", async () => {
+        const restaurant = await createRestaurant(app, {
+          slug: "e2e-pede-duas-vezes-tenta-a-primeira",
+        });
+
+        const tokenAntigo = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+        // limpa o outbox ANTES do segundo pedido: sem isso, o próximo
+        // `esperaEmail` (dentro de `pedeTokenDeRecuperacao`) poderia achar de
+        // novo o e-mail do primeiro pedido, que já está no array, e devolver o
+        // token ANTIGO como se fosse o novo
+        clearOutbox();
+        const tokenNovo = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+        expect(tokenNovo).not.toBe(tokenAntigo);
+
+        // ataque: usar o link que chegou primeiro, e que a pessoa pode muito
+        // bem ainda ter aberto numa aba
+        const ataqueComTokenAntigo = await trocaSenha(
+          tokenAntigo,
+          "senha-do-invasor-com-link-velho-123",
+        );
+        expect(ataqueComTokenAntigo.statusCode).toBe(400);
+
+        // o legítimo, com o token que de fato vale, funciona normalmente
+        const trocaLegitima = await trocaSenha(
+          tokenNovo,
+          "senha-legitima-do-dono-123",
+        );
+        expect(trocaLegitima.statusCode).toBe(200);
+
+        const loginComSenhaDoAtaque = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: {
+            email: restaurant.ownerEmail,
+            password: "senha-do-invasor-com-link-velho-123",
+          },
+        });
+        expect(loginComSenhaDoAtaque.statusCode).toBe(401);
+
+        const loginComSenhaLegitima = await app.inject({
+          method: "POST",
+          url: "/auth/login",
+          payload: { email: restaurant.ownerEmail, password: "senha-legitima-do-dono-123" },
+        });
+        expect(loginComSenhaLegitima.statusCode).toBe(200);
+      });
+    });
   });
 
 });
