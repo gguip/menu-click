@@ -68,6 +68,16 @@ alter table orders
   );
 
 -- Down Migration
+--
+-- ⚠️ PERDA DE INFORMAÇÃO, e ela é total: a grade de horário de todos os
+-- restaurantes desaparece junto com a tabela, e cada pedido perde a forma de
+-- pagamento e o troco combinado. Não há como preservar — as colunas e a tabela
+-- não existem no schema anterior, então não há onde guardar.
+--
+-- Na prática isto significa que descer esta migration num banco com pedidos em
+-- andamento deixa o entregador sem saber se precisa levar troco. Se o objetivo
+-- for só desfazer o bloqueio de horário, apague as faixas em vez de descer a
+-- migration: sem faixa a loja fica fechada, mas o dado de pagamento fica.
 
 alter table orders
   drop constraint orders_change_for_check,
