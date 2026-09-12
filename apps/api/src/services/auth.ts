@@ -246,6 +246,13 @@ export async function resetPassword(
   const linkInvalido = () =>
     new ValidationError("Link de recuperação inválido ou expirado");
 
+  // o hash sai da transação pelo mesmo motivo do `register()` acima: bcrypt a
+  // custo 12 leva centenas de milissegundos, e segurar uma conexão do pool por
+  // esse tempo é desperdício. Aqui pesa mais ainda — a rota é pública e sem
+  // sessão, então é alvo natural de tentativa em lote depois de uma campanha
+  // de e-mail. Não depende de nada lido lá dentro: só da senha, já validada.
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
   await withTransaction(async (client) => {
     const linha = await passwordResetRepository.findLiveByHash(
       hashToken(token),
@@ -258,8 +265,6 @@ export async function resetPassword(
     // falha que ele conseguiria exercitar. Um filtro, um lugar, e a mutação
     // que o remove derruba teste de verdade.
     if (linha === null) throw linkInvalido();
-
-    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
     // `false` = o usuário foi removido depois de o token ser emitido (o
     // `findLiveByHash` não junta com `restaurant_users`, então um token de
