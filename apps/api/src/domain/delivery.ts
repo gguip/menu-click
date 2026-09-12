@@ -117,6 +117,11 @@ function taxaBase(input: DeliveryQuoteInput): number | undefined {
 
   if (input.mode === "neighborhood") {
     const alvo = normalizeNeighborhood(input.addressNeighborhood);
+    // Bairro que normaliza para vazio não casa com nada. Sem esta guarda, um
+    // endereço com o campo em branco casaria com uma linha cujo nome fosse só
+    // espaço — e sairia cobrando a taxa dela. O serviço já recusa cadastrar
+    // esse nome; isto protege o cálculo de linha antiga ou escrita por fora.
+    if (alvo === "") return undefined;
     const achado = input.neighborhoods.find(
       (bairro) => normalizeNeighborhood(bairro.name) === alvo,
     );

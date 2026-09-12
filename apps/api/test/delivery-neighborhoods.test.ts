@@ -140,6 +140,22 @@ describe("bairros atendidos", () => {
     expect(get.json().neighborhoods).toEqual([]);
   });
 
+  it("recusa bairro cujo nome é só espaço", async () => {
+    const restaurant = await createRestaurant(app, { slug: "bairro-vazio" });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: `/restaurants/${restaurant.id}/delivery-neighborhoods`,
+      headers: restaurant.headers,
+      // `minLength: 1` do schema não pega: três espaços têm tamanho 3. Se
+      // passasse, a chave normalizada seria vazia e casaria com todo endereço
+      // cujo bairro viesse em branco — a loja cobraria essa taxa sem escolher.
+      payload: { neighborhoods: [{ name: "   ", feeInCents: 500 }] },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
   it("bairro de outro dono responde 404", async () => {
     const dono = await createRestaurant(app, { slug: "dono-b" });
     const alheio = await createRestaurant(app, { slug: "alheio-b" });

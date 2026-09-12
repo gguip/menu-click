@@ -108,6 +108,20 @@ describe("cotação de frete", () => {
     expect(quote.deliversTo).toBe(false);
   });
 
+  it("bairro em branco no endereço não casa com nada", () => {
+    // defesa em profundidade: o serviço já recusa cadastrar nome só-espaço,
+    // mas se uma linha dessas existir (dado antigo, escrita por fora), a chave
+    // vazia não pode casar com um endereço de bairro em branco e sair cobrando
+    const quote = quoteDelivery({
+      ...base,
+      mode: "neighborhood",
+      neighborhoods: [{ name: "   ", feeInCents: 500 }],
+      addressNeighborhood: "   ",
+    });
+    expect(quote.deliversTo).toBe(false);
+    expect(quote.feeInCents).toBeNull();
+  });
+
   it("modo distância ainda não decide nada na Parte 1", () => {
     // as faixas de km chegam com o Nominatim; até lá o modo cai no caminho de
     // "não consegue determinar", que é honesto
