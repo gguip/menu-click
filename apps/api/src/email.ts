@@ -82,12 +82,39 @@ function readDriver(): EmailDriver {
  * sem subir app nem mexer em `process.env`. Quem guarda o resultado é esta
  * função, e é o resultado guardado que o envio usa depois.
  */
+/**
+ * 🚨 Com `smtp`, as três variáveis do fluxo precisam existir NO BOOT.
+ *
+ * `SMTP_URL` e `EMAIL_FROM` já falhavam — mas só no primeiro envio, o que
+ * significa descobrir o problema quando alguém já está trancado para fora.
+ * `PASSWORD_RESET_URL` não falhava nunca: sem ela o link cai num default de
+ * desenvolvimento, e a loja recebe um e-mail apontando para `localhost`.
+ *
+ * Esse é o pior dos três, e por isso entra aqui apesar de ser lida fora deste
+ * módulo: um e-mail que chega com link errado é tão inútil quanto um que não
+ * chega, e falha **sem erro nenhum** — ninguém descobre até o dono reclamar
+ * que o link não abre. O fluxo inteiro existe para dar caminho de volta a quem
+ * perdeu o acesso; entregá-lo quebrado em silêncio anula a feature.
+ */
+function assertSmtpConfigIsComplete(): void {
+  const faltando = (["SMTP_URL", "EMAIL_FROM", "PASSWORD_RESET_URL"] as const)
+    .filter((nome) => !process.env[nome]);
+
+  if (faltando.length > 0) {
+    // só os NOMES, nunca os valores (S13)
+    throw new Error(
+      `EMAIL_DRIVER=smtp exige ${faltando.join(", ")} configurado(s)`,
+    );
+  }
+}
+
 export function configureEmail(
   driver: string,
   nodeEnv: string | undefined,
   logger: (mensagem: string) => void,
 ): void {
   assertEmailDriverIsSafe(driver, nodeEnv);
+  if (driver === "smtp") assertSmtpConfigIsComplete();
   resolvedDriver = driver as EmailDriver;
   log = logger;
 }
@@ -110,7 +137,6 @@ export function configureEmail(
  */
 function assertSmtpUrlIsParseable(url: string): void {
   try {
-    // eslint-disable-next-line no-new
     new URL(url);
   } catch {
     // o erro original é descartado de propósito: ele carrega a URL

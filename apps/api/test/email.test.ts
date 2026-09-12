@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertEmailDriverIsSafe, sendEmail } from "../src/email.ts";
+import { assertEmailDriverIsSafe, configureEmail, sendEmail } from "../src/email.ts";
 
 describe("porta de e-mail", () => {
   it("recusa o driver de console em produção", () => {
@@ -54,6 +54,35 @@ describe("porta de e-mail", () => {
         JSON.stringify(erro, Object.getOwnPropertyNames(erro ?? {})),
       ].join(" ");
       expect(tudo).not.toContain("SENHA_SECRETA");
+    } finally {
+      process.env = anterior;
+    }
+  });
+
+  /**
+   * Subir com `smtp` e sem as variáveis é falha de boot, não surpresa depois.
+   *
+   * `PASSWORD_RESET_URL` é a que mais importa aqui: sem ela o link cai num
+   * default de desenvolvimento e a loja recebe um e-mail apontando para
+   * `localhost` — quebrado, e **sem erro nenhum**. Ninguém descobre até o dono
+   * reclamar que o link não abre, e a feature inteira existe para dar caminho
+   * de volta a quem perdeu o acesso.
+   */
+  it("recusa subir com smtp e variável faltando", () => {
+    const anterior = { ...process.env };
+    try {
+      process.env.SMTP_URL = "smtp://u:p@host:587";
+      process.env.EMAIL_FROM = "nao-responda@exemplo.com";
+      delete process.env.PASSWORD_RESET_URL;
+
+      expect(() => configureEmail("smtp", "production", () => {})).toThrow(
+        /PASSWORD_RESET_URL/,
+      );
+
+      process.env.PASSWORD_RESET_URL = "https://painel.exemplo.com/recuperar";
+      expect(() =>
+        configureEmail("smtp", "production", () => {}),
+      ).not.toThrow();
     } finally {
       process.env = anterior;
     }
