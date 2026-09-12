@@ -3204,6 +3204,232 @@
         }
       }
     },
+    "/restaurants/{restaurantId}/delivery-neighborhoods": {
+      "put": {
+        "operationId": "replaceDeliveryNeighborhoods",
+        "summary": "Define os bairros atendidos e o preço de cada um",
+        "tags": [
+          "Entrega"
+        ],
+        "description": "Troca a lista inteira pela enviada — como a tela faz: a pessoa edita e salva. Lista vazia é válida e limpa a configuração. `feeInCents: 0` é entrega grátis, estado legítimo e diferente de não configurado. Dois bairros que só diferem por acento ou caixa são o mesmo bairro e respondem 409.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "neighborhoods"
+                ],
+                "properties": {
+                  "neighborhoods": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "name",
+                        "feeInCents"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "feeInCents": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "neighborhoods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "feeInCents": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getDeliveryNeighborhoods",
+        "summary": "Os bairros atendidos atualmente",
+        "tags": [
+          "Entrega"
+        ],
+        "description": "A lista viva do restaurante, em ordem alfabética.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "neighborhoods": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "feeInCents": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/restaurants/{restaurantId}/users": {
       "post": {
         "operationId": "createRestaurantUser",
@@ -7005,6 +7231,10 @@
     {
       "name": "Horário",
       "description": "As faixas em que o restaurante aceita pedido, no fuso dele. Dia sem faixa é dia fechado, e uma faixa pode atravessar a meia-noite."
+    },
+    {
+      "name": "Entrega",
+      "description": "Os bairros atendidos e o preço de cada um. Nome repetido (por acento ou caixa) é 409 — foi digitado por quem edita o cardápio, então não ganha sufixo automático."
     },
     {
       "name": "Pedidos",

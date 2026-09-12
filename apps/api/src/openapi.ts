@@ -63,6 +63,13 @@ export const OPENAPI_TAGS = [
       "faixa é dia fechado, e uma faixa pode atravessar a meia-noite.",
   },
   {
+    name: "Entrega",
+    description:
+      "Os bairros atendidos e o preço de cada um. Nome repetido (por acento " +
+      "ou caixa) é 409 — foi digitado por quem edita o cardápio, então não " +
+      "ganha sufixo automático.",
+  },
+  {
     name: "Pedidos",
     description:
       "Criar um pedido é público (o cliente do QR não tem conta); listar, " +

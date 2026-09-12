@@ -313,6 +313,24 @@ export function setOpeningHours(
   });
 }
 
+/** Define a lista de bairros atendidos de um restaurante de teste. */
+export async function setDeliveryNeighborhoods(
+  app: FastifyInstance,
+  restaurant: TestRestaurant,
+  neighborhoods: { name: string; feeInCents: number }[],
+) {
+  const response = await app.inject({
+    method: "PUT",
+    url: `/restaurants/${restaurant.id}/delivery-neighborhoods`,
+    headers: restaurant.headers,
+    payload: { neighborhoods },
+  });
+  if (response.statusCode !== 200) {
+    throw new Error(`setDeliveryNeighborhoods falhou: ${response.body}`);
+  }
+  return response.json();
+}
+
 /** Header pronto para `app.inject({ headers })`. */
 export function authHeaders(token: string) {
   return { authorization: `Bearer ${token}` };

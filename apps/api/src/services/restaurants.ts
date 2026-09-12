@@ -12,6 +12,7 @@ import { isUuid } from "../domain/uuid.ts";
 import { isValidTimezone } from "../domain/timezone.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
+import * as deliveryNeighborhoodsRepository from "../repositories/delivery-neighborhoods.ts";
 import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as productsRepository from "../repositories/products.ts";
@@ -195,8 +196,8 @@ export async function update(
 
 /**
  * Remove o restaurante **e o cardápio dele** — produtos, categorias, grupos de
- * opções, opções e os vínculos entre produto e grupo (soft delete em
- * cascata, D3).
+ * opções, opções e os vínculos entre produto e grupo —, além da grade de
+ * horário e dos bairros atendidos (soft delete em cascata, D3).
  *
  * Os updates valem juntos ou não valem: se um falhar, o rollback
  * traz o restaurante de volta. Lançar o `NotFoundError` de dentro da transação
@@ -219,5 +220,6 @@ export async function remove(id: string): Promise<void> {
     await optionGroupsRepository.softDeleteOptionsByRestaurant(id, client);
     await optionGroupsRepository.softDeleteByRestaurant(id, client);
     await openingHoursRepository.softDeleteByRestaurant(id, client);
+    await deliveryNeighborhoodsRepository.softDeleteByRestaurant(id, client);
   });
 }

@@ -20,3 +20,35 @@ export type DeliveryFeeMode = (typeof DELIVERY_FEE_MODES)[number];
  * e deixar a loja selecioná-lo seria oferecer um estado quebrado.
  */
 export const SELECTABLE_DELIVERY_FEE_MODES = ["neighborhood", "fixed"] as const;
+
+/**
+ * A chave de comparação de um bairro: sem acento, sem caixa, sem espaço
+ * sobrando.
+ *
+ * Usa a mesma técnica do `slugify` (`normalize("NFD")` separa a letra do
+ * acento, e o filtro de `\p{M}` tira só o acento), mas **não** é o `slugify`:
+ * aquele produz URL — corta no tamanho, troca espaço por hífen. Este produz
+ * chave de igualdade, e precisa que "Jardim América" e "jardim  america"
+ * colidam sem virar "jardim-america".
+ */
+export function normalizeNeighborhood(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+/** Um bairro atendido, como o restaurante o define. */
+export type DeliveryNeighborhoodInput = {
+  name: string;
+  feeInCents: number;
+};
+
+/**
+ * Um bairro atendido, como a API o devolve. Sem `id`: a lista é substituída
+ * inteira a cada `PUT` (ver `services/delivery-neighborhoods.ts`), então não
+ * há identidade estável para o cliente guardar entre uma chamada e outra.
+ */
+export type DeliveryNeighborhood = DeliveryNeighborhoodInput;
