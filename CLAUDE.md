@@ -97,7 +97,7 @@ A API atende **duas audiências**, e a diferença entre elas é a coisa mais imp
 
 **A lista está invertida de propósito: um hook `onRequest` na raiz (`routes/authenticate.ts`) exige sessão em tudo, e a rota pública se declara com `config: { public: true }`.** Rota nova nasce fechada. Com opt-in rota a rota, esquecer uma linha exporia a rota em silêncio; com opt-out, o mesmo esquecimento a fecha e o sintoma aparece no primeiro teste — os dois erros não custam a mesma coisa.
 
-Público hoje, e nada além disso: `GET /health`, `GET /menu/:slug`, `GET /menu/:slug/products`, `POST /auth/register`, `POST /auth/login` e `POST /restaurants/:restaurantId/orders`.
+Público hoje, e nada além disso: `GET /health`, `GET /menu/:slug`, `GET /menu/:slug/products`, **`POST /menu/:slug/delivery-quote`**, `POST /auth/register`, `POST /auth/login` e `POST /restaurants/:restaurantId/orders`.
 
 **Autorização também mora no hook.** Ele compara o `:restaurantId` da URL com o da sessão e responde **404** na divergência — 403 confirmaria que aquele restaurante existe. Por isso **toda rota escopada em restaurante precisa chamar o parâmetro de `restaurantId`**: uma rota que o chamasse de `id` ficaria autenticada mas **não** escopada, e uma sessão passaria por cima de outro restaurante. É o tipo de erro que não aparece em teste de caminho feliz.
 
@@ -259,6 +259,17 @@ A validação é construir um `Intl.DateTimeFormat` e ver se ele reclama, **não
 **`GET /restaurants/:restaurantId/orders/summary`** devolve os contadores por status (todos, zerados ou não), o faturamento, quantos pedidos o compõem e o ticket médio. Rota separada da listagem porque o painel troca de página e de filtro o tempo todo, e porque `total` (da consulta paginada) e os contadores (do período inteiro) são duas noções de "quantos" que não devem morar no mesmo corpo.
 
 **Faturamento é o que o restaurante ACEITOU vender:** de `confirmed` em diante, sem `pending` (ainda não é venda) nem `cancelled` (deixou de ser). Contar só `completed` mostraria quase zero no pico do almoço, que é quando alguém abre o painel. A lista vive em `REVENUE_STATUSES` no domínio, **não no SQL**: o repositório agrupa por status e devolve o cru, e a regra é aplicada no serviço — se estivesse na query, mudá-la sumiria de onde alguém a procura. ⚠️ Status novo na máquina **não** entra ali sozinho.
+
+⚠️ **Desde a taxa de entrega, o faturamento inclui o frete** — e isso não foi
+decidido, foi herdado. `revenueInCents` soma `total_in_cents`, e esse total
+passou a carregar o frete nos pedidos de entrega. Medido: R$ 30,00 de mercadoria
+com R$ 15,00 de frete entra como R$ 45,00 de faturamento, e o ticket médio passa
+a misturar comida com entrega. Para faturamento bruto o número está certo — foi
+o que a loja cobrou —, mas para decidir preço de cardápio, não: o frete pode ser
+repassado ao entregador. **Se alguém quiser separar os dois, é decisão de
+produto, não refatoração**, e o lugar é o serviço, que já aplica a regra de
+`REVENUE_STATUSES` sobre o cru do repositório. Há teste prendendo o
+comportamento de hoje, para a mudança ser deliberada.
 
 A resposta traz em `period` os instantes que o servidor usou. Sem eles, "por que o faturamento de hoje está zerado?" não tem como ser respondido sem abrir o banco.
 
