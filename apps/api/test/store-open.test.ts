@@ -369,10 +369,18 @@ describe("está aberto agora?", () => {
 
     /**
      * O troco é comparado com o total que o SERVIDOR calculou, e quem paga não
-     * escolhe esse número. Mandar `totalInCents` no corpo é recusado antes de
-     * qualquer conta, pelo `additionalProperties: false` do schema.
+     * escolhe esse número.
+     *
+     * O caminho é menos óbvio do que parece, e vale escrever: o validador do
+     * corpo roda com `removeAdditional: true` (`routes/validators.ts`), então
+     * um `totalInCents` forjado não é recusado — é **removido em silêncio**, e
+     * nunca chega ao serviço. O 400 que este teste vê vem depois, do
+     * `assertTrocoCoerente`, que compara o troco com o total calculado no
+     * servidor. É por isso que a asserção é interessante: ela prova que o
+     * número mandado pelo cliente não entrou na conta, e não apenas que o
+     * schema barrou um campo extra.
      */
-    it("400 quando o corpo tenta mandar o próprio total", async () => {
+    it("ignora o total mandado no corpo e confere o troco contra o do servidor", async () => {
       const timezone = fusoSeguro();
       const { restaurant, produto } = await lojaComProduto(
         "total-forjado",
@@ -391,9 +399,9 @@ describe("está aberto agora?", () => {
           customer: { name: "Ana", phone: "11999990000" },
           items: [{ productId: produto.id, quantity: 1 }],
           paymentMethod: "cash",
+          // troco menor que o total real do pedido
           changeForInCents: 100,
-          // o item custa mais que isto: se o total viesse do corpo, o troco de
-          // R$ 1,00 passaria na checagem
+          // se este número entrasse na conta, o troco acima passaria
           totalInCents: 1,
         },
       });
