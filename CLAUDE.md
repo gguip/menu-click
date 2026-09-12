@@ -97,7 +97,27 @@ A API atende **duas audiências**, e a diferença entre elas é a coisa mais imp
 
 **A lista está invertida de propósito: um hook `onRequest` na raiz (`routes/authenticate.ts`) exige sessão em tudo, e a rota pública se declara com `config: { public: true }`.** Rota nova nasce fechada. Com opt-in rota a rota, esquecer uma linha exporia a rota em silêncio; com opt-out, o mesmo esquecimento a fecha e o sintoma aparece no primeiro teste — os dois erros não custam a mesma coisa.
 
-Público hoje, e nada além disso: `GET /health`, `GET /menu/:slug`, `GET /menu/:slug/products`, **`POST /menu/:slug/delivery-quote`**, `POST /auth/register`, `POST /auth/login` e `POST /restaurants/:restaurantId/orders`.
+Público hoje, e nada além disso:
+
+| Rota | Como é protegida |
+| --- | --- |
+| `GET /health` | nada a proteger |
+| `GET /menu/:slug` | o cardápio é o que o QR code abre |
+| `GET /menu/:slug/products` | idem |
+| `POST /menu/:slug/delivery-quote` | cota o frete antes de existir carrinho |
+| `POST /auth/register` | cria a primeira conta |
+| `POST /auth/login` | teto próprio por IP (S25) |
+| `POST /auth/forgot-password` | teto próprio por IP; responde igual para e-mail que existe e que não existe |
+| `POST /restaurants/:restaurantId/orders` | quem pede não tem conta |
+| `GET /orders/:orderId` | **pelo `trackingToken`**, não por sessão — e o token confere contra aquele pedido |
+| `GET /orders/:orderId/track` | idem, o canal de WebSocket |
+
+⚠️ As duas últimas são públicas no sentido de "não exigem sessão", mas **não são
+abertas**: quem não tem o `trackingToken` não lê pedido nenhum. Elas ficaram fora
+desta lista por um tempo, embora sempre tenham estado nas duas listas que a
+máquina lê (`test/authorization.test.ts` e `test/openapi.test.ts`) — e uma lista
+escrita como "nada além disso" que esquece duas rotas é pior que não ter lista,
+porque quem a lê acredita nela.
 
 **Autorização também mora no hook.** Ele compara o `:restaurantId` da URL com o da sessão e responde **404** na divergência — 403 confirmaria que aquele restaurante existe. Por isso **toda rota escopada em restaurante precisa chamar o parâmetro de `restaurantId`**: uma rota que o chamasse de `id` ficaria autenticada mas **não** escopada, e uma sessão passaria por cima de outro restaurante. É o tipo de erro que não aparece em teste de caminho feliz.
 
