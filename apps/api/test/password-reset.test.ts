@@ -426,6 +426,43 @@ describe("recuperação de senha", () => {
      * passaria mesmo sem a proteção. É o alerta que o CLAUDE.md dá sobre o
      * teste de concorrência da confirmação de pedido.
      */
+    /**
+     * As duas colunas de data guardam fatos diferentes, e um pedido novo não
+     * pode borrar isso.
+     *
+     * `used_at` = "esta recuperação aconteceu"; `deleted_at` = "invalidado SEM
+     * ter sido usado". Se o `softDeleteLiveForUser` marcasse também o token já
+     * usado, quem fosse investigar um acesso indevido depois não teria como
+     * separar "a pessoa usou o link" de "o link foi substituído por outro
+     * pedido" — que é exatamente a pergunta que se faz nessa hora.
+     */
+    it("pedido novo não marca como removido o token já usado", async () => {
+      const restaurant = await createRestaurant(app, { slug: "recupera-historico" });
+      const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+      expect((await trocaSenha(token, "senha-nova-do-historico-1")).statusCode).toBe(200);
+
+      // zera o outbox antes do segundo pedido: sem isso o `esperaEmail`
+      // encontra o e-mail do PRIMEIRO e volta antes de o novo token existir
+      clearOutbox();
+      await pedeTokenDeRecuperacao(restaurant.ownerEmail);
+
+      const { rows } = await pool.query<{ usado: boolean; removido: boolean }>(
+        `select t.used_at is not null as usado, t.deleted_at is not null as removido
+           from password_reset_tokens t
+           join restaurant_users u on u.id = t.restaurant_user_id
+          where u.email = $1
+          order by t.created_at`,
+        [restaurant.ownerEmail],
+      );
+
+      expect(rows).toEqual([
+        // o usado continua usado e NÃO removido
+        { usado: true, removido: false },
+        // o novo está vivo
+        { usado: false, removido: false },
+      ]);
+    });
+
     it("duas trocas simultâneas com o mesmo token: só uma vence", async () => {
       const restaurant = await createRestaurant(app, { slug: "recupera-corrida" });
       const token = await pedeTokenDeRecuperacao(restaurant.ownerEmail);

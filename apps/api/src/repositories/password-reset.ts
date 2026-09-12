@@ -121,7 +121,14 @@ export async function softDeleteLiveForUser(
 ): Promise<void> {
   await db.query(
     `update password_reset_tokens set deleted_at = now(), updated_at = now()
-      where restaurant_user_id = $1 and deleted_at is null`,
+      where restaurant_user_id = $1
+        and deleted_at is null
+        -- ⚠️ used_at is null importa: marcar como removido um token JA USADO
+        -- borraria a distincao que as duas colunas existem para guardar --
+        -- deleted_at significa "invalidado SEM ter sido usado". Quem ja foi
+        -- usado fica como esta, e o historico continua legivel para quem
+        -- precisar entender um acesso indevido depois.
+        and used_at is null`,
     [restaurantUserId],
   );
 }
