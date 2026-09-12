@@ -108,6 +108,7 @@ Público hoje, e nada além disso:
 | `POST /auth/register` | cria a primeira conta |
 | `POST /auth/login` | teto próprio por IP (S25) |
 | `POST /auth/forgot-password` | teto próprio por IP; responde igual para e-mail que existe e que não existe |
+| `POST /auth/reset-password` | **pelo token de recuperação**, de uso único e uma hora de validade |
 | `POST /restaurants/:restaurantId/orders` | quem pede não tem conta |
 | `GET /orders/:orderId` | **pelo `trackingToken`**, não por sessão — e o token confere contra aquele pedido |
 | `GET /orders/:orderId/track` | idem, o canal de WebSocket |
