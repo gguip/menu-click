@@ -12,6 +12,7 @@ import {
   pageResponseSchema,
   paginationQuerystringSchema,
 } from "./schemas.ts";
+import { installRouteValidators } from "./validators.ts";
 
 /**
  * Cardápio público — o que o QR code aponta. **Sem login.**
@@ -183,6 +184,11 @@ const deliveryQuoteResponseSchema = {
 };
 
 export async function menuRoutes(app: FastifyInstance) {
+  // O validador ESTRITO para o corpo. Sem ele vale o Ajv padrão do Fastify,
+  // que coage tipo: `subtotalInCents: null` na cotação viraria 0, e a decisão
+  // de "grátis acima de X" sairia calculada sobre um pedido de valor zero.
+  installRouteValidators(app);
+
   app.get<{ Params: { slug: string } }>(
     "/menu/:slug",
     {

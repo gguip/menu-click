@@ -288,6 +288,39 @@ describe("CRUD /restaurants", () => {
       expect(response.statusCode).toBe(400);
     });
 
+    /**
+     * O validador ESTRITO do corpo, provado pelo campo onde a falha custaria
+     * mais caro.
+     *
+     * Sem `installRouteValidators`, vale o Ajv padrão do Fastify, que coage
+     * tipo: `null` num campo `integer` vira `0`, com **200** na resposta. Em
+     * `freeDeliveryAboveInCents` isso significa "frete grátis acima de
+     * R$ 0,00" — entrega grátis em todo pedido da loja —, e não havia caminho
+     * pela API de volta para NULL. Era o defeito que a revisão da branch
+     * inteira pegou, e nenhuma revisão por tarefa podia ver: a lacuna estava
+     * num arquivo de rota anterior a esta feature.
+     */
+    it("recusa null e string nos campos de dinheiro, em vez de coagir", async () => {
+      const restaurant = await createRestaurant(app, { slug: "sem-coercao" });
+
+      const respostas = await Promise.all(
+        [
+          { freeDeliveryAboveInCents: null },
+          { deliveryFixedFeeInCents: null },
+          { deliveryFixedFeeInCents: "2500" },
+        ].map((payload) =>
+          app.inject({
+            method: "PATCH",
+            url: `/restaurants/${restaurant.id}`,
+            headers: restaurant.headers,
+            payload,
+          }),
+        ),
+      );
+
+      expect(respostas.map((r) => r.statusCode)).toEqual([400, 400, 400]);
+    });
+
     it("ainda não deixa escolher o modo por distância", async () => {
       const restaurant = await createRestaurant(app, { slug: "modo-distancia" });
 
