@@ -36,7 +36,7 @@ import { trackingRoutes } from "./routes/tracking.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { installAuth } from "./routes/authenticate.ts";
 import { openapiOptions } from "./openapi.ts";
-import { assertEmailDriverIsSafe } from "./email.ts";
+import { assertEmailDriverIsSafe, configureEmail } from "./email.ts";
 
 /**
  * Monta a instância do Fastify sem escutar (F1): registra plugins, rotas e o
@@ -54,7 +54,8 @@ export async function buildApp() {
    * seria ignorado até o dia em que fosse tarde. Ver `assertEmailDriverIsSafe`
    * em `email.ts`.
    */
-  assertEmailDriverIsSafe(process.env.EMAIL_DRIVER ?? "console", process.env.NODE_ENV);
+  const emailDriver = process.env.EMAIL_DRIVER ?? "console";
+  assertEmailDriverIsSafe(emailDriver, process.env.NODE_ENV);
 
   const app = Fastify({
     bodyLimit: BODY_LIMIT_BYTES,
@@ -87,6 +88,13 @@ export async function buildApp() {
       },
     },
   });
+
+  // A guarda já validou o driver acima, antes de existir Fastify. Aqui o
+  // resultado é guardado e o log do pino é injetado: é o que dá log
+  // estruturado ao driver de console sem `email.ts` importar Fastify (F19).
+  configureEmail(emailDriver, process.env.NODE_ENV, (mensagem) =>
+    app.log.info(mensagem),
+  );
 
   // Tratamento centralizado de erro (F14/S11). É aqui — e só aqui — que erro de
   // negócio vira status HTTP: o serviço lança `NotFoundError`/`ConflictError`

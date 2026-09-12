@@ -22,6 +22,11 @@ export type EmailDriver = (typeof EMAIL_DRIVERS)[number];
  */
 export const outbox: Email[] = [];
 
+/** Zera o `outbox`. Existe para um arquivo de teste não enxergar o do outro. */
+export function clearOutbox(): void {
+  outbox.length = 0;
+}
+
 /**
  * 🚨 O driver de console escreve o link no log, e o link **é** o token.
  *
@@ -53,6 +58,66 @@ export function assertEmailDriverIsSafe(
  */
 let smtpTransport: ReturnType<typeof createTransport> | undefined;
 
+/**
+ * Para onde o driver de console escreve.
+ *
+ * Injetado uma vez pelo `buildApp()`, como o `pool` é um singleton de módulo:
+ * é o que dá log estruturado (F19) sem este módulo importar Fastify. Antes do
+ * boot — ou num teste que não sobe o app — cai num descarte silencioso, porque
+ * a alternativa seria `console.log`.
+ */
+let log: (mensagem: string) => void = () => {};
+
+/** O driver que a guarda de boot aprovou. */
+let resolvedDriver: EmailDriver | undefined;
+
+function readDriver(): EmailDriver {
+  return (process.env.EMAIL_DRIVER ?? "console") as EmailDriver;
+}
+
+/**
+ * A fiação de boot, numa chamada só: valida o driver e injeta o log.
+ *
+ * `assertEmailDriverIsSafe` fica PURA de propósito — é o que permite testá-la
+ * sem subir app nem mexer em `process.env`. Quem guarda o resultado é esta
+ * função, e é o resultado guardado que o envio usa depois.
+ */
+export function configureEmail(
+  driver: string,
+  nodeEnv: string | undefined,
+  logger: (mensagem: string) => void,
+): void {
+  assertEmailDriverIsSafe(driver, nodeEnv);
+  resolvedDriver = driver as EmailDriver;
+  log = logger;
+}
+
+/**
+ * 🚨 Valida a `SMTP_URL` **sem nunca deixar o valor entrar num erro**.
+ *
+ * Medido: três formas de URL malformada fazem o parser lançar com a senha
+ * dentro, e por caminhos diferentes — `smtp://u:senha@h:abc` vaza em
+ * `err.input`; `u:senha@host:587` e `://u:senha@h` vazam em `err.message` e
+ * `err.stack`. Redigir uma chave só não resolveria, porque são três.
+ *
+ * Pior: com URL inválida o próprio Node imprime a string inteira no stderr
+ * como DeprecationWarning, fora de qualquer logger nosso — nenhum `redact`
+ * alcança isso. Por isso a defesa não é redigir o erro depois, é **nunca
+ * produzir o erro**: valida-se aqui, e o `nodemailer` só recebe URL que já
+ * passou.
+ *
+ * A mensagem lançada diz o nome da variável e nada do valor.
+ */
+function assertSmtpUrlIsParseable(url: string): void {
+  try {
+    // eslint-disable-next-line no-new
+    new URL(url);
+  } catch {
+    // o erro original é descartado de propósito: ele carrega a URL
+    throw new Error("SMTP_URL não é uma URL válida");
+  }
+}
+
 function requiredEnv(name: "SMTP_URL" | "EMAIL_FROM"): string {
   const value = process.env[name];
   if (!value) {
@@ -64,7 +129,11 @@ function requiredEnv(name: "SMTP_URL" | "EMAIL_FROM"): string {
 }
 
 async function sendViaSmtp(email: Email): Promise<void> {
-  smtpTransport ??= createTransport(requiredEnv("SMTP_URL"));
+  if (smtpTransport === undefined) {
+    const url = requiredEnv("SMTP_URL");
+    assertSmtpUrlIsParseable(url);
+    smtpTransport = createTransport(url);
+  }
   await smtpTransport.sendMail({
     from: requiredEnv("EMAIL_FROM"),
     to: email.to,
@@ -79,12 +148,16 @@ async function sendViaSmtp(email: Email): Promise<void> {
  * de existir provedor de SMTP configurado. Fora de produção, `console.log` é
  * a escolha certa: este módulo é uma porta de infraestrutura sem Fastify por
  * perto (a mesma razão de `db/seed.ts` não usar `app.log`), e `assertEmail-
- * DriverIsSafe` já garante que este caminho nunca roda em produção — onde o
- * log de verdade (pino) é o único que existe.
+ * DriverIsSafe` já garante que este caminho nunca roda em produção.
+ *
+ * Escreve pelo logger que o `buildApp()` injetou, e não por `console.log`: o
+ * F19 é explícito, e um `console.log` escaparia do `redact` do pino além de
+ * sujar um fluxo de log que é JSON no resto. O módulo continua sem conhecer
+ * Fastify — recebe uma função de log, não a instância.
  */
 function sendViaConsole(email: Email): void {
   outbox.push(email);
-  console.log(
+  log(
     `[email] para: ${email.to}\nassunto: ${email.subject}\n\n${email.text}`,
   );
 }
@@ -95,7 +168,10 @@ function sendViaConsole(email: Email): void {
  * Quem chama não sabe — nem precisa saber — qual dos dois está por trás.
  */
 export async function sendEmail(email: Email): Promise<void> {
-  const driver = (process.env.EMAIL_DRIVER ?? "console") as EmailDriver;
+  // o driver validado no boot, não uma releitura da env: `assertEmailDriver-
+  // IsSafe` só protege o que ele de fato decidiu, e reler aqui abriria a
+  // fresta de algo mutar `process.env` depois da guarda ter passado
+  const driver = resolvedDriver ?? readDriver();
 
   if (driver === "smtp") {
     await sendViaSmtp(email);
