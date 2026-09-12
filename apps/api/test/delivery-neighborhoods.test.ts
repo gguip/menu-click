@@ -27,16 +27,16 @@ describe("bairros atendidos", () => {
   /**
    * ⚠️ A ordenação deste teste NÃO é prendida por mutação, e isso é sabido.
    *
-   * Tirar o `order by name` do repositório não derruba nada: o índice único
-   * parcial de `(restaurant_id, normalized_name)` já faz a varredura sair em
-   * ordem de nome normalizado, que coincide com a alfabética em qualquer nome
-   * realista. Verificado à mão — três bairros inseridos em ordem não
-   * alfabética voltam alfabéticos mesmo sem `order by`.
+   * Tirar o `order by name` do repositório não derruba nada: existe um índice
+   * parcial em `(restaurant_id, name)` — o de busca, criado junto com a
+   * tabela —, e o planejador o escolhe para esta consulta, devolvendo as
+   * linhas já ordenadas sem nó de Sort. Confirmado por `EXPLAIN ANALYZE`, e
+   * também à mão: três bairros inseridos em ordem não alfabética voltam
+   * alfabéticos sem nenhum `order by`.
    *
-   * Construir um caso em que as duas ordens divergem exigiria nomes que só
-   * diferem por caixa ou espaço, e aí o resultado passaria a depender do
-   * collation do servidor — um teste mais frágil do que a garantia que ele
-   * protegeria. O `order by` explícito fica como cinto além do suspensório:
+   * Não há como construir divergência: o índice ordena pela MESMA coluna que o
+   * `order by` pede. Mudar o teste para forçar a falha exigiria remover ou
+   * alterar o índice, que é mexer no que está sendo testado. O `order by` explícito fica como cinto além do suspensório:
    * não depender do plano de execução é barato, e o dia em que o índice mudar
    * de forma a ordem continua definida.
    *
