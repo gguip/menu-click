@@ -6391,6 +6391,141 @@
         }
       }
     },
+    "/menu/{slug}/delivery-quote": {
+      "post": {
+        "operationId": "quoteMenuDelivery",
+        "summary": "Cota o frete antes de montar o pedido",
+        "tags": [
+          "Cardápio público"
+        ],
+        "description": "Informa se a loja entrega no endereço e por quanto, ANTES de o cliente montar o carrinho. Não decide nada: a criação do pedido confere de novo no servidor. O endereço vai no corpo, nunca na querystring, pelo mesmo motivo do S21 sobre credencial em URL.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "address",
+                  "subtotalInCents"
+                ],
+                "properties": {
+                  "address": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "street",
+                      "number",
+                      "neighborhood",
+                      "city",
+                      "state",
+                      "zipCode"
+                    ],
+                    "properties": {
+                      "street": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "number": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "neighborhood": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "city": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "state": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "zipCode": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  },
+                  "subtotalInCents": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "in": "path",
+            "name": "slug",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deliversTo": {
+                      "type": "boolean"
+                    },
+                    "feeInCents": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "isFree": {
+                      "type": "boolean"
+                    },
+                    "toArrange": {
+                      "type": "boolean"
+                    },
+                    "servedNeighborhoods": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/orders/{orderId}": {
       "get": {
         "operationId": "getTrackedOrder",

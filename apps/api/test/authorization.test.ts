@@ -28,6 +28,9 @@ const ROTAS_PUBLICAS = new Set([
   "GET /health",
   "GET /menu/:slug",
   "GET /menu/:slug/products",
+  // a cotação de frete: informa antes do pedido, para quem ainda não tem
+  // carrinho montado nem conta
+  "POST /menu/:slug/delivery-quote",
   "POST /auth/register",
   "POST /auth/login",
   "POST /restaurants/:restaurantId/orders",

@@ -70,6 +70,17 @@ export const RATE_LIMIT_MAX = 100;
  */
 export const LOGIN_RATE_LIMIT_MAX = 5;
 
+/**
+ * Teto da cotação de frete (`POST /menu/:slug/delivery-quote`), muito abaixo
+ * do global — mesmo motivo do login (S25).
+ *
+ * A cotação é anônima e vai disparar chamada externa na Parte 2 (Nominatim,
+ * que limita 1 req/s e bane quem abusa). Teto próprio pelo mesmo motivo do
+ * `/auth/login`: rota anônima e cara não pode dividir o teto geral com as
+ * baratas.
+ */
+export const DELIVERY_QUOTE_RATE_LIMIT_MAX = 20;
+
 export const RATE_LIMIT_WINDOW = "1 minute";
 
 /**

@@ -23,6 +23,7 @@ const OPERACOES_PUBLICAS = new Set([
   "GET /health",
   "GET /menu/{slug}",
   "GET /menu/{slug}/products",
+  "POST /menu/{slug}/delivery-quote",
   "POST /auth/register",
   "POST /auth/login",
   "POST /restaurants/{restaurantId}/orders",
