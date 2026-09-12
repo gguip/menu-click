@@ -145,11 +145,15 @@ export async function insert(
          (name, slug, cuisine_type, logo_url,
           street, number, neighborhood, city, state, zip_code,
           is_delivery, is_takeaway, is_qrcode, timezone, accepting_orders,
-          accepts_cash, accepts_card_on_delivery, accepts_pix, accepts_meal_voucher)
+          accepts_cash, accepts_card_on_delivery, accepts_pix, accepts_meal_voucher,
+          delivery_fee_mode, delivery_fixed_fee_in_cents, delivery_fee_to_arrange,
+          free_delivery_above_in_cents)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
                coalesce($14, 'America/Sao_Paulo'), coalesce($15, true),
                coalesce($16, true), coalesce($17, true), coalesce($18, true),
-               coalesce($19, false))
+               coalesce($19, false),
+               coalesce($20, 'fixed'), coalesce($21, 0), coalesce($22, false),
+               $23)
        returning *`,
       [
         input.name,
@@ -179,6 +183,15 @@ export async function insert(
         input.acceptsCardOnDelivery ?? null,
         input.acceptsPix ?? null,
         input.acceptsMealVoucher ?? null,
+        // os quatro do frete: mesmo raciocínio do `acceptingOrders` acima — o
+        // corpo de criação não os oferece hoje, então isto é sempre null, mas
+        // descartá-los aqui faria o insert prometer no tipo o que não cumpre
+        // no SQL. `free_delivery_above_in_cents` vai sem `coalesce`: a coluna é
+        // nulável de verdade, e null ali significa "não há promoção".
+        input.deliveryFeeMode ?? null,
+        input.deliveryFixedFeeInCents ?? null,
+        input.deliveryFeeToArrange ?? null,
+        input.freeDeliveryAboveInCents ?? null,
       ],
     );
     return toRestaurant(rows[0]);

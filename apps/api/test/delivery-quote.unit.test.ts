@@ -3,6 +3,7 @@ import { quoteDelivery } from "../src/domain/delivery.ts";
 
 describe("cotação de frete", () => {
   const base = {
+    acceptsDelivery: true,
     mode: "fixed" as const,
     fixedFeeInCents: 700,
     freeAboveInCents: undefined,
@@ -11,6 +12,20 @@ describe("cotação de frete", () => {
     addressNeighborhood: "Centro",
     subtotalInCents: 3000,
   };
+
+  it("loja que não faz entrega não entrega em endereço nenhum", () => {
+    // sabido antes de qualquer cálculo, e sem depender do endereço: não é o
+    // caso de "informa × decide", é modalidade
+    expect(quoteDelivery({ ...base, acceptsDelivery: false })).toEqual({
+      deliversTo: false, feeInCents: null, isFree: false, toArrange: false,
+    });
+  });
+
+  it("nem com 'a combinar' ligado, se a loja não faz entrega", () => {
+    const quote = quoteDelivery({ ...base, acceptsDelivery: false, toArrange: true });
+    expect(quote.deliversTo).toBe(false);
+    expect(quote.toArrange).toBe(false);
+  });
 
   it("taxa fixa devolve a taxa", () => {
     expect(quoteDelivery(base)).toEqual({

@@ -235,8 +235,9 @@ on conflict (id) do nothing;
 -- `payment_method` passa a ser explícito nos três: sem isso o default
 -- `'cash'` cobriria os três em silêncio, e o exemplo do troco não existiria.
 -- O pendente é o único em dinheiro — e leva `change_for_in_cents` maior que o
--- total (12270), para o troco aparecer numa leitura de exemplo (o "recibo" do
--- cliente e a listagem do restaurante).
+-- total do pedido, para o troco aparecer numa leitura de exemplo (o "recibo"
+-- do cliente e a listagem do restaurante). ⚠️ 12270 é o SUBTOTAL dos itens; o
+-- total com frete é 13170, e é contra ele que o troco é conferido.
 -- O pedido de entrega leva `delivery_fee_in_cents = 900`: é a taxa real do
 -- bairro "Consolação" na lista acima, não um número escolhido à parte — e
 -- `total_in_cents` (13170) é o subtotal dos itens (12270) MAIS essa taxa,

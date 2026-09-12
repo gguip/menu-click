@@ -88,7 +88,14 @@ export type CreateRestaurantInput = {
  */
 export type UpdateRestaurantInput = Partial<
   Omit<CreateRestaurantInput, "slug">
->;
+> & {
+  /**
+   * `null` DESLIGA a promoção de frete grátis, e é o único campo do PATCH em
+   * que o nulo é intenção e não ausência. Sem ele a promoção seria de mão
+   * única: dá para ligar e mudar o limite, nunca para acabar com ela.
+   */
+  freeDeliveryAboveInCents?: number | null;
+};
 
 /** Restaurante completo, como é guardado e devolvido na resposta. */
 export type Restaurant = CreateRestaurantInput & {

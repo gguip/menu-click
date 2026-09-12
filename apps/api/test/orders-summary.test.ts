@@ -6,6 +6,7 @@ import {
   createOrder,
   createProduct,
   createRestaurant,
+  validDeliveryAddress,
 } from "./helpers.ts";
 import type { TestRestaurant } from "./helpers.ts";
 
@@ -78,6 +79,51 @@ describe("resumo dos pedidos", () => {
     });
     return { statusCode: response.statusCode, body: response.json() };
   }
+
+  /**
+   * ⚠️ Este teste PRENDE um comportamento herdado, não escolhido.
+   *
+   * Desde a taxa de entrega, `total_in_cents` carrega o frete, e o faturamento
+   * soma esse total — então o frete entra no faturamento e no ticket médio.
+   * Para faturamento bruto o número está certo: foi o que a loja cobrou. Para
+   * decidir preço de cardápio, não: o frete pode ir inteiro para o entregador.
+   *
+   * Ninguém decidiu isso — veio junto com a mudança da invariante do total. O
+   * teste existe para que separar as duas coisas seja uma decisão deliberada,
+   * com um teste vermelho apontando para esta explicação, em vez de uma
+   * descoberta no meio de um fechamento de mês.
+   */
+  it("o faturamento inclui o frete, e isso é herdado e não escolhido", async () => {
+    const restaurant = await createRestaurant(app, { slug: "faturamento-frete" });
+    await app.inject({
+      method: "PATCH",
+      url: `/restaurants/${restaurant.id}`,
+      headers: restaurant.headers,
+      payload: { deliveryFixedFeeInCents: 1500 },
+    });
+    const product = await createProduct(app, restaurant, {
+      priceInCents: 3000,
+      stock: 10,
+    });
+
+    const order = await createOrder(
+      app,
+      restaurant.id,
+      [{ productId: product.id, quantity: 1 }],
+      { type: "delivery", deliveryAddress: validDeliveryAddress },
+    );
+    await app.inject({
+      method: "POST",
+      url: `/restaurants/${restaurant.id}/orders/${order.id}/confirm`,
+      headers: restaurant.headers,
+    });
+
+    const { body } = await resumo(restaurant);
+
+    // 3000 de mercadoria + 1500 de frete
+    expect(body.revenueInCents).toBe(4500);
+    expect(body.averageTicketInCents).toBe(4500);
+  });
 
   it("conta todos os status, inclusive os zerados", async () => {
     const { restaurant, product } = await cenario();

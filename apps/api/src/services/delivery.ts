@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import type { DeliveryQuote } from "../domain/delivery.ts";
-import { quoteDelivery } from "../domain/delivery.ts";
+import { normalizeNeighborhood, quoteDelivery } from "../domain/delivery.ts";
 import type { OrderType } from "../domain/order.ts";
 import type { Address, Restaurant } from "../domain/restaurant.ts";
 import * as deliveryNeighborhoodsRepository from "../repositories/delivery-neighborhoods.ts";
@@ -48,6 +48,7 @@ export async function quote(
       : [];
 
   const result = quoteDelivery({
+    acceptsDelivery: restaurant.isDelivery,
     mode: restaurant.deliveryFeeMode,
     fixedFeeInCents: restaurant.deliveryFixedFeeInCents,
     freeAboveInCents: restaurant.freeDeliveryAboveInCents,
@@ -59,7 +60,12 @@ export async function quote(
 
   return {
     ...result,
-    servedNeighborhoods: neighborhoods.map((neighborhood) => neighborhood.name),
+    // filtra nome que normaliza para vazio pelo mesmo motivo do cálculo: o
+    // serviço recusa cadastrá-lo, mas uma linha escrita por fora da API não
+    // pode sujar o seletor que a tela monta com esta lista
+    servedNeighborhoods: neighborhoods
+      .filter((neighborhood) => normalizeNeighborhood(neighborhood.name) !== "")
+      .map((neighborhood) => neighborhood.name),
   };
 }
 
@@ -101,6 +107,7 @@ export async function quoteForOrder(
       : [];
 
   return quoteDelivery({
+    acceptsDelivery: restaurant.isDelivery,
     mode: restaurant.deliveryFeeMode,
     fixedFeeInCents: restaurant.deliveryFixedFeeInCents,
     freeAboveInCents: restaurant.freeDeliveryAboveInCents,

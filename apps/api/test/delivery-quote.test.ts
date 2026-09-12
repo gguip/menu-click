@@ -35,6 +35,35 @@ describe("cotação de frete pública", () => {
     await app.close();
   });
 
+  it("loja que só faz retirada responde que não entrega", async () => {
+    // sem isto a cotação responderia `deliversTo: true` com um preço, e o
+    // cliente montaria um carrinho que a criação recusaria com 409 de
+    // modalidade — a resposta errada para a pergunta que o endpoint existe
+    // para responder
+    const restaurant = await createRestaurant(app, {
+      slug: "so-retirada",
+      isDelivery: false,
+    });
+    await app.inject({
+      method: "PATCH",
+      url: `/restaurants/${restaurant.id}`,
+      headers: restaurant.headers,
+      payload: { deliveryFixedFeeInCents: 900 },
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/menu/so-retirada/delivery-quote",
+      payload: { address: validDeliveryAddress, subtotalInCents: 3000 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      deliversTo: false,
+      feeInCents: null,
+    });
+  });
+
   it("cota o frete pelo bairro, sem precisar de sessão", async () => {
     const restaurant = await createRestaurant(app, { slug: "cota" });
     await app.inject({

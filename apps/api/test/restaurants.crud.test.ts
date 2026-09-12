@@ -300,14 +300,41 @@ describe("CRUD /restaurants", () => {
      * inteira pegou, e nenhuma revisão por tarefa podia ver: a lacuna estava
      * num arquivo de rota anterior a esta feature.
      */
+    it("desliga a promoção de frete grátis com null", async () => {
+      const restaurant = await createRestaurant(app, { slug: "desliga-promo" });
+      await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { freeDeliveryAboveInCents: 5000 },
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        // `null` aqui é intenção, não ausência: sem este caminho a promoção
+        // seria de mão única, e a loja que rodou "grátis acima de R$ 50" só
+        // poderia disfarçá-la subindo o limite para um número absurdo
+        payload: { freeDeliveryAboveInCents: null },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().freeDeliveryAboveInCents).toBeUndefined();
+    });
+
     it("recusa null e string nos campos de dinheiro, em vez de coagir", async () => {
       const restaurant = await createRestaurant(app, { slug: "sem-coercao" });
 
+      // `freeDeliveryAboveInCents: null` NÃO entra aqui: naquele campo o nulo é
+      // intenção declarada (`nullable: true`), e desliga a promoção. Estes são
+      // os casos em que o nulo ou a string são erro de quem chama.
       const respostas = await Promise.all(
         [
-          { freeDeliveryAboveInCents: null },
           { deliveryFixedFeeInCents: null },
           { deliveryFixedFeeInCents: "2500" },
+          { deliveryFeeToArrange: "true" },
+          { deliveryFeeMode: 1 },
         ].map((payload) =>
           app.inject({
             method: "PATCH",
@@ -318,7 +345,7 @@ describe("CRUD /restaurants", () => {
         ),
       );
 
-      expect(respostas.map((r) => r.statusCode)).toEqual([400, 400, 400]);
+      expect(respostas.map((r) => r.statusCode)).toEqual([400, 400, 400, 400]);
     });
 
     it("ainda não deixa escolher o modo por distância", async () => {

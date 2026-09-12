@@ -467,7 +467,8 @@
                   },
                   "freeDeliveryAboveInCents": {
                     "type": "integer",
-                    "minimum": 0
+                    "minimum": 0,
+                    "nullable": true
                   },
                   "deliveryFeeToArrange": {
                     "type": "boolean"

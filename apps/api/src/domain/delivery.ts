@@ -54,6 +54,13 @@ export type DeliveryNeighborhoodInput = {
 export type DeliveryNeighborhood = DeliveryNeighborhoodInput;
 
 export type DeliveryQuoteInput = {
+  /**
+   * A loja faz entrega? É o `isDelivery` do restaurante.
+   *
+   * Mora aqui, e não no serviço, para os dois consumidores — o endpoint
+   * público e a criação do pedido — decidirem pelo mesmo caminho.
+   */
+  acceptsDelivery: boolean;
   mode: DeliveryFeeMode;
   fixedFeeInCents: number;
   freeAboveInCents?: number;
@@ -92,6 +99,15 @@ export type DeliveryQuote = {
  * justamente o que está sendo decidido.
  */
 export function quoteDelivery(input: DeliveryQuoteInput): DeliveryQuote {
+  // Loja que não faz entrega não entrega em endereço nenhum, e isso se sabe
+  // antes de qualquer cálculo. Sem esta linha a cotação responderia
+  // `deliversTo: true` com um preço para quem só faz retirada, mandando o
+  // cliente montar um carrinho que a criação recusaria com 409 de modalidade.
+  // Não é o caso de "informa × decide": a modalidade não depende do endereço.
+  if (!input.acceptsDelivery) {
+    return { deliversTo: false, feeInCents: null, isFree: false, toArrange: false };
+  }
+
   const base = taxaBase(input);
 
   if (base === undefined) {

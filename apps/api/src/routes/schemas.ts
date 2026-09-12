@@ -173,7 +173,12 @@ export const updateRestaurantBodySchema = {
     deliveryFeeMode: { type: "string", enum: [...SELECTABLE_DELIVERY_FEE_MODES] },
     deliveryFixedFeeInCents: { type: "integer", minimum: 0 },
     // nulo/ausente = a promoção "grátis acima de X" não existe
-    freeDeliveryAboveInCents: { type: "integer", minimum: 0 },
+    // `nullable: true` (F12, não `anyOf`) para a promoção poder ser DESLIGADA.
+    // Sem isto ela é de mão única: a loja que rodou "grátis acima de R$ 50"
+    // não teria como voltar atrás, e a tentativa natural (`null`) só não
+    // gravava 0 — "grátis acima de zero", sempre grátis — porque o validador
+    // estrito passou a recusar. Aqui o `null` é a intenção, e escreve NULL.
+    freeDeliveryAboveInCents: { type: "integer", minimum: 0, nullable: true },
     deliveryFeeToArrange: { type: "boolean" },
   },
 };
