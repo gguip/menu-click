@@ -6193,6 +6193,12 @@
                     "isQrcode": {
                       "type": "boolean"
                     },
+                    "deliveryFeeMode": {
+                      "type": "string"
+                    },
+                    "freeDeliveryAboveInCents": {
+                      "type": "integer"
+                    },
                     "isOpen": {
                       "type": "boolean"
                     },

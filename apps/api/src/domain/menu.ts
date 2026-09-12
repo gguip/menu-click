@@ -23,6 +23,14 @@ import type { Weekday } from "./opening-hours.ts";
  * coluna nova em `restaurants` para ela aparecer aqui sem ninguém decidir. Foi
  * o que aconteceu com o `timezone`, que só não vazou porque o
  * `schema.response` da rota o barrava — o tipo já dizia que ele era público.
+ *
+ * `deliveryFeeMode` e `freeDeliveryAboveInCents` entram para a tela poder
+ * anunciar "frete grátis acima de R$ 50" antes de a pessoa montar o carrinho.
+ * `deliveryFixedFeeInCents` e `deliveryFeeToArrange` ficam de fora **de
+ * propósito**: o cliente não precisa saber a taxa base antes de informar o
+ * endereço — a cotação (`POST /menu/:slug/delivery-quote`) já devolve o número
+ * certo para o endereço dele —, e `deliveryFeeToArrange` é política interna da
+ * loja, não informação do cliente (S10).
  */
 export type MenuRestaurant = Pick<
   Restaurant,
@@ -35,6 +43,8 @@ export type MenuRestaurant = Pick<
   | "isDelivery"
   | "isTakeaway"
   | "isQrcode"
+  | "deliveryFeeMode"
+  | "freeDeliveryAboveInCents"
 > & {
   /**
    * A loja está aceitando pedido AGORA: a grade **e** a pausa, juntas. É o que

@@ -44,6 +44,12 @@ const menuRestaurantResponseSchema = {
     isDelivery: { type: "boolean" },
     isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
+    // exatamente o que a tela precisa para anunciar "frete grátis acima de
+    // R$ 50" antes do carrinho. `deliveryFixedFeeInCents` e
+    // `deliveryFeeToArrange` NÃO entram: a cotação já devolve o número certo
+    // para o endereço do cliente, e a segunda é política interna da loja (S10)
+    deliveryFeeMode: { type: "string" },
+    freeDeliveryAboveInCents: { type: "integer" },
     // a grade E a pausa, juntas: é o que decide se a tela mostra o botão
     isOpen: { type: "boolean" },
     // a pausa sozinha, para separar "fechado agora" de "a loja pausou"
