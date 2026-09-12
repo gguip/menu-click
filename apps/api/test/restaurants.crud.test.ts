@@ -180,4 +180,51 @@ describe("CRUD /restaurants", () => {
       expect(getResponse.statusCode).toBe(404);
     });
   });
+
+  describe("formas de pagamento aceitas", () => {
+    it("nasce aceitando dinheiro, cartão e pix, mas não vale-refeição", async () => {
+      const restaurant = await createRestaurant(app);
+
+      expect(restaurant).toMatchObject({
+        acceptsCash: true,
+        acceptsCardOnDelivery: true,
+        acceptsPix: true,
+        // exige credenciamento com a bandeira: quem tem, liga
+        acceptsMealVoucher: false,
+      });
+    });
+
+    it("PATCH muda o que é aceito", async () => {
+      const restaurant = await createRestaurant(app);
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { acceptsPix: false, acceptsMealVoucher: true },
+      });
+
+      expect(response.json()).toMatchObject({
+        acceptsPix: false,
+        acceptsMealVoucher: true,
+        acceptsCash: true,
+      });
+    });
+
+    it("o cardápio público lista as formas aceitas, não as flags", async () => {
+      const restaurant = await createRestaurant(app, { slug: "pagamentos" });
+      await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { acceptsPix: false },
+      });
+
+      const response = await app.inject({ method: "GET", url: "/menu/pagamentos" });
+
+      expect(response.json().paymentMethods).toEqual(["cash", "card_on_delivery"]);
+      // as flags cruas não vazam: o cliente recebe a lista pronta
+      expect(response.json().acceptsCash).toBeUndefined();
+    });
+  });
 });

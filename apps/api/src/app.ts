@@ -27,6 +27,7 @@ import { restaurantRoutes } from "./routes/restaurants.ts";
 import { productRoutes } from "./routes/products.ts";
 import { categoryRoutes } from "./routes/categories.ts";
 import { optionGroupRoutes } from "./routes/option-groups.ts";
+import { openingHoursRoutes } from "./routes/opening-hours.ts";
 import { restaurantUserRoutes } from "./routes/restaurant-users.ts";
 import { orderRoutes } from "./routes/orders.ts";
 import { menuRoutes } from "./routes/menu.ts";
@@ -270,6 +271,7 @@ export async function buildApp() {
   await app.register(productRoutes);
   await app.register(categoryRoutes);
   await app.register(optionGroupRoutes);
+  await app.register(openingHoursRoutes);
   await app.register(restaurantUserRoutes);
   await app.register(orderRoutes);
   await app.register(menuRoutes);

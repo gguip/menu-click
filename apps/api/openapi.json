@@ -158,6 +158,21 @@
                           "timezone": {
                             "type": "string"
                           },
+                          "acceptingOrders": {
+                            "type": "boolean"
+                          },
+                          "acceptsCash": {
+                            "type": "boolean"
+                          },
+                          "acceptsCardOnDelivery": {
+                            "type": "boolean"
+                          },
+                          "acceptsPix": {
+                            "type": "boolean"
+                          },
+                          "acceptsMealVoucher": {
+                            "type": "boolean"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -270,6 +285,21 @@
                     },
                     "timezone": {
                       "type": "string"
+                    },
+                    "acceptingOrders": {
+                      "type": "boolean"
+                    },
+                    "acceptsCash": {
+                      "type": "boolean"
+                    },
+                    "acceptsCardOnDelivery": {
+                      "type": "boolean"
+                    },
+                    "acceptsPix": {
+                      "type": "boolean"
+                    },
+                    "acceptsMealVoucher": {
+                      "type": "boolean"
                     },
                     "createdAt": {
                       "type": "string"
@@ -384,6 +414,21 @@
                     "type": "string",
                     "pattern": "^[A-Za-z][A-Za-z0-9+_-]*(?:/[A-Za-z0-9+_-]+)*$",
                     "maxLength": 64
+                  },
+                  "acceptingOrders": {
+                    "type": "boolean"
+                  },
+                  "acceptsCash": {
+                    "type": "boolean"
+                  },
+                  "acceptsCardOnDelivery": {
+                    "type": "boolean"
+                  },
+                  "acceptsPix": {
+                    "type": "boolean"
+                  },
+                  "acceptsMealVoucher": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -468,6 +513,21 @@
                     },
                     "timezone": {
                       "type": "string"
+                    },
+                    "acceptingOrders": {
+                      "type": "boolean"
+                    },
+                    "acceptsCash": {
+                      "type": "boolean"
+                    },
+                    "acceptsCardOnDelivery": {
+                      "type": "boolean"
+                    },
+                    "acceptsPix": {
+                      "type": "boolean"
+                    },
+                    "acceptsMealVoucher": {
+                      "type": "boolean"
                     },
                     "createdAt": {
                       "type": "string"
@@ -2868,6 +2928,228 @@
         }
       }
     },
+    "/restaurants/{restaurantId}/opening-hours": {
+      "put": {
+        "operationId": "replaceOpeningHours",
+        "summary": "Define a grade de horário da semana",
+        "tags": [
+          "Horário"
+        ],
+        "description": "Troca a semana inteira pela grade enviada — como a tela faz: a pessoa edita e salva. Dia sem faixa nasce fechado; `closesAt` menor que `opensAt` significa que a faixa atravessa a meia-noite.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "openingHours"
+                ],
+                "properties": {
+                  "openingHours": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "weekday",
+                        "opensAt",
+                        "closesAt"
+                      ],
+                      "properties": {
+                        "weekday": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 6
+                        },
+                        "opensAt": {
+                          "type": "string",
+                          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                        },
+                        "closesAt": {
+                          "type": "string",
+                          "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "openingHours": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "weekday": {
+                            "type": "integer"
+                          },
+                          "opensAt": {
+                            "type": "string"
+                          },
+                          "closesAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getOpeningHours",
+        "summary": "A grade de horário atual",
+        "tags": [
+          "Horário"
+        ],
+        "description": "As faixas vivas do restaurante, ordenadas por dia e por início.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "openingHours": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "weekday": {
+                            "type": "integer"
+                          },
+                          "opensAt": {
+                            "type": "string"
+                          },
+                          "closesAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/restaurants/{restaurantId}/users": {
       "post": {
         "operationId": "createRestaurantUser",
@@ -3264,7 +3546,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
+        "description": "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409. Loja fora do horário de funcionamento ou com os pedidos pausados também é 409, com mensagens distintas para cada causa — vale para as três modalidades, `dine_in` inclusive.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3275,7 +3557,8 @@
                 "required": [
                   "type",
                   "customer",
-                  "items"
+                  "items",
+                  "paymentMethod"
                 ],
                 "properties": {
                   "type": {
@@ -3384,6 +3667,19 @@
                         "minLength": 1
                       }
                     }
+                  },
+                  "paymentMethod": {
+                    "type": "string",
+                    "enum": [
+                      "cash",
+                      "card_on_delivery",
+                      "pix",
+                      "meal_voucher"
+                    ]
+                  },
+                  "changeForInCents": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 }
               }
@@ -3473,6 +3769,12 @@
                           "minLength": 1
                         }
                       }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -3798,6 +4100,12 @@
                               }
                             }
                           },
+                          "paymentMethod": {
+                            "type": "string"
+                          },
+                          "changeForInCents": {
+                            "type": "integer"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -4108,6 +4416,12 @@
                         }
                       }
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -4316,6 +4630,12 @@
                           "minLength": 1
                         }
                       }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -4526,6 +4846,12 @@
                         }
                       }
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -4734,6 +5060,12 @@
                           "minLength": 1
                         }
                       }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -4944,6 +5276,12 @@
                         }
                       }
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -5152,6 +5490,12 @@
                           "minLength": 1
                         }
                       }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -5362,6 +5706,12 @@
                         }
                       }
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -5526,6 +5876,35 @@
                     },
                     "isQrcode": {
                       "type": "boolean"
+                    },
+                    "isOpen": {
+                      "type": "boolean"
+                    },
+                    "acceptingOrders": {
+                      "type": "boolean"
+                    },
+                    "openingHours": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "weekday": {
+                            "type": "integer"
+                          },
+                          "opensAt": {
+                            "type": "string"
+                          },
+                          "closesAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "paymentMethods": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -5780,6 +6159,12 @@
                     "totalInCents": {
                       "type": "integer"
                     },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -6008,6 +6393,18 @@
                         "type": "string",
                         "pattern": "^[A-Za-z][A-Za-z0-9+_-]*(?:/[A-Za-z0-9+_-]+)*$",
                         "maxLength": 64
+                      },
+                      "acceptsCash": {
+                        "type": "boolean"
+                      },
+                      "acceptsCardOnDelivery": {
+                        "type": "boolean"
+                      },
+                      "acceptsPix": {
+                        "type": "boolean"
+                      },
+                      "acceptsMealVoucher": {
+                        "type": "boolean"
                       }
                     }
                   },
@@ -6108,6 +6505,21 @@
                         },
                         "timezone": {
                           "type": "string"
+                        },
+                        "acceptingOrders": {
+                          "type": "boolean"
+                        },
+                        "acceptsCash": {
+                          "type": "boolean"
+                        },
+                        "acceptsCardOnDelivery": {
+                          "type": "boolean"
+                        },
+                        "acceptsPix": {
+                          "type": "boolean"
+                        },
+                        "acceptsMealVoucher": {
+                          "type": "boolean"
                         },
                         "createdAt": {
                           "type": "string"
@@ -6523,6 +6935,10 @@
     {
       "name": "Opções",
       "description": "Os grupos de opções do cardápio — tamanho, sabores, adicionais. O grupo pertence ao restaurante e se liga a vários produtos, porque \"Sabores\" vale para todas as pizzas."
+    },
+    {
+      "name": "Horário",
+      "description": "As faixas em que o restaurante aceita pedido, no fuso dele. Dia sem faixa é dia fechado, e uma faixa pode atravessar a meia-noite."
     },
     {
       "name": "Pedidos",

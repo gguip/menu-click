@@ -10,6 +10,7 @@ import type { OrderSortField, SortDirection } from "../domain/order.ts";
 import { ORDER_PERIODS } from "../domain/period.ts";
 import type { OrderPeriod } from "../domain/period.ts";
 import type { Pagination } from "../domain/pagination.ts";
+import { PAYMENT_METHODS } from "../domain/payment.ts";
 import * as ordersService from "../services/orders.ts";
 import { installRouteValidators } from "./validators.ts";
 import {
@@ -33,7 +34,7 @@ import {
 const createOrderBodySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "customer", "items"],
+  required: ["type", "customer", "items", "paymentMethod"],
   properties: {
     // decide a trilha de status, se exige endereço e se há acompanhamento
     type: { type: "string", enum: [...ORDER_TYPES] },
@@ -81,6 +82,13 @@ const createOrderBodySchema = {
     },
     // obrigatório em `delivery`, recusado nas outras duas (400)
     deliveryAddress: addressSchema,
+    // como o pedido será pago; o restaurante que não aceitar a forma responde
+    // 409 (mesma pergunta que já recusa modalidade)
+    paymentMethod: { type: "string", enum: [...PAYMENT_METHODS] },
+    // "troco para R$ 50", em centavos — só faz sentido em dinheiro, e é
+    // opcional: ausente significa "tenho o valor certo". Comparado com o
+    // total calculado no SERVIDOR, nunca com um valor do cliente.
+    changeForInCents: { type: "integer", minimum: 0 },
   },
   // `totalInCents` não está aqui de propósito: o total é calculado no servidor.
   // Aceitá-lo do cliente seria deixar quem paga escolher o preço.
@@ -137,6 +145,10 @@ const orderSummaryProperties = {
     nullable: true,
     properties: addressProperties,
   },
+  paymentMethod: { type: "string" },
+  // ausente = "tenho o valor certo"; por isso não é `nullable` (F12) — a
+  // ausência é a informação, um `null` explícito não diria nada a mais
+  changeForInCents: { type: "integer" },
   createdAt: { type: "string" },
   updatedAt: { type: "string" },
 };
@@ -275,7 +287,7 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "createOrder",
         summary: "Cria um pedido (público)",
         description:
-          "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409.",
+          "Quem pede não precisa ter conta. Devolve `trackingToken` em `takeaway` e `delivery` — é a credencial do acompanhamento em tempo real, e ela aparece **só aqui**. O total é calculado no servidor — `totalInCents` nem existe no corpo. Os itens congelam nome, preço e as opções escolhidas do produto, então reajuste de cardápio (ou de opção) não muda pedido já feito. Cada item pode trazer `options` com as opções escolhidas nos grupos ligados ao produto; toda violação (grupo obrigatório sem escolha, teto de opções ou de unidades, opção indisponível ou de outro produto) é 400. Duas linhas com o mesmo produto E as mesmas opções viram uma, com a quantidade somada — opções diferentes geram linhas separadas. NÃO debita estoque: isso é a confirmação. Endereço de entrega ausente = pedido de mesa; presente em restaurante que não entrega = 409. Loja fora do horário de funcionamento ou com os pedidos pausados também é 409, com mensagens distintas para cada causa — vale para as três modalidades, `dine_in` inclusive.",
         params: restaurantIdParamsSchema,
         body: createOrderBodySchema,
         response: {

@@ -43,6 +43,7 @@ describe("pedidos", () => {
           type: "dine_in",
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: 2 }],
+          paymentMethod: "cash",
         },
       });
 
@@ -219,6 +220,7 @@ describe("pedidos", () => {
             type,
             customer: validCustomerBody,
             items: [{ productId: product.id, quantity: 1 }],
+            paymentMethod: "cash",
             ...(type === "delivery"
               ? { deliveryAddress: validDeliveryAddress }
               : {}),
@@ -296,6 +298,7 @@ describe("pedidos", () => {
           type: "dine_in",
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: 1 }],
+          paymentMethod: "cash",
         },
       });
 
@@ -318,6 +321,7 @@ describe("pedidos", () => {
           type: "dine_in",
           customer: validCustomerBody,
           items: [{ productId: product.id, quantity: 1 }],
+          paymentMethod: "cash",
         },
       });
 
@@ -337,6 +341,7 @@ describe("pedidos", () => {
               quantity: 1,
             },
           ],
+          paymentMethod: "cash",
         },
       });
 

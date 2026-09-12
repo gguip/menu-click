@@ -40,6 +40,27 @@ const menuRestaurantResponseSchema = {
     isDelivery: { type: "boolean" },
     isTakeaway: { type: "boolean" },
     isQrcode: { type: "boolean" },
+    // a grade E a pausa, juntas: é o que decide se a tela mostra o botão
+    isOpen: { type: "boolean" },
+    // a pausa sozinha, para separar "fechado agora" de "a loja pausou"
+    acceptingOrders: { type: "boolean" },
+    // para a tela dizer QUANDO abre, em vez de só "fechado"
+    openingHours: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          weekday: { type: "integer" },
+          opensAt: { type: "string" },
+          closesAt: { type: "string" },
+        },
+      },
+    },
+    // a lista pronta, não as quatro flags: o cliente escolhe entre opções,
+    // não lê booleanos. `acceptsCash` e companhia NÃO entram aqui.
+    paymentMethods: { type: "array", items: { type: "string" } },
+    // `timezone` NÃO entra: é operação do restaurante, não do cliente. O que
+    // o fuso decide já chegou traduzido no `isOpen`.
   },
 };
 

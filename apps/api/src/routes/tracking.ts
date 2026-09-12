@@ -72,6 +72,9 @@ const trackedOrderResponseSchema = {
     type: { type: "string" },
     status: { type: "string" },
     totalInCents: { type: "integer" },
+    paymentMethod: { type: "string" },
+    // ausente = "tenho o valor certo"; ver o mesmo campo em `routes/orders.ts`
+    changeForInCents: { type: "integer" },
     items: {
       type: "array",
       items: {

@@ -12,6 +12,7 @@ import { isUuid } from "../domain/uuid.ts";
 import { isValidTimezone } from "../domain/timezone.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
+import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as productsRepository from "../repositories/products.ts";
 import * as restaurantsRepository from "../repositories/restaurants.ts";
@@ -217,5 +218,6 @@ export async function remove(id: string): Promise<void> {
     await optionGroupsRepository.softDeleteLinksByRestaurant(id, client);
     await optionGroupsRepository.softDeleteOptionsByRestaurant(id, client);
     await optionGroupsRepository.softDeleteByRestaurant(id, client);
+    await openingHoursRepository.softDeleteByRestaurant(id, client);
   });
 }

@@ -1,0 +1,430 @@
+import type { FastifyInstance } from "fastify";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { pool } from "../src/db/pool.ts";
+import {
+  buildTestApp,
+  createProduct,
+  createRestaurant,
+  setOpeningHours,
+  validDeliveryAddress,
+} from "./helpers.ts";
+
+/**
+ * Dia da semana e hora locais do restaurante, agora, direto do Postgres.
+ *
+ * Compartilhado entre os dois `describe` deste arquivo (o de `isOpenNow` e o
+ * do bloqueio na criação de pedido) — por isso mora no escopo do módulo, e
+ * não dentro de um `describe` só.
+ */
+async function agoraNoFuso(timezone: string) {
+  const { rows } = await pool.query<{ dow: number; hora: string }>(
+    `select extract(dow from now() at time zone $1)::int as dow,
+            to_char(now() at time zone $1, 'HH24:MI') as hora`,
+    [timezone],
+  );
+  return rows[0];
+}
+
+/** Soma minutos a "HH:MM", dando a volta na meia-noite. Compartilhado (ver acima). */
+function somaMinutos(hora: string, minutos: number): string {
+  const [h, m] = hora.split(":").map(Number);
+  const total = (h * 60 + m + minutos + 1440 * 2) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/**
+ * "A loja está aberta agora?"
+ *
+ * Três coisas se combinam aqui, e cada uma sozinha já é fonte de erro: o fuso
+ * do restaurante, a faixa que atravessa a meia-noite, e a pausa manual.
+ *
+ * Os testes montam a grade a partir da hora ATUAL no fuso do restaurante, em
+ * vez de horas fixas. Horas fixas fariam o teste passar de manhã e falhar à
+ * noite — e este projeto já pagou por isso uma vez, com três testes que
+ * assumiam que São Paulo e Manaus estão sempre na mesma data.
+ */
+describe("está aberto agora?", () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    app = await buildTestApp();
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  /**
+   * Um fuso fixo (sem horário de verão) cuja hora local é `horaAlvo` agora
+   * mesmo, qualquer que seja a hora real de quem roda o teste.
+   *
+   * `Etc/GMT` inverte o sinal (é a convenção POSIX que o tzdata segue):
+   * `Etc/GMT-N` é UTC+N e `Etc/GMT+N` é UTC-N. O deslocamento escolhido fica
+   * sempre entre -11 e +12, dentro da faixa que o tzdata garante (-12 a +14).
+   */
+  function fusoComHoraAtual(horaAlvo: number): string {
+    const horaUtc = new Date().getUTCHours();
+    const bruto = ((horaAlvo - horaUtc) % 24 + 24) % 24; // 0..23
+    const deslocamento = bruto <= 12 ? bruto : bruto - 24;
+    if (deslocamento === 0) return "Etc/GMT";
+    return deslocamento > 0 ? `Etc/GMT-${deslocamento}` : `Etc/GMT+${-deslocamento}`;
+  }
+
+  /**
+   * Fuso em que agora é meio-dia — onde uma faixa relativa é segura de montar.
+   *
+   * Todo teste que precisa que a grade COBRA o instante atual usa isto em vez
+   * de `America/Sao_Paulo`. O motivo é concreto: `somaMinutos(hora, -60)` dá a
+   * volta na meia-noite quando a hora local é `00:xx`, a faixa vira
+   * `23:xx–01:xx`, e aí `closes_at < opens_at` a joga no ramo de
+   * atravessamento — que exige "fim do próprio dia" ou "madrugada do dia
+   * SEGUINTE". Cadastrada no dia de hoje e consultada às 00:xx de hoje, nenhuma
+   * das duas metades bate, e o restaurante aparece fechado.
+   *
+   * Com o meio-dia, `hora ± 60` fica em `11:xx–13:xx` e nunca atravessa. A
+   * faixa continua saindo da hora local real, então não há hora mágica no
+   * teste — só a garantia de que ele vale às 03:00 tanto quanto às 14:00.
+   */
+  function fusoSeguro(): string {
+    return fusoComHoraAtual(12);
+  }
+
+  async function isOpen(slug: string) {
+    const response = await app.inject({ method: "GET", url: `/menu/${slug}` });
+    return response.json();
+  }
+
+  it("aberto dentro da faixa", async () => {
+    const timezone = fusoSeguro();
+    const restaurant = await createRestaurant(app, { slug: "aberta", timezone });
+    const { dow, hora } = await agoraNoFuso(timezone);
+    await setOpeningHours(app, restaurant, [
+      { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
+    ]);
+
+    expect((await isOpen("aberta")).isOpen).toBe(true);
+  });
+
+  it("fechado fora da faixa", async () => {
+    const restaurant = await createRestaurant(app, { slug: "fechada" });
+    const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+    await setOpeningHours(app, restaurant, [
+      { weekday: dow, opensAt: somaMinutos(hora, 120), closesAt: somaMinutos(hora, 180) },
+    ]);
+
+    expect((await isOpen("fechada")).isOpen).toBe(false);
+  });
+
+  it("dia sem faixa é dia fechado", async () => {
+    const restaurant = await createRestaurant(app, { slug: "sem-faixa" });
+    const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+    // faixa cadastrada no dia SEGUINTE, cobrindo a hora atual
+    await setOpeningHours(app, restaurant, [
+      {
+        weekday: ((dow + 1) % 7) as 0,
+        opensAt: somaMinutos(hora, -60),
+        closesAt: somaMinutos(hora, 60),
+      },
+    ]);
+
+    expect((await isOpen("sem-faixa")).isOpen).toBe(false);
+  });
+
+  /**
+   * A pizzaria que atende até as duas. A faixa cruza a meia-noite (22h–02h) e
+   * é testada nas suas DUAS metades — cada metade só é alcançável em certas
+   * horas locais: a metade "hoje à noite" só faz sentido se agora for noite
+   * naquele fuso, e a metade "madrugada seguinte" só se agora for madrugada.
+   *
+   * Por isso cada teste escolhe o FUSO do restaurante (um deslocamento fixo,
+   * sem horário de verão) de modo que a hora local seja sempre a mesma, não
+   * importa a hora real de quem roda a suíte: a hora-alvo cai bem no meio da
+   * metade da faixa que o teste quer exercitar. A faixa em si sai da hora
+   * local real lida do Postgres, o que garante uma hora de folga de cada lado.
+   */
+  it("faixa que atravessa a meia-noite vale na própria noite", async () => {
+    const timezone = fusoComHoraAtual(23); // meio da metade 22h–24h
+    const restaurant = await createRestaurant(app, {
+      slug: "noturna-noite",
+      timezone,
+    });
+    const { dow, hora } = await agoraNoFuso(timezone);
+    // A faixa sai da hora local REAL, não de "22:00" fixo: como agora são 23h
+    // no fuso escolhido, somar 120 minutos dá a volta na meia-noite. Assim a
+    // folga é de uma hora inteira para cada lado, e não do punhado de segundos
+    // que sobraria se a faixa terminasse aos 02:00 em ponto.
+    await setOpeningHours(app, restaurant, [
+      { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 120) },
+    ]);
+
+    expect((await isOpen("noturna-noite")).isOpen).toBe(true);
+  });
+
+  it("faixa que atravessa a meia-noite vale na madrugada seguinte", async () => {
+    const timezone = fusoComHoraAtual(1); // meio da metade 00h–02h
+    const restaurant = await createRestaurant(app, {
+      slug: "noturna-madrugada",
+      timezone,
+    });
+    const { dow, hora } = await agoraNoFuso(timezone);
+    await setOpeningHours(app, restaurant, [
+      // A faixa foi cadastrada ONTEM (relativo ao fuso escolhido) e ainda vale
+      // agora, de madrugada. Sai da hora local real pelo mesmo motivo do teste
+      // acima: agora é 01h, então -180 cai nas 22h de ontem e +60 nas 02h de
+      // hoje, com uma hora de folga de cada lado.
+      {
+        weekday: ((dow + 6) % 7) as 0,
+        opensAt: somaMinutos(hora, -180),
+        closesAt: somaMinutos(hora, 60),
+      },
+    ]);
+
+    expect((await isOpen("noturna-madrugada")).isOpen).toBe(true);
+  });
+
+  /**
+   * O fuso decide. Dois restaurantes com a MESMA grade, fusos diferentes: a
+   * faixa é montada em torno da hora de São Paulo, então o de Manaus (uma hora
+   * atrás) está fora dela.
+   */
+  it("a mesma grade dá respostas diferentes em fusos diferentes", async () => {
+    const sp = await createRestaurant(app, {
+      slug: "sp",
+      timezone: "America/Sao_Paulo",
+    });
+    const manaus = await createRestaurant(app, {
+      slug: "manaus",
+      timezone: "America/Manaus",
+    });
+    const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+    // faixa estreita: começa agora em SP e dura 30 minutos. Em Manaus são
+    // 60 minutos mais cedo, logo fora dela.
+    const grade = [
+      { weekday: dow, opensAt: hora, closesAt: somaMinutos(hora, 30) },
+    ];
+    await setOpeningHours(app, sp, grade);
+    await setOpeningHours(app, manaus, grade);
+
+    expect((await isOpen("sp")).isOpen).toBe(true);
+    expect((await isOpen("manaus")).isOpen).toBe(false);
+  });
+
+  /** A pausa fecha a loja mesmo dentro da faixa. */
+  it("a pausa manual fecha a loja, e sai separada de isOpen", async () => {
+    // a grade precisa cobrir AGORA, senão o `isOpen: false` viria dela e não
+    // da pausa — o teste passaria sem testar o que promete
+    const timezone = fusoSeguro();
+    const restaurant = await createRestaurant(app, { slug: "pausada", timezone });
+    const { dow, hora } = await agoraNoFuso(timezone);
+    await setOpeningHours(app, restaurant, [
+      { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
+    ]);
+
+    await app.inject({
+      method: "PATCH",
+      url: `/restaurants/${restaurant.id}`,
+      headers: restaurant.headers,
+      payload: { acceptingOrders: false },
+    });
+
+    const body = await isOpen("pausada");
+    expect(body.isOpen).toBe(false);
+    // separado, para a tela distinguir "fechado agora" de "a loja pausou"
+    expect(body.acceptingOrders).toBe(false);
+  });
+
+  it("o cardápio devolve a grade, para a tela dizer quando abre", async () => {
+    const restaurant = await createRestaurant(app, { slug: "com-grade" });
+    await setOpeningHours(app, restaurant, [
+      { weekday: 1, opensAt: "18:00", closesAt: "23:00" },
+    ]);
+
+    const body = await isOpen("com-grade");
+
+    expect(body.openingHours).toEqual([
+      { weekday: 1, opensAt: "18:00", closesAt: "23:00" },
+    ]);
+  });
+
+  it("restaurante sem grade nenhuma está fechado", async () => {
+    // desde a Task 6, `createRestaurant` nasce com a grade sempre-aberta (para
+    // não fechar sozinho todo restaurante de teste que não é sobre horário) —
+    // aqui o teste quer exatamente o estado "sem grade", então sobrescreve com
+    // uma grade vazia, o que dá o mesmo estado no banco (nenhuma linha viva).
+    const restaurant = await createRestaurant(app, { slug: "virgem" });
+    await setOpeningHours(app, restaurant, []);
+
+    expect((await isOpen("virgem")).isOpen).toBe(false);
+  });
+
+  /**
+   * O bloqueio na criação de pedido — a Task 6.
+   *
+   * Aninhado neste `describe` (em vez de um segundo `describe` de topo) para
+   * reaproveitar `app`, `agoraNoFuso` e `somaMinutos` já montados aqui — o
+   * projeto usa um único `describe` de topo por arquivo de teste.
+   */
+  describe("a criação de pedido respeita o horário", () => {
+    /** Cria produto e devolve o que os testes precisam. */
+    async function lojaComProduto(slug: string, timezone?: string) {
+      const restaurant = await createRestaurant(app, {
+        slug,
+        ...(timezone === undefined ? {} : { timezone }),
+      });
+      const produto = await createProduct(app, restaurant, { stock: 10 });
+      return { restaurant, produto };
+    }
+
+    function pedir(restaurantId: string, produtoId: string) {
+      return app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurantId}/orders`,
+        payload: {
+          type: "takeaway",
+          customer: { name: "Ana", phone: "11999990000" },
+          items: [{ productId: produtoId, quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+    }
+
+    it("409 fora do horário", async () => {
+      const { restaurant, produto } = await lojaComProduto("fora-do-horario");
+      const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+      await setOpeningHours(app, restaurant, [
+        { weekday: dow, opensAt: somaMinutos(hora, 120), closesAt: somaMinutos(hora, 180) },
+      ]);
+
+      const response = await pedir(restaurant.id, produto.id);
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("fechad");
+    });
+
+    it("409 com a loja pausada, mesmo dentro do horário", async () => {
+      // idem: sem grade cobrindo agora, o 409 viria do horário, não da pausa
+      const timezone = fusoSeguro();
+      const { restaurant, produto } = await lojaComProduto(
+        "pausada-pedido",
+        timezone,
+      );
+      const { dow, hora } = await agoraNoFuso(timezone);
+      await setOpeningHours(app, restaurant, [
+        { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
+      ]);
+      await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { acceptingOrders: false },
+      });
+
+      const response = await pedir(restaurant.id, produto.id);
+
+      expect(response.statusCode).toBe(409);
+      // mensagem distinta da de "fora do horário"
+      expect(response.json().message).toContain("pausad");
+    });
+
+    it("201 dentro do horário", async () => {
+      const timezone = fusoSeguro();
+      const { restaurant, produto } = await lojaComProduto(
+        "aberta-pedido",
+        timezone,
+      );
+      const { dow, hora } = await agoraNoFuso(timezone);
+      await setOpeningHours(app, restaurant, [
+        { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
+      ]);
+
+      expect((await pedir(restaurant.id, produto.id)).statusCode).toBe(201);
+    });
+
+    /** Se a loja está fechada, não há ninguém no salão para servir. */
+    /**
+     * A terceira modalidade, e a de caminho mais longo: `delivery` exige
+     * `deliveryAddress`, e `assertEnderecoCoerente` roda DEPOIS de
+     * `assertLojaAberta`. Sem este teste, uma inversão dessa ordem trocaria o
+     * 409 de "loja fechada" por um 400 de endereço e ninguém veria.
+     */
+    it("409 também no pedido de entrega", async () => {
+      const { restaurant, produto } = await lojaComProduto("entrega-fechada");
+      await setOpeningHours(app, restaurant, []);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "delivery",
+          customer: { name: "Ana", phone: "11999990000" },
+          deliveryAddress: validDeliveryAddress,
+          items: [{ productId: produto.id, quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+    });
+
+    /**
+     * O troco é comparado com o total que o SERVIDOR calculou, e quem paga não
+     * escolhe esse número.
+     *
+     * O caminho é menos óbvio do que parece, e vale escrever: o validador do
+     * corpo roda com `removeAdditional: true` (`routes/validators.ts`), então
+     * um `totalInCents` forjado não é recusado — é **removido em silêncio**, e
+     * nunca chega ao serviço. O 400 que este teste vê vem depois, do
+     * `assertTrocoCoerente`, que compara o troco com o total calculado no
+     * servidor. É por isso que a asserção é interessante: ela prova que o
+     * número mandado pelo cliente não entrou na conta, e não apenas que o
+     * schema barrou um campo extra.
+     */
+    it("ignora o total mandado no corpo e confere o troco contra o do servidor", async () => {
+      const timezone = fusoSeguro();
+      const { restaurant, produto } = await lojaComProduto(
+        "total-forjado",
+        timezone,
+      );
+      const { dow, hora } = await agoraNoFuso(timezone);
+      await setOpeningHours(app, restaurant, [
+        { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
+      ]);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "takeaway",
+          customer: { name: "Ana", phone: "11999990000" },
+          items: [{ productId: produto.id, quantity: 1 }],
+          paymentMethod: "cash",
+          // troco menor que o total real do pedido
+          changeForInCents: 100,
+          // se este número entrasse na conta, o troco acima passaria
+          totalInCents: 1,
+        },
+      });
+
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("409 também no pedido de salão", async () => {
+      const { restaurant, produto } = await lojaComProduto("salao-fechado");
+      await setOpeningHours(app, restaurant, []);
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "dine_in",
+          customer: { name: "Ana", phone: "11999990000" },
+          items: [{ productId: produto.id, quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+
+      expect(response.statusCode).toBe(409);
+    });
+  });
+});

@@ -24,12 +24,16 @@ import {
 } from "../domain/order.ts";
 import type { OptionGroup, PricedGroup } from "../domain/option.ts";
 import { unitPrice } from "../domain/option.ts";
+import type { AcceptedPaymentFlags, PaymentMethod } from "../domain/payment.ts";
+import { acceptedPaymentMethods } from "../domain/payment.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as customersRepository from "../repositories/customers.ts";
+import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as ordersRepository from "../repositories/orders.ts";
 import * as productsRepository from "../repositories/products.ts";
 import type { Product } from "../domain/product.ts";
+import type { Restaurant } from "../domain/restaurant.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import { generateToken, hashToken } from "../tokens.ts";
 import * as orderEvents from "../events/orders.ts";
@@ -66,6 +70,14 @@ const NOME_DA_MODALIDADE: Record<OrderType, string> = {
   delivery: "entrega",
 };
 
+/** Como cada forma de pagamento se chama para quem lê a mensagem de erro. */
+const NOME_DA_FORMA: Record<PaymentMethod, string> = {
+  cash: "dinheiro",
+  card_on_delivery: "cartão na entrega",
+  pix: "pix",
+  meal_voucher: "vale-refeição",
+};
+
 /**
  * O restaurante aceita essa modalidade?
  *
@@ -85,6 +97,74 @@ function assertRestauranteAceita(
   if (!aceita[type]) {
     throw new ConflictError(
       `Este restaurante não aceita ${NOME_DA_MODALIDADE[type]}`,
+    );
+  }
+}
+
+/**
+ * Recusa pedido com a loja fechada — **409**, conflito com o estado atual.
+ *
+ * As duas causas têm mensagens distintas de propósito: "fora do horário" e "a
+ * loja pausou" pedem reações diferentes de quem está do outro lado — esperar
+ * o horário, ou tentar de novo mais tarde.
+ *
+ * ⚠️ Isto NÃO é redundante com o `isOpen` do cardápio. O cardápio informa; a
+ * criação decide. Entre uma coisa e outra cabe o tempo de montar o carrinho, e
+ * cabe um cliente que chame a API direto, sem passar por tela nenhuma.
+ *
+ * Vale para as três modalidades, `dine_in` inclusive: com a loja fechada não
+ * há ninguém no salão para servir. Horário por modalidade é outro conceito.
+ */
+async function assertLojaAberta(restaurant: Restaurant): Promise<void> {
+  if (!restaurant.acceptingOrders) {
+    throw new ConflictError(
+      "A loja está pausada no momento. Tente de novo mais tarde",
+    );
+  }
+  if (!(await openingHoursRepository.isOpenNow(restaurant.id, restaurant.timezone))) {
+    throw new ConflictError("A loja está fechada agora");
+  }
+}
+
+/**
+ * Recusa forma que o restaurante não aceita — **409**, com a mesma forma do
+ * `assertRestauranteAceita` que já recusa modalidade. É a mesma pergunta
+ * ("este restaurante aceita isso?") e merece o mesmo formato de resposta.
+ */
+function assertFormaAceita(
+  restaurant: AcceptedPaymentFlags,
+  paymentMethod: PaymentMethod,
+): void {
+  if (!acceptedPaymentMethods(restaurant).includes(paymentMethod)) {
+    throw new ConflictError(
+      `Este restaurante não aceita ${NOME_DA_FORMA[paymentMethod]}`,
+    );
+  }
+}
+
+/**
+ * Recusa troco incoerente — **400**, porque é corpo malformado e não conflito
+ * de estado.
+ *
+ * ⚠️ A comparação é com o total calculado no SERVIDOR. O corpo não tem
+ * `totalInCents` (aceitá-lo deixaria quem paga escolher o preço), e comparar
+ * com um número do cliente deixaria esta validação sem sentido.
+ */
+function assertTrocoCoerente(
+  paymentMethod: PaymentMethod,
+  changeForInCents: number | undefined,
+  totalInCents: number,
+): void {
+  if (changeForInCents === undefined) return;
+
+  if (paymentMethod !== "cash") {
+    throw new ValidationError(
+      "Troco só faz sentido em pagamento com dinheiro",
+    );
+  }
+  if (changeForInCents < totalInCents) {
+    throw new ValidationError(
+      `O troco (${changeForInCents}) é menor que o total do pedido (${totalInCents})`,
     );
   }
 }
@@ -224,7 +304,9 @@ export async function create(
   input: CreateOrderInput,
 ): Promise<CreatedOrder> {
   const restaurant = await restaurantsService.getById(restaurantId);
+  await assertLojaAberta(restaurant);
   assertRestauranteAceita(restaurant, input.type);
+  assertFormaAceita(restaurant, input.paymentMethod);
   assertEnderecoCoerente(input);
 
   // Duas linhas iguais (mesmo produto, mesmas opções) viram uma com a
@@ -308,6 +390,7 @@ export async function create(
       (sum, item) => sum + item.unitPriceInCents * item.quantity,
       0,
     );
+    assertTrocoCoerente(input.paymentMethod, input.changeForInCents, totalInCents);
 
     const customer = await customersRepository.upsertByPhone(
       input.customer,
@@ -323,6 +406,8 @@ export async function create(
         deliveryAddress: input.deliveryAddress,
         trackingTokenHash:
           trackingToken === null ? null : hashToken(trackingToken),
+        paymentMethod: input.paymentMethod,
+        changeForInCents: input.changeForInCents,
       },
       client,
     );

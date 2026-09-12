@@ -57,6 +57,12 @@ export const OPENAPI_TAGS = [
       '"Sabores" vale para todas as pizzas.',
   },
   {
+    name: "Horário",
+    description:
+      "As faixas em que o restaurante aceita pedido, no fuso dele. Dia sem " +
+      "faixa é dia fechado, e uma faixa pode atravessar a meia-noite.",
+  },
+  {
     name: "Pedidos",
     description:
       "Criar um pedido é público (o cliente do QR não tem conta); listar, " +
