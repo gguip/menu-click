@@ -35,6 +35,68 @@ describe("cotação de frete pública", () => {
     await app.close();
   });
 
+  /**
+   * O validador ESTRITO nesta rota, presa por teste.
+   *
+   * A rota é pública e anônima, então é a mais exposta da feature. Sem
+   * `installRouteValidators`, vale o Ajv padrão do Fastify, que coage tipo:
+   * `subtotalInCents: null` viraria `0`, e a decisão de "grátis acima de X"
+   * sairia calculada sobre um pedido de valor zero — cotação com desconto que
+   * o cliente não tem direito.
+   *
+   * O teste existe porque a guarda foi acrescentada num conserto e, sem ele, a
+   * suíte inteira ficava verde com a linha removida. Guarda que nada prende
+   * não é guarda: um refactor futuro a tiraria sem nenhum sinal.
+   */
+  it("recusa corpo de tipo errado em vez de coagir", async () => {
+    await createRestaurant(app, { slug: "cota-estrita" });
+
+    const respostas = await Promise.all(
+      [
+        { address: validDeliveryAddress, subtotalInCents: null },
+        { address: validDeliveryAddress, subtotalInCents: "7777" },
+      ].map((payload) =>
+        app.inject({
+          method: "POST",
+          url: "/menu/cota-estrita/delivery-quote",
+          payload,
+        }),
+      ),
+    );
+
+    expect(respostas.map((r) => r.statusCode)).toEqual([400, 400]);
+  });
+
+  /**
+   * Campo extra é REMOVIDO, não recusado — e a distinção importa.
+   *
+   * O corpo declara `additionalProperties: false`, mas o validador roda com
+   * `removeAdditional: true`, então o Ajv descarta o campo em silêncio e a
+   * requisição segue com 200. Quem ler só o schema vai supor 400.
+   *
+   * Na prática é o comportamento certo aqui: o que o cliente mandou a mais não
+   * chega ao serviço, e é isso que protege o cálculo. Mas está escrito porque
+   * um teste que afirmasse 400 falharia, e quem o escrevesse "consertaria" o
+   * schema atrás de um erro que não existe.
+   */
+  it("descarta campo extra do corpo em vez de recusar", async () => {
+    await createRestaurant(app, { slug: "cota-extra" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/menu/cota-extra/delivery-quote",
+      payload: {
+        address: validDeliveryAddress,
+        subtotalInCents: 3000,
+        feeInCents: 1,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    // o campo forjado não influenciou nada: a loja é taxa fixa 0 por default
+    expect(response.json().feeInCents).toBe(0);
+  });
+
   it("loja que só faz retirada responde que não entrega", async () => {
     // sem isto a cotação responderia `deliversTo: true` com um preço, e o
     // cliente montaria um carrinho que a criação recusaria com 409 de
