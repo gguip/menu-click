@@ -70,14 +70,34 @@ describe("está aberto agora?", () => {
     return deslocamento > 0 ? `Etc/GMT-${deslocamento}` : `Etc/GMT+${-deslocamento}`;
   }
 
+  /**
+   * Fuso em que agora é meio-dia — onde uma faixa relativa é segura de montar.
+   *
+   * Todo teste que precisa que a grade COBRA o instante atual usa isto em vez
+   * de `America/Sao_Paulo`. O motivo é concreto: `somaMinutos(hora, -60)` dá a
+   * volta na meia-noite quando a hora local é `00:xx`, a faixa vira
+   * `23:xx–01:xx`, e aí `closes_at < opens_at` a joga no ramo de
+   * atravessamento — que exige "fim do próprio dia" ou "madrugada do dia
+   * SEGUINTE". Cadastrada no dia de hoje e consultada às 00:xx de hoje, nenhuma
+   * das duas metades bate, e o restaurante aparece fechado.
+   *
+   * Com o meio-dia, `hora ± 60` fica em `11:xx–13:xx` e nunca atravessa. A
+   * faixa continua saindo da hora local real, então não há hora mágica no
+   * teste — só a garantia de que ele vale às 03:00 tanto quanto às 14:00.
+   */
+  function fusoSeguro(): string {
+    return fusoComHoraAtual(12);
+  }
+
   async function isOpen(slug: string) {
     const response = await app.inject({ method: "GET", url: `/menu/${slug}` });
     return response.json();
   }
 
   it("aberto dentro da faixa", async () => {
-    const restaurant = await createRestaurant(app, { slug: "aberta" });
-    const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+    const timezone = fusoSeguro();
+    const restaurant = await createRestaurant(app, { slug: "aberta", timezone });
+    const { dow, hora } = await agoraNoFuso(timezone);
     await setOpeningHours(app, restaurant, [
       { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
     ]);
@@ -191,8 +211,11 @@ describe("está aberto agora?", () => {
 
   /** A pausa fecha a loja mesmo dentro da faixa. */
   it("a pausa manual fecha a loja, e sai separada de isOpen", async () => {
-    const restaurant = await createRestaurant(app, { slug: "pausada" });
-    const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+    // a grade precisa cobrir AGORA, senão o `isOpen: false` viria dela e não
+    // da pausa — o teste passaria sem testar o que promete
+    const timezone = fusoSeguro();
+    const restaurant = await createRestaurant(app, { slug: "pausada", timezone });
+    const { dow, hora } = await agoraNoFuso(timezone);
     await setOpeningHours(app, restaurant, [
       { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
     ]);
@@ -243,8 +266,11 @@ describe("está aberto agora?", () => {
    */
   describe("a criação de pedido respeita o horário", () => {
     /** Cria produto e devolve o que os testes precisam. */
-    async function lojaComProduto(slug: string) {
-      const restaurant = await createRestaurant(app, { slug });
+    async function lojaComProduto(slug: string, timezone?: string) {
+      const restaurant = await createRestaurant(app, {
+        slug,
+        ...(timezone === undefined ? {} : { timezone }),
+      });
       const produto = await createProduct(app, restaurant, { stock: 10 });
       return { restaurant, produto };
     }
@@ -276,8 +302,13 @@ describe("está aberto agora?", () => {
     });
 
     it("409 com a loja pausada, mesmo dentro do horário", async () => {
-      const { restaurant, produto } = await lojaComProduto("pausada-pedido");
-      const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+      // idem: sem grade cobrindo agora, o 409 viria do horário, não da pausa
+      const timezone = fusoSeguro();
+      const { restaurant, produto } = await lojaComProduto(
+        "pausada-pedido",
+        timezone,
+      );
+      const { dow, hora } = await agoraNoFuso(timezone);
       await setOpeningHours(app, restaurant, [
         { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
       ]);
@@ -296,8 +327,12 @@ describe("está aberto agora?", () => {
     });
 
     it("201 dentro do horário", async () => {
-      const { restaurant, produto } = await lojaComProduto("aberta-pedido");
-      const { dow, hora } = await agoraNoFuso("America/Sao_Paulo");
+      const timezone = fusoSeguro();
+      const { restaurant, produto } = await lojaComProduto(
+        "aberta-pedido",
+        timezone,
+      );
+      const { dow, hora } = await agoraNoFuso(timezone);
       await setOpeningHours(app, restaurant, [
         { weekday: dow, opensAt: somaMinutos(hora, -60), closesAt: somaMinutos(hora, 60) },
       ]);
