@@ -51,6 +51,7 @@ const menuRestaurantResponseSchema = {
     // para o endereço do cliente, e a segunda é política interna da loja (S10)
     deliveryFeeMode: { type: "string" },
     freeDeliveryAboveInCents: { type: "integer" },
+    minimumOrderInCents: { type: "integer" },
     // a grade E a pausa, juntas: é o que decide se a tela mostra o botão
     isOpen: { type: "boolean" },
     // a pausa sozinha, para separar "fechado agora" de "a loja pausou"

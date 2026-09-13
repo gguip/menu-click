@@ -185,6 +185,9 @@
                           "deliveryFeeToArrange": {
                             "type": "boolean"
                           },
+                          "minimumOrderInCents": {
+                            "type": "integer"
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -324,6 +327,9 @@
                     },
                     "deliveryFeeToArrange": {
                       "type": "boolean"
+                    },
+                    "minimumOrderInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -472,6 +478,10 @@
                   },
                   "deliveryFeeToArrange": {
                     "type": "boolean"
+                  },
+                  "minimumOrderInCents": {
+                    "type": "integer",
+                    "minimum": 0
                   }
                 }
               }
@@ -583,6 +593,9 @@
                     },
                     "deliveryFeeToArrange": {
                       "type": "boolean"
+                    },
+                    "minimumOrderInCents": {
+                      "type": "integer"
                     },
                     "createdAt": {
                       "type": "string"
@@ -6200,6 +6213,9 @@
                     "freeDeliveryAboveInCents": {
                       "type": "integer"
                     },
+                    "minimumOrderInCents": {
+                      "type": "integer"
+                    },
                     "isOpen": {
                       "type": "boolean"
                     },
@@ -6994,6 +7010,9 @@
                         },
                         "deliveryFeeToArrange": {
                           "type": "boolean"
+                        },
+                        "minimumOrderInCents": {
+                          "type": "integer"
                         },
                         "createdAt": {
                           "type": "string"

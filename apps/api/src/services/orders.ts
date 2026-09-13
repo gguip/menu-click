@@ -116,6 +116,41 @@ function assertRestauranteAceita(
  * Vale para as três modalidades, `dine_in` inclusive: com a loja fechada não
  * há ninguém no salão para servir. Horário por modalidade é outro conceito.
  */
+/**
+ * Recusa entrega abaixo do pedido mínimo da loja — **409**.
+ *
+ * Vale só em `delivery`: o mínimo existe porque entrega tem custo de piso —
+ * sai entregador, sai veículo. Retirada e salão não custam nada a mais à loja,
+ * e recusar um café de R$ 5 no balcão só perderia venda.
+ *
+ * ⚠️ Compara com o **subtotal dos itens**, nunca com o total. O total inclui o
+ * frete, e somá-lo para atingir o mínimo faria o cliente pagar mais para
+ * contornar exatamente o que a loja quis evitar: sair para entregar pouca
+ * mercadoria. É o mesmo critério do "grátis acima de X", e pela mesma razão.
+ *
+ * Zero é "sem mínimo", e cai fora por comparação normal — não precisa de caso
+ * especial.
+ */
+function assertAtingeMinimo(
+  restaurant: Restaurant,
+  type: OrderType,
+  subtotalInCents: number,
+): void {
+  if (type !== "delivery") return;
+  // o limite é INCLUSIVO: exclusivo recusaria o pedido de R$ 50,00 e aceitaria
+  // o de R$ 50,01, o que ninguém consegue explicar ao cliente
+  if (subtotalInCents >= restaurant.minimumOrderInCents) return;
+
+  throw new ConflictError(
+    `O pedido mínimo para entrega é de ${formataReais(restaurant.minimumOrderInCents)}`,
+  );
+}
+
+/** Centavos em reais, para a mensagem que o cliente lê. */
+function formataReais(centavos: number): string {
+  return `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
+}
+
 async function assertLojaAberta(restaurant: Restaurant): Promise<void> {
   if (!restaurant.acceptingOrders) {
     throw new ConflictError(
@@ -392,6 +427,10 @@ export async function create(
       (sum, item) => sum + item.unitPriceInCents * item.quantity,
       0,
     );
+
+    // Antes da cotação de propósito: o mínimo depende só do subtotal, então
+    // falha mais cedo e sem ir ao banco buscar bairro.
+    assertAtingeMinimo(restaurant, input.type, subtotalInCents);
 
     // O frete sai da mesma cotação que o endpoint público usa, recalculada
     // aqui: aquele endpoint informa, esta criação decide. Entre cotar e pedir

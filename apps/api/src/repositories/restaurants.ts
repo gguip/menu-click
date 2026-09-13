@@ -47,6 +47,7 @@ type RestaurantRow = {
   delivery_fixed_fee_in_cents: number;
   free_delivery_above_in_cents: number | null;
   delivery_fee_to_arrange: boolean;
+  minimum_order_in_cents: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -85,6 +86,7 @@ function toRestaurant(row: RestaurantRow): Restaurant {
       ? {}
       : { freeDeliveryAboveInCents: row.free_delivery_above_in_cents }),
     deliveryFeeToArrange: row.delivery_fee_to_arrange,
+    minimumOrderInCents: row.minimum_order_in_cents,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -108,6 +110,7 @@ const restaurantColumns = {
   deliveryFixedFeeInCents: "delivery_fixed_fee_in_cents",
   freeDeliveryAboveInCents: "free_delivery_above_in_cents",
   deliveryFeeToArrange: "delivery_fee_to_arrange",
+  minimumOrderInCents: "minimum_order_in_cents",
 } as const;
 
 /** O endereço mora em colunas planas: campo do value object → coluna. */
@@ -147,13 +150,13 @@ export async function insert(
           is_delivery, is_takeaway, is_qrcode, timezone, accepting_orders,
           accepts_cash, accepts_card_on_delivery, accepts_pix, accepts_meal_voucher,
           delivery_fee_mode, delivery_fixed_fee_in_cents, delivery_fee_to_arrange,
-          free_delivery_above_in_cents)
+          free_delivery_above_in_cents, minimum_order_in_cents)
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
                coalesce($14, 'America/Sao_Paulo'), coalesce($15, true),
                coalesce($16, true), coalesce($17, true), coalesce($18, true),
                coalesce($19, false),
                coalesce($20, 'fixed'), coalesce($21, 0), coalesce($22, false),
-               $23)
+               $23, coalesce($24, 0))
        returning *`,
       [
         input.name,
@@ -192,6 +195,10 @@ export async function insert(
         input.deliveryFixedFeeInCents ?? null,
         input.deliveryFeeToArrange ?? null,
         input.freeDeliveryAboveInCents ?? null,
+        // mesmo raciocínio dos quatro acima: o corpo de criação não oferece o
+        // campo, mas descartá-lo aqui faria o insert prometer no tipo o que
+        // não cumpre no SQL
+        input.minimumOrderInCents ?? null,
       ],
     );
     return toRestaurant(rows[0]);
