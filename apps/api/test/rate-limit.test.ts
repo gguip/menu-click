@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   LOGIN_RATE_LIMIT_MAX,
+  PASSWORD_RESET_RATE_LIMIT_MAX,
   RATE_LIMIT_MAX,
 } from "../src/limits.ts";
 import { buildTestApp, registerRestaurant } from "./helpers.ts";
@@ -35,6 +36,57 @@ describe("rate limit", () => {
     ipCounter += 1;
     return `192.168.7.${ipCounter}`;
   }
+
+  it(`o ${PASSWORD_RESET_RATE_LIMIT_MAX + 1}º uso de token do mesmo IP é 429`, async () => {
+    // a troca é anônima como o pedido, e as três rotas de autenticação sem
+    // sessão passam a ter teto próprio — compartilhar o global de 100/min
+    // deixaria justamente esta de fora
+    const remoteAddress = ipDedicado();
+    const payload = { token: "token-que-nao-existe", newPassword: "senha-nova-qualquer-1" };
+
+    const respostas = [];
+    for (let i = 0; i < PASSWORD_RESET_RATE_LIMIT_MAX + 1; i++) {
+      respostas.push(
+        await app.inject({
+          method: "POST",
+          url: "/auth/reset-password",
+          remoteAddress,
+          payload,
+        }),
+      );
+    }
+
+    expect(
+      respostas.slice(0, PASSWORD_RESET_RATE_LIMIT_MAX).map((r) => r.statusCode),
+    ).toEqual(Array(PASSWORD_RESET_RATE_LIMIT_MAX).fill(400));
+    expect(respostas.at(-1)?.statusCode).toBe(429);
+  });
+
+  it(`o ${PASSWORD_RESET_RATE_LIMIT_MAX + 1}º pedido de recuperação do mesmo IP é 429`, async () => {
+    // as irmãs com teto próprio (login e cotação de frete) já têm caso
+    // dedicado; sem este, o teto da recuperação existiria só em `limits.ts`
+    const remoteAddress = ipDedicado();
+    const payload = { email: "ninguem@lugar.com" };
+
+    const respostas = [];
+    for (let i = 0; i < PASSWORD_RESET_RATE_LIMIT_MAX + 1; i++) {
+      respostas.push(
+        await app.inject({
+          method: "POST",
+          url: "/auth/forgot-password",
+          remoteAddress,
+          payload,
+        }),
+      );
+    }
+
+    // as primeiras respondem 202 mesmo sem o e-mail existir (é o que fecha o
+    // oráculo de enumeração); a excedente é recusada pelo limite
+    expect(
+      respostas.slice(0, PASSWORD_RESET_RATE_LIMIT_MAX).map((r) => r.statusCode),
+    ).toEqual(Array(PASSWORD_RESET_RATE_LIMIT_MAX).fill(202));
+    expect(respostas.at(-1)?.statusCode).toBe(429);
+  });
 
   it(`o ${LOGIN_RATE_LIMIT_MAX + 1}º login do mesmo IP é 429`, async () => {
     const remoteAddress = ipDedicado();

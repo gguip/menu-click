@@ -36,6 +36,7 @@ import { trackingRoutes } from "./routes/tracking.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { installAuth } from "./routes/authenticate.ts";
 import { openapiOptions } from "./openapi.ts";
+import { assertEmailDriverIsSafe, configureEmail } from "./email.ts";
 
 /**
  * Monta a instância do Fastify sem escutar (F1): registra plugins, rotas e o
@@ -44,6 +45,18 @@ import { openapiOptions } from "./openapi.ts";
  * (F21), sem precisar abrir socket nenhum.
  */
 export async function buildApp() {
+  /**
+   * Pré-condição de subida: o driver de e-mail configurado tem que ser
+   * seguro para o ambiente. O driver de console escreve o link de
+   * recuperação de senha no log — e o link **é** o token —, então rodar com
+   * ele em produção derramaria credencial em log de aplicação (S13). Falhar
+   * aqui, antes de o Fastify sequer existir, é a resposta certa: um aviso
+   * seria ignorado até o dia em que fosse tarde. Ver `assertEmailDriverIsSafe`
+   * em `email.ts`.
+   */
+  const emailDriver = process.env.EMAIL_DRIVER ?? "console";
+  assertEmailDriverIsSafe(emailDriver, process.env.NODE_ENV);
+
   const app = Fastify({
     bodyLimit: BODY_LIMIT_BYTES,
     keepAliveTimeout: KEEP_ALIVE_TIMEOUT_MS,
@@ -58,12 +71,30 @@ export async function buildApp() {
       // para trace). Nesse dia o `Authorization` carrega uma credencial válida
       // em texto puro, e quem mexer no logger não vai lembrar disso. Custo
       // zero agora, e a alternativa é depender de memória.
+      //
+      // `DATABASE_URL` e `SMTP_URL` entram pelo mesmo motivo: as duas são
+      // connection string com senha dentro (S13), e nenhuma das duas é lida
+      // hoje por nada que logue o valor — a rede é para o dia em que alguém
+      // logar a config do pool ou do transporte de e-mail para depurar uma
+      // conexão que não sobe.
       redact: {
-        paths: ["req.headers.authorization", "req.headers.cookie"],
+        paths: [
+          "req.headers.authorization",
+          "req.headers.cookie",
+          "DATABASE_URL",
+          "SMTP_URL",
+        ],
         remove: true,
       },
     },
   });
+
+  // A guarda já validou o driver acima, antes de existir Fastify. Aqui o
+  // resultado é guardado e o log do pino é injetado: é o que dá log
+  // estruturado ao driver de console sem `email.ts` importar Fastify (F19).
+  configureEmail(emailDriver, process.env.NODE_ENV, (mensagem) =>
+    app.log.info(mensagem),
+  );
 
   // Tratamento centralizado de erro (F14/S11). É aqui — e só aqui — que erro de
   // negócio vira status HTTP: o serviço lança `NotFoundError`/`ConflictError`

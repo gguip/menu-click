@@ -3,7 +3,11 @@ import { createRequire } from "node:module";
 import type { CreateRestaurantInput } from "../domain/restaurant.ts";
 import type { CreateRestaurantUserInput } from "../domain/restaurant-user.ts";
 import { PASSWORD_MIN_LENGTH } from "../domain/restaurant-user.ts";
-import { LOGIN_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW } from "../limits.ts";
+import {
+  LOGIN_RATE_LIMIT_MAX,
+  PASSWORD_RESET_RATE_LIMIT_MAX,
+  RATE_LIMIT_WINDOW,
+} from "../limits.ts";
 import * as authService from "../services/auth.ts";
 import { requireAuth } from "./authenticate.ts";
 import {
@@ -136,6 +140,52 @@ const loginResponseSchema = {
   },
 };
 
+const forgotPasswordBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["email"],
+  properties: {
+    email: { type: "string", format: "email", maxLength: 254 },
+  },
+};
+
+/**
+ * Mensagem genérica, de propósito: nada aqui distingue "existe" de "não
+ * existe". O schema também é a barreira que impede o token de vazar por
+ * engano na resposta (S10) — ele nunca esteve num campo deste objeto.
+ */
+const forgotPasswordResponseSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string" },
+  },
+};
+
+const resetPasswordBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["token", "newPassword"],
+  properties: {
+    // o token não tem `format` nem regra de tamanho fixa: é opaco para quem
+    // valida, e um valor fora do formato esperado simplesmente não bate com
+    // hash nenhum no banco — a mesma mensagem de "inválido" cobre os dois
+    token: { type: "string", minLength: 1 },
+    newPassword: passwordSchema,
+  },
+};
+
+/**
+ * Sem token e sem dado de usuário — a rota é o gêmeo do `/auth/forgot-
+ * password` na barreira de saída (S10): devolver sessão aqui trocaria a
+ * segunda barreira (a senha nova) por só possuir o link.
+ */
+const resetPasswordResponseSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string" },
+  },
+};
+
 // ===================== Rotas =====================
 
 export async function authRoutes(app: FastifyInstance) {
@@ -198,6 +248,92 @@ export async function authRoutes(app: FastifyInstance) {
     async (request) => {
       const { email, password } = request.body;
       return authService.login(email, password);
+    },
+  );
+
+  // Pede o link de recuperação de senha. Pública pelo mesmo motivo do
+  // login: quem esqueceu a senha não tem sessão para provar quem é.
+  app.post<{ Body: { email: string } }>(
+    "/auth/forgot-password",
+    {
+      config: {
+        public: true,
+        // teto próprio, bem abaixo do global — ver PASSWORD_RESET_RATE_LIMIT_MAX
+        rateLimit: {
+          max: PASSWORD_RESET_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+        },
+      },
+      schema: {
+        tags: ["Autenticação"],
+        operationId: "requestPasswordReset",
+        summary: "Pede o link de recuperação de senha",
+        description:
+          "Sempre responde 202, exista ou não o e-mail: dizer que não existe seria um oráculo de quais contas estão cadastradas. O trabalho (achar o usuário, criar o token, mandar o e-mail) acontece DEPOIS desta resposta, então nem o tempo de resposta denuncia — e um provedor de SMTP lento deixa de segurar a requisição. Limite de 5 por minuto por IP (429 ao estourar), mesmo motivo do `/auth/login`.",
+        body: forgotPasswordBodySchema,
+        response: {
+          202: forgotPasswordResponseSchema,
+          // o corpo tem `format: "email"`: 400 é resposta real, e sem o schema
+          // o corpo do erro sai com campos que nenhum outro 400 da API expõe
+          400: errorResponseSchema,
+          429: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      reply.code(202).send({
+        message: "Se o e-mail estiver cadastrado, enviamos um link de recuperação",
+      });
+
+      // Depois de responder, e sem `await` — ver o comentário de
+      // `requestPasswordReset` em `services/auth.ts`. Falha de envio vai só
+      // para o log, sem o token (S13): contar ao cliente que o envio falhou
+      // também diria que o e-mail existe.
+      void authService.requestPasswordReset(request.body.email).catch((error) => {
+        request.log.error({ err: error }, "falha ao processar recuperação de senha");
+      });
+
+      return reply;
+    },
+  );
+
+  // Consome o token de `/auth/forgot-password`. Pública pelo mesmo motivo:
+  // quem está aqui não tem sessão para provar quem é — é o próprio token que
+  // prova.
+  app.post<{ Body: { token: string; newPassword: string } }>(
+    "/auth/reset-password",
+    {
+      config: {
+        public: true,
+        // teto próprio: desde que a conferência do token passou a vir ANTES do
+        // bcrypt, token inventado sai barato — mas a rota segue anônima e cara
+        // no caminho feliz, e é o perfil que o S25 descreve. Compartilhar o
+        // teto global de 100/min a deixaria de fora da proteção que as duas
+        // rotas irmãs de autenticação já têm.
+        rateLimit: {
+          max: PASSWORD_RESET_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+        },
+      },
+      schema: {
+        tags: ["Autenticação"],
+        operationId: "resetPassword",
+        summary: "Troca a senha com o token de recuperação",
+        description:
+          "Mensagem única para token inválido, expirado ou já usado — distinguir diria a quem guarda um link velho se ele um dia existiu. Não devolve sessão: quem recuperou entra como todo mundo, por `/auth/login` — devolver token aqui trocaria a segunda barreira (a senha nova) por só possuir o link. Derruba TODAS as sessões do usuário, sem exceção: não há sessão atual a poupar, e qualquer sessão viva pertence a quem tinha a senha antiga.",
+        body: resetPasswordBodySchema,
+        response: {
+          200: resetPasswordResponseSchema,
+          400: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      await authService.resetPassword(
+        request.body.token,
+        request.body.newPassword,
+      );
+      return { message: "Senha alterada. Entre com a senha nova" };
     },
   );
 

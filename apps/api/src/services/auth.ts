@@ -9,12 +9,15 @@ import type {
 import { PASSWORD_MAX_BYTES } from "../domain/restaurant-user.ts";
 import { isUuid } from "../domain/uuid.ts";
 import type { AuthContext, IssuedSession } from "../domain/session.ts";
+import { PASSWORD_RESET_TOKEN_TTL_MS } from "../domain/password-reset.ts";
 import {
   ConflictError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
 } from "../errors.ts";
+import { sendEmail } from "../email.ts";
+import * as passwordResetRepository from "../repositories/password-reset.ts";
 import * as restaurantUsersRepository from "../repositories/restaurant-users.ts";
 import * as sessionsRepository from "../repositories/sessions.ts";
 import { generateToken, hashToken } from "../tokens.ts";
@@ -159,6 +162,149 @@ export async function logout(sessionId: string): Promise<void> {
   await sessionsRepository.revoke(sessionId);
 }
 
+/**
+ * Base da URL do link de recuperação, e o link em si.
+ *
+ * Lida do ambiente a cada chamada — não uma constante de módulo — pelo mesmo
+ * motivo do `corsOrigins()` de `limits.ts`: permite variar o valor sem
+ * reiniciar o processo (e testar os dois). O default de desenvolvimento
+ * aponta para o front local; produção configura `PASSWORD_RESET_URL` (ver
+ * `.env.example`).
+ */
+function passwordResetLink(token: string): string {
+  const base =
+    process.env.PASSWORD_RESET_URL ?? "http://localhost:5173/recuperar-senha";
+  return `${base}?token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * Pede a recuperação de senha: acha o usuário, cria o token e manda o link
+ * por e-mail.
+ *
+ * ⚠️ **Chamada sem `await` pela rota**, que já respondeu 202 antes disso.
+ * Responder antes de fazer este trabalho é o que fecha o oráculo de tempo:
+ * com o trabalho no caminho da resposta, um e-mail inexistente voltaria mais
+ * rápido que um existente, e a diferença diria quais e-mails estão
+ * cadastrados — o mesmo problema que o login fecha rodando bcrypt contra um
+ * hash descartável, com uma saída melhor aqui: um SMTP lento também deixa de
+ * segurar a requisição. Por isso esta função nunca precisa lançar para quem
+ * chamou responder — quem chamou já respondeu, e é a própria rota que
+ * encapsula a chamada num `.catch()` (ver `routes/auth.ts`).
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  // filtra removido nos dois níveis: usuário e restaurante. Sem isso a
+  // recuperação viraria o caminho de volta para uma conta que alguém removeu
+  const user = await restaurantUsersRepository.findActiveByEmail(email);
+  if (user === null) return;
+
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MS);
+
+  await withTransaction(async (client) => {
+    // um pedido novo invalida os anteriores: sem isso, três tentativas
+    // deixariam três tokens vivos espalhados pela caixa de entrada
+    await passwordResetRepository.softDeleteLiveForUser(user.id, client);
+    await passwordResetRepository.insert(
+      { restaurantUserId: user.id, tokenHash: hashToken(token), expiresAt },
+      client,
+    );
+  });
+
+  // FORA da transação, e depois do commit: mandar de dentro dela seguraria
+  // uma conexão do pool durante a ida e volta do SMTP — que é rede, e pode
+  // levar segundos com um provedor ruim. Se o envio falhar, sobra um token
+  // que ninguém recebeu e que expira sozinho em uma hora — o mesmo resultado
+  // prático de um e-mail que caiu no spam.
+  await sendEmail({
+    to: user.email,
+    subject: "Recupere sua senha do MenuClick",
+    text: `Pediram a troca da senha da sua conta MenuClick. Use o link abaixo em até 1 hora:\n\n${passwordResetLink(token)}\n\nSe não foi você, ignore este e-mail.`,
+  });
+}
+
+/**
+ * Troca a senha usando o token de recuperação por e-mail — a outra ponta de
+ * `requestPasswordReset`.
+ *
+ * Não devolve sessão: quem recuperou entra como todo mundo, por
+ * `/auth/login`. Devolver um token aqui trocaria a segunda barreira (provar
+ * que conhece a senha nova) por só possuir o link — um e-mail interceptado
+ * viraria acesso imediato.
+ *
+ * Uma mensagem só para token inválido, expirado ou já usado: distinguir diria
+ * a quem guarda um link velho se ele um dia existiu. `findLiveByHash` já
+ * filtra os três casos no SQL (ver `repositories/password-reset.ts`); a
+ * conferência aqui é redundante de propósito — defesa em profundidade, não
+ * proteção que falta.
+ */
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<void> {
+  assertPasswordFits(newPassword);
+
+  const linkInvalido = () =>
+    new ValidationError("Link de recuperação inválido ou expirado");
+
+  // 🚨 A ORDEM aqui é a defesa, e ela já esteve errada.
+  //
+  // O token é conferido ANTES do bcrypt. Trocar os dois faria toda tentativa
+  // com token inventado queimar um hash inteiro — medido em 190 ms — numa rota
+  // pública, anônima e que ninguém precisa de credencial para chamar. Quem
+  // quisesse derrubar a recuperação só precisaria mandar lixo em volume, e
+  // derrubaria justamente a rota que tem de funcionar quando alguém está
+  // trancado para fora.
+  //
+  // E o bcrypt continua FORA da transação, pelo mesmo motivo do `register()`:
+  // custo 12 leva centenas de milissegundos, e segurar uma conexão do pool por
+  // esse tempo é desperdício. As duas exigências juntas dão esta ordem:
+  // consulta barata -> recusa cedo -> hash caro -> transação curta.
+  const linha = await passwordResetRepository.findLiveByHash(hashToken(token));
+  // O filtro mora inteiro no `findLiveByHash`: ele já exige `deleted_at is
+  // null`, `used_at is null` e `expires_at > now()`. Repetir as duas últimas
+  // aqui seria código inalcançável — a consulta nunca devolve linha que falhe
+  // nelas —, e três condições fariam o leitor supor três modos de falha que
+  // ele conseguiria exercitar.
+  if (linha === null) throw linkInvalido();
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+  await withTransaction(async (client) => {
+    // `false` = o usuário foi removido depois de o token ser emitido.
+    //
+    // ⚠️ Isto cobre o USUÁRIO removido, não o restaurante dele. Um token
+    // emitido antes de `DELETE /restaurants/:id` ainda troca a senha — o que
+    // é coerente com o login, que hoje também deixa entrar nesse caso, e
+    // inofensivo porque todo recurso do restaurante removido responde 404. O
+    // `findActiveByEmail` filtra os dois níveis na hora de EMITIR; aqui só o
+    // usuário. A assimetria está escrita porque um comentário anterior
+    // prometia os dois e a revisão da branch pegou a promessa falsa.
+    const atualizou = await restaurantUsersRepository.updatePasswordHash(
+      linha.restaurantUserId,
+      passwordHash,
+      client,
+    );
+    if (!atualizou) throw linkInvalido();
+
+    // `false` = outra troca com o MESMO token venceu a corrida entre a
+    // leitura de cima e este ponto. O `update ... where used_at is null` é a
+    // linha que serializa as duas tentativas: a perdedora cai aqui, e o
+    // rollback da transação desfaz o `updatePasswordHash` que ela acabou de
+    // fazer.
+    const marcou = await passwordResetRepository.markUsed(linha.id, client);
+    if (!marcou) throw linkInvalido();
+
+    // TODAS, sem exceção: não há sessão atual a poupar aqui — a pessoa está
+    // trancada para fora, e qualquer sessão viva pertence a quem tem (ou
+    // tinha) a senha antiga, que é exatamente quem está sendo trancado.
+    await sessionsRepository.revokeAllForUser(
+      linha.restaurantUserId,
+      undefined,
+      client,
+    );
+  });
+}
+
 /** Dados do usuário da sessão atual (`GET /auth/me`). */
 /** Erro padrão de usuário inexistente — mesma mensagem em toda a API. */
 function userNotFound(id: string): NotFoundError {
@@ -189,6 +335,10 @@ export async function getUser(userId: string): Promise<RestaurantUser> {
  * A senha errada aqui é **401**, não 400: o corpo é válido, o que falhou foi a
  * credencial. Diferente do login, não há oráculo a defender — quem chega aqui
  * já provou quem é, e a existência da conta não é segredo para ela mesma.
+ *
+ * Também invalida qualquer token de recuperação pendente (`resetPassword`):
+ * se a pessoa lembrou a senha e trocou por aqui, um link pedido antes não
+ * pode continuar valendo pela próxima hora.
  */
 export async function changePassword(
   auth: AuthContext,
@@ -205,8 +355,20 @@ export async function changePassword(
   }
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-  await restaurantUsersRepository.updatePasswordHash(auth.userId, passwordHash);
-  await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId);
+
+  // As três numa transação só: sem ela, falhar no meio deixa a senha trocada
+  // com um token de recuperação ainda vivo pela próxima hora — que é
+  // exatamente o estado que a invalidação foi acrescentada para impedir. Duas
+  // das três já corriam soltas antes desta feature; a terceira entrou no meio,
+  // e é ela que torna o meio-estado perigoso em vez de só inconsistente.
+  await withTransaction(async (client) => {
+    await restaurantUsersRepository.updatePasswordHash(auth.userId, passwordHash, client);
+    // Se a pessoa lembrou da senha e a trocou pelo caminho comum, um token de
+    // recuperação pedido antes (por ela mesma, ou por quem tinha acesso à caixa
+    // de entrada) não pode continuar valendo pela próxima hora.
+    await passwordResetRepository.softDeleteLiveForUser(auth.userId, client);
+    await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId, client);
+  });
 }
 
 /** Os usuários com acesso ao painel do restaurante. */
