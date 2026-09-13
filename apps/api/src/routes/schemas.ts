@@ -180,6 +180,8 @@ export const updateRestaurantBodySchema = {
     // estrito passou a recusar. Aqui o `null` é a intenção, e escreve NULL.
     freeDeliveryAboveInCents: { type: "integer", minimum: 0, nullable: true },
     deliveryFeeToArrange: { type: "boolean" },
+    // zero é "sem mínimo", então desligar não precisa de `nullable`
+    minimumOrderInCents: { type: "integer", minimum: 0 },
   },
 };
 
@@ -209,6 +211,7 @@ export const restaurantResponseSchema = {
     deliveryFixedFeeInCents: { type: "integer" },
     freeDeliveryAboveInCents: { type: "integer" },
     deliveryFeeToArrange: { type: "boolean" },
+    minimumOrderInCents: { type: "integer" },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

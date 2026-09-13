@@ -45,6 +45,7 @@ export type MenuRestaurant = Pick<
   | "isQrcode"
   | "deliveryFeeMode"
   | "freeDeliveryAboveInCents"
+  | "minimumOrderInCents"
 > & {
   /**
    * A loja está aceitando pedido AGORA: a grade **e** a pausa, juntas. É o que

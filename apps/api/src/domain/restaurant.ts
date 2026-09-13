@@ -80,6 +80,12 @@ export type CreateRestaurantInput = {
   freeDeliveryAboveInCents?: number;
   /** Aceita o pedido mesmo sem conseguir cotar, para acertar por fora. */
   deliveryFeeToArrange?: boolean;
+  /**
+   * Valor mínimo do pedido, e vale **só em entrega**: o mínimo existe porque
+   * entrega tem custo de piso. Zero é "sem mínimo" — a coluna não é nulável de
+   * propósito, para desligar ser pôr zero em vez de precisar de nulo.
+   */
+  minimumOrderInCents?: number;
 };
 
 /**
@@ -117,6 +123,8 @@ export type Restaurant = CreateRestaurantInput & {
   deliveryFixedFeeInCents: number;
   /** Idem: `not null default false`. */
   deliveryFeeToArrange: boolean;
+  /** Idem: `not null default 0`. */
+  minimumOrderInCents: number;
   createdAt: string;
   updatedAt: string;
 };

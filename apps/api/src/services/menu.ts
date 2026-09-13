@@ -66,6 +66,8 @@ function toMenuRestaurant(
     ...(restaurant.freeDeliveryAboveInCents === undefined
       ? {}
       : { freeDeliveryAboveInCents: restaurant.freeDeliveryAboveInCents }),
+    // para a tela avisar do mínimo antes de a pessoa montar o carrinho
+    minimumOrderInCents: restaurant.minimumOrderInCents,
     isOpen,
     acceptingOrders: restaurant.acceptingOrders,
     openingHours: openingHours.map(({ weekday, opensAt, closesAt }) => ({
