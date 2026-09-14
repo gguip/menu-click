@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis e troca de senha, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -109,6 +109,7 @@ Público hoje, e nada além disso:
 | `POST /auth/login` | teto próprio por IP (S25) |
 | `POST /auth/forgot-password` | teto próprio por IP; responde igual para e-mail que existe e que não existe |
 | `POST /auth/reset-password` | **pelo token de recuperação**, de uso único e uma hora de validade |
+| `POST /auth/verify-email` | **pelo token de verificação**, de uso único e 24 horas de validade; teto próprio por IP |
 | `POST /restaurants/:restaurantId/orders` | quem pede não tem conta |
 | `GET /orders/:orderId` | **pelo `trackingToken`**, não por sessão — e o token confere contra aquele pedido |
 | `GET /orders/:orderId/track` | idem, o canal de WebSocket |
@@ -118,7 +119,9 @@ abertas**: quem não tem o `trackingToken` não lê pedido nenhum. Elas ficaram 
 desta lista por um tempo, embora sempre tenham estado nas duas listas que a
 máquina lê (`test/authorization.test.ts` e `test/openapi.test.ts`) — e uma lista
 escrita como "nada além disso" que esquece duas rotas é pior que não ter lista,
-porque quem a lê acredita nela.
+porque quem a lê acredita nela. O `POST /auth/verify-email` repetiu a história em
+menor escala: entrou nas duas listas da máquina no mesmo commit que o criou, e só
+chegou a esta tabela na documentação da feature.
 
 **Autorização também mora no hook.** Ele compara o `:restaurantId` da URL com o da sessão e responde **404** na divergência — 403 confirmaria que aquele restaurante existe. Por isso **toda rota escopada em restaurante precisa chamar o parâmetro de `restaurantId`**: uma rota que o chamasse de `id` ficaria autenticada mas **não** escopada, e uma sessão passaria por cima de outro restaurante. É o tipo de erro que não aparece em teste de caminho feliz.
 
@@ -132,7 +135,7 @@ porque quem a lê acredita nela.
 - **Login errado responde sempre a mesma coisa, e leva sempre o mesmo tempo**: o bcrypt roda contra um hash descartável quando o e-mail não existe, senão o tempo de resposta viraria um oráculo de quais e-mails estão cadastrados.
 - `BCRYPT_ROUNDS` existe só para a suíte baixar o custo para 4; o padrão é 12 e o valor é preso entre 4 e 15.
 
-### Acesso: papéis, senha e usuários
+### Acesso: papéis, senha, usuários e verificação de e-mail
 
 O restaurante teve, por várias PRs, **um login só e nenhuma forma de trocar a senha** — quem a esquecesse perdia o restaurante, sem caminho de volta pela API. As rotas abaixo existem para fechar isso, e a ordem entre elas não é arbitrária.
 
@@ -142,7 +145,7 @@ A marcação é `config: { ownerOnly: true }`, lida pelo **mesmo hook** que já 
 
 ⚠️ **O sentido do `ownerOnly` é o oposto do `public`, e de propósito.** Lá o padrão fecha, porque esquecer expõe. Aqui o padrão abre, porque o papel restringe só duas ações — marcar rota nova como `ownerOnly` por reflexo criaria uma hierarquia que ninguém decidiu.
 
-**403 aqui, e não 404.** É a única situação do projeto em que 403 é a resposta certa, e ela não conflita com o S19: lá o 404 protege a *existência* de um restaurante que não é seu; aqui o restaurante É o da sessão e o que falta é permissão. Responder 404 diria que o restaurante sumiu, e mandaria quem está no painel procurar o problema no lugar errado.
+**403 aqui, e não 404.** É uma das **duas** situações do projeto em que 403 é a resposta certa — a outra é a loja que ainda não verificou o e-mail, mais abaixo —, e ela não conflita com o S19: lá o 404 protege a *existência* de um restaurante que não é seu; aqui o restaurante É o da sessão e o que falta é permissão. Responder 404 diria que o restaurante sumiu, e mandaria quem está no painel procurar o problema no lugar errado.
 
 **`POST /auth/change-password` exige a senha atual** mesmo já havendo sessão: sem isso, um token roubado trocaria a senha e trancaria o dono para fora — o pior resultado de um vazamento. E revoga as **demais** sessões, poupando a atual; trocar senha é o que se faz ao desconfiar de vazamento, e sessões antigas ainda válidas esvaziariam o gesto.
 
@@ -157,6 +160,35 @@ A sessão de um usuário removido morre sozinha — a resolução do token junta
 A troca (`POST /auth/reset-password`) revoga **todas** as sessões do usuário, sem poupar nenhuma — ao contrário do `change-password`, aqui não existe sessão atual para proteger, e qualquer sessão viva pertence a quem tinha a senha antiga. E não devolve sessão: quem recuperou entra por `/auth/login`, como qualquer login — devolver token ali trocaria a prova de "conhece a senha nova" por só possuir o link.
 
 🚨 **O e-mail sai por `nodemailer` (SMTP) ou por um driver de console, e o de console é recusado em produção — falha ao subir.** Ele escreve o link no log para dev e teste rodarem sem provedor nenhum, mas o link **é** o token: logar isso em produção derramaria credencial de recuperação de senha em log de aplicação, exatamente o que o S13 proíbe. Falhar no boot é a resposta certa — um aviso seria ignorado até o dia em que fizesse falta.
+
+**A verificação do e-mail mora no RESTAURANTE, não no usuário** (`restaurants.email_verified_at`; nulo é "não provou"). A marca natural seria no usuário, já que é a pessoa que prova o endereço — mas quem fica bloqueado e invisível é a **loja**, e é essa diferença que decide o desenho: com a marca no usuário, o hook teria que descobrir se o **dono** verificou (e não o usuário da sessão), um `staff` convidado ficaria bloqueado por não ter verificado nada, e o `findBySlug` do cardápio público — o caminho mais quente da API, o que o QR code abre — passaria a juntar com `restaurant_users`. Com a coluna no restaurante, o hook lê o que já tem em mãos e o filtro público é uma condição a mais numa consulta que já existe. O token aponta para o **usuário** (é a caixa de entrada dele que prova algo) e a verificação marca o restaurante **dele**: não existe token que libere loja de terceiro.
+
+⚠️ **A migration marcou como verificado todo restaurante que já estava no banco** — é o default sendo backfill, o mesmo cuidado da grade de horário e da taxa de entrega. Sem essa linha, o deploy trancaria toda loja do banco no mesmo instante, nas três modalidades. A exigência vale só para cadastro novo.
+
+**403 no painel, 404 no cardápio — é a mesma decisão vista dos dois lados.** Para quem está no painel, a sessão é válida e o restaurante É o da sessão: esconder mandaria a pessoa procurar o problema no lugar errado. Para quem está do lado de fora, uma loja que não provou o e-mail tem que ser indistinguível de uma que não existe — 403 ali diria "existe, mas não verificou", entregando que o slug está ocupado. ⚠️ No hook, o escopo (o 404 do S19) é conferido **antes** da verificação: invertendo a ordem, uma sessão descobriria que o restaurante de outra pessoa existe só por receber 403 em vez de 404. Há teste para essa ordem.
+
+⚠️ **A criação de pedido não herda o filtro do cardápio**, porque resolve a loja por id (`getById`) e não por `findBySlug`. Ela tem o próprio assert em `services/orders.ts` — são dois lugares, de propósito: `getById` é um "pegue o restaurante por id" de propósito geral, e fazê-lo esconder loja não verificada mudaria o contrato para todo chamador futuro, inclusive os três de painel, que só ficam corretos porque o hook roda antes. Não consolide os dois sem saber o que está trocando.
+
+**O reenvio (`POST /auth/resend-verification`) é parte do desenho, não conveniência.** Se o envio falhar no cadastro — SMTP fora do ar naquele minuto —, a loja fica com a conta criada e nenhum caminho para dentro: uma verificação sem reenvio fecharia um buraco e abriria outro, que é exatamente o que o S30 cobra. É por isso, também, que **o login funciona sem verificação** — é como a pessoa chega até o botão. O reenvio manda para o endereço de **quem chama** (nunca para outro), e invalida o token anterior antes de criar o novo, na mesma transação, para não deixar dois links vivos na caixa de entrada.
+
+O token vale **24 horas**, e não a uma hora da recuperação de senha: o perfil de risco é outro — um token de recuperação vazado abre uma conta que já existe e tem dado dentro; um de verificação destrava uma conta vazia, cuja senha quem o pegou continua não tendo. Uma hora obrigaria a reenviar para quem só lê o e-mail depois do almoço. O banco guarda só o **hash**, como em `sessions`, no `trackingToken` e na recuperação.
+
+🚨 **O que mantém a limpeza de cadastro abandonado segura é uma condição só: loja não verificada não pode ter NADA dentro.** Isso foi medido em duas revisões e está preso por teste — não é esperança. A loja bloqueada recebe **403 em toda rota de gestão** (produtos, categorias, grupos de opções, usuários, horário, bairros, o `PATCH` e até o `DELETE` do próprio restaurante, porque a verificação é conferida antes do `ownerOnly`), **404 em toda a superfície pública** (cardápio, listagem, cotação de frete e criação de pedido), e termina com **zero linha em toda tabela filha**. As rotas autenticadas que escapam do gate escapam porque ele depende do parâmetro `:restaurantId` na URL — são `GET /restaurants`, `GET /auth/me`, `POST /auth/resend-verification`, `POST /auth/logout` e `POST /auth/change-password` —, e todas são leitura ou escrita na **própria** conta de quem chama (sessão, senha, token de verificação): nenhuma delas cria filho de restaurante. **Se isso deixar de valer, o estrago não é uma linha a mais removida — são as filhas ficando órfãs**: produto, categoria, grade, bairro e pedido vivos, apontando para um restaurante morto, fora do alcance de qualquer cascata (a cascata de verdade mora no `remove()` de `services/restaurants.ts`, e a limpeza não a usa; e `orders` não entra nela nem lá, de propósito). O teste da varredura tira a lista de tabelas filhas do catálogo do Postgres, para tabela nova entrar sem ninguém precisar lembrar.
+
+**Cadastro abandonado libera slug e e-mail, passados 7 dias.** Quem se cadastra e nunca verifica segura duas coisas escassas, e a verificação tornou o abandono mais provável por criar um passo a mais onde desistir. O dano é mudo: a segunda "Pizzaria do João" ganha sufixo por causa de uma primeira que nunca existiu de fato, e — pior — quem não recebeu o e-mail e tenta de novo com o mesmo endereço batia em "e-mail já usado", sem caminho nenhum. Por isso **`POST /auth/register` agora responde 201 onde respondia 409**. Os 7 dias são folgados de propósito: o token vale 24 horas e o reenvio existe, então "demorei para confirmar" não pode virar "perdi o endereço para outra pessoa".
+
+⚠️ **A liberação roda dentro da transação de quem chamou (D3)**, e marca o restaurante e o usuário dele juntos — é o usuário que segura o e-mail. Se o cadastro novo falhar depois (o slug liberou, mas o e-mail está ocupado por uma conta viva), o rollback desfaz a liberação junto; com transação própria, um 409 apagaria para sempre um cadastro numa requisição que não criou nada.
+
+⚠️ **A limpeza é preguiçosa por falta de lugar melhor, e os dois lugares óbvios não servem.** No índice único parcial o Postgres recusa — `functions in index predicate must be marked IMMUTABLE`, e `now()` não é (verificado neste ambiente). Numa rotina agendada, o projeto não tem agendador, e trazer um para isto seria infraestrutura nova para um caso de borda. Na colisão o trabalho acontece exatamente quando importa, e custa uma consulta a mais só quando há colisão.
+
+### Trabalho depois da resposta (`src/background.ts`)
+
+Três rotas respondem antes de terminar o serviço — o cadastro (manda o e-mail de verificação), o reenvio e o `/auth/forgot-password` —, e nas três o motivo é o mesmo: o tempo de resposta não pode denunciar o que aconteceu, e um provedor de SMTP lento não pode segurar a requisição. `track()` registra a promessa, `drainBackgroundWork()` espera todas. Continua sendo fogo-e-esquece para quem chama: a rota não aguarda nada. O que se ganha é que alguém mais sabe da promessa — sem isso, o `app.close()` termina com o e-mail de quem acabou de se cadastrar no meio, e o `truncate` do `afterEach` disputa lock com o insert que ficou correndo (medido: em três execuções da suíte, uma teve deadlock e uma falha de teste).
+
+Dois detalhes custaram tempo de verdade, e os dois são contraintuitivos:
+
+- ⚠️ **Quem tira do conjunto é o laço do dreno, DEPOIS de esperar** — não o `finally` de `track()`, e nunca antes da espera. Esvaziar o conjunto antes de esperar fazia um segundo dreno, começado no meio do primeiro, enxergar conjunto vazio e voltar dizendo "terminou" com trabalho ainda correndo. E a versão que confiava no `finally` para esvaziar reentrava no `while` com as mesmas promessas já resolvidas, e virava laço quente: medido, um teste ficou **707 segundos** preso assim.
+- ⚠️ **O `onClose` drena com PRAZO** (`SHUTDOWN_DRAIN_TIMEOUT_MS`, 5 s — folga para um envio normal terminar, e dentro de qualquer janela de deploy). A espera ilimitada pendurava o `app.close()` atrás de um socket de SMTP travado — o nodemailer espera 2 minutos para conectar e 10 para o socket — e o `pool.end()` depois dela nunca rodava, que era exatamente o que o hook queria garantir (F26). Perder um e-mail é melhor que não encerrar. No teste o dreno é **sem** prazo, de propósito: ali, trabalho que não termina é sintoma a enxergar, não a esconder.
 
 ### Cardápio público e o slug
 
@@ -456,6 +488,8 @@ A autorização roda em **`preHandler`, não `preValidation`**. Rota WebSocket p
 Todos os números vivem em `src/limits.ts`, cada um com o porquê ao lado, e **nenhum é o default** (F27/S16): `bodyLimit` 128 KB, `keepAliveTimeout` 72s (tem que ser **maior** que o do proxy à frente, senão vira 502 intermitente), `connectionTimeout` 10s, e os tetos de rate limit.
 
 **Rate limit:** 100 req/min por IP no geral, **5 req/min no `/auth/login`**. A chave é só o IP — por e-mail protegeria uma conta de ataque distribuído, mas viraria uma forma de trancar o dono para fora. O contador é em memória, **por processo**: com duas instâncias, o limite efetivo dobra.
+
+⚠️ **`POST /auth/resend-verification` é o único teto do projeto que NÃO tem o IP como chave:** ele conta por **usuário**, 3 por minuto (o suficiente para "cliquei, não chegou, cliquei de novo"). A rota exige sessão, então existe sinal melhor que o endereço de rede — e por IP duas lojas na mesma praça de alimentação, ou atrás do mesmo CGNAT, dividiriam o teto e o botão de "não recebi o e-mail" pararia de funcionar justamente para a segunda. O teto precisa existir porque cada chamada manda um e-mail de verdade: sem ele, uma sessão sozinha dispara os 100/min do teto global contra a reputação do domínio. O S25 manda usar IP em rota **anônima**, onde não há outra chave; não é o caso desta.
 
 ⚠️ **`TRUST_PROXY` precisa estar certo, e os dois erros custam caro.** `false` atrás de um proxy faz `request.ip` ser o IP do proxy para todo mundo, e o teto vira compartilhado entre todos os clientes juntos. `true` com a app exposta direto deixa qualquer um forjar o `X-Forwarded-For` e escolher o próprio IP. Default `false`.
 
