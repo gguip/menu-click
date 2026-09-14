@@ -1,6 +1,12 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildTestApp, createRestaurant, registerAndLogin } from "./helpers.ts";
+import {
+  buildTestApp,
+  createRestaurant,
+  registerAndLogin,
+  validDeliveryAddress,
+} from "./helpers.ts";
 
 /**
  * O bloqueio do painel por e-mail não verificado (Task 2 do plano).
@@ -106,5 +112,88 @@ describe("bloqueio do painel por e-mail não verificado", () => {
     });
 
     expect(response.json().emailVerified).toBe(true);
+  });
+
+  /**
+   * Task 3 do plano: a loja que não provou o e-mail some do lado de fora —
+   * cardápio, cotação de frete e criação de pedido. `registerAndLogin` cria
+   * sem verificar (ver o comentário do topo do arquivo), então `restaurant`
+   * aqui é sempre uma loja invisível para o cliente.
+   */
+  describe("a loja invisível para o cliente até verificar o e-mail", () => {
+    it("o cardápio de loja não verificada responde 404", async () => {
+      const { restaurant } = await registerAndLogin(app, {
+        restaurant: { slug: "invisivel" },
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/invisivel",
+      });
+
+      // 404 e não 403: do lado de fora, loja que não provou o e-mail tem que
+      // ser indistinguível de loja que não existe. 403 entregaria que o slug
+      // está ocupado.
+      expect(response.statusCode).toBe(404);
+      expect(restaurant.slug).toBe("invisivel"); // ela existe; só não aparece
+    });
+
+    it("a listagem de produtos do cardápio também", async () => {
+      await registerAndLogin(app, { restaurant: { slug: "invisivel-produtos" } });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/menu/invisivel-produtos/products",
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("a cotação de frete também", async () => {
+      await registerAndLogin(app, { restaurant: { slug: "invisivel-frete" } });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/menu/invisivel-frete/delivery-quote",
+        payload: { address: validDeliveryAddress, subtotalInCents: 3000 },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("e não dá para criar pedido nela", async () => {
+      const { restaurant } = await registerAndLogin(app);
+
+      // pelo id, não pelo slug: é o caminho que a criação usa
+      // (`restaurantsService.getById`, não `findBySlug`) — productId
+      // qualquer serve: o 404 de visibilidade tem que vir antes de qualquer
+      // checagem de item, ou este teste dependeria de o restaurante ter
+      // produto cadastrado, e uma loja não verificada não passa nem pelo
+      // painel para criar um.
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "dine_in",
+          customer: { name: "Ana Souza", phone: "11999990000" },
+          items: [{ productId: randomUUID(), quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("depois de verificar, a loja aparece", async () => {
+      // mesma loja, agora verificada pelo fluxo real (`createRestaurant`)
+      const restaurant = await createRestaurant(app, { slug: "agora-visivel" });
+
+      const response = await app.inject({
+        method: "GET",
+        url: `/menu/${restaurant.slug}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+    });
   });
 });

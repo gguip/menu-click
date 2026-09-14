@@ -220,7 +220,12 @@ export async function findBySlug(
   db: Queryable = pool,
 ): Promise<Restaurant | null> {
   const { rows } = await db.query<RestaurantRow>(
-    "select * from restaurants where slug = $1 and deleted_at is null",
+    // email_verified_at is not null fica AO LADO do deleted_at is null, e não
+    // por acaso: do ponto de vista de quem está de fora, loja que não provou
+    // o e-mail e loja removida são a mesma coisa - não existem. Um filtro, um
+    // lugar, e cardápio, cotação e pedido herdam.
+    `select * from restaurants
+      where slug = $1 and deleted_at is null and email_verified_at is not null`,
     [slug],
   );
   return rows.length === 0 ? null : toRestaurant(rows[0]);
