@@ -120,6 +120,32 @@ export const EMAIL_VERIFICATION_RATE_LIMIT_MAX = 5;
  */
 export const EMAIL_RESEND_RATE_LIMIT_MAX = 3;
 
+/**
+ * Teto do `/auth/register`, e ele chegou tarde: a rota só virou remetente de
+ * e-mail quando o cadastro passou a disparar o link de verificação. Até ali
+ * era uma rota anônima barata, e o teto global de 100/min bastava; hoje ela é
+ * exatamente o perfil que o S25 descreve, e era a única rota de e-mail do
+ * projeto sem teto próprio.
+ *
+ * Medido antes deste número existir: 120 cadastros do MESMO IP passaram 100 e
+ * dispararam 100 e-mails, para 100 endereços **escolhidos por quem chama** —
+ * 6.000 por hora de um endereço de rede só. Não dá para bombardear UM
+ * endereço (o segundo cadastro com o mesmo e-mail é 409 e não envia), então é
+ * spray e não alvo; mas o dano é o mesmo que o `/auth/forgot-password` já cita
+ * como razão do teto dele — conta do provedor e reputação de domínio, que é o
+ * que faz e-mail legítimo começar a cair no spam de quem não tem nada com
+ * isso. E cada tentativa ainda deixa restaurante, usuário e token no banco,
+ * segurando um slug e um e-mail pelos 7 dias da liberação de cadastro
+ * abandonado.
+ *
+ * Por IP, e não por conta: a rota é anônima — é ela que CRIA a conta —, então
+ * não existe chave melhor, que é o caso em que o S25 manda usar o IP. O
+ * `/auth/resend-verification` chaveia pelo usuário porque tem sessão; aqui não
+ * há nenhuma. Cinco por minuto é o mesmo das rotas irmãs de autenticação e
+ * cobre com folga quem erra o formulário algumas vezes seguidas.
+ */
+export const REGISTER_RATE_LIMIT_MAX = 5;
+
 export const RATE_LIMIT_WINDOW = "1 minute";
 
 /**

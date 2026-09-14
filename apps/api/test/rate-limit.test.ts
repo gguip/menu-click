@@ -6,11 +6,15 @@ import {
   LOGIN_RATE_LIMIT_MAX,
   PASSWORD_RESET_RATE_LIMIT_MAX,
   RATE_LIMIT_MAX,
+  REGISTER_RATE_LIMIT_MAX,
 } from "../src/limits.ts";
 import {
   buildTestApp,
   registerAndLogin,
   registerRestaurant,
+  uniqueEmail,
+  validRestaurantBody,
+  validUserBody,
 } from "./helpers.ts";
 
 /**
@@ -117,6 +121,38 @@ describe("rate limit", () => {
         .slice(0, EMAIL_VERIFICATION_RATE_LIMIT_MAX)
         .map((r) => r.statusCode),
     ).toEqual(Array(EMAIL_VERIFICATION_RATE_LIMIT_MAX).fill(400));
+    expect(respostas.at(-1)?.statusCode).toBe(429);
+  });
+
+  it(`o ${REGISTER_RATE_LIMIT_MAX + 1}º cadastro do mesmo IP é 429`, async () => {
+    // Desde que o cadastro dispara o e-mail de verificação, esta rota é
+    // anônima E manda e-mail para um endereço escolhido por quem chama — o
+    // perfil do S25. Com o teto global de 100/min, um IP só mandava 6.000
+    // e-mails por hora (medido na revisão da branch).
+    const remoteAddress = ipDedicado();
+
+    const respostas = [];
+    for (let i = 0; i < REGISTER_RATE_LIMIT_MAX + 1; i++) {
+      respostas.push(
+        await app.inject({
+          method: "POST",
+          url: "/auth/register",
+          remoteAddress,
+          // e-mail diferente a cada volta: repetir o mesmo daria 409 a partir
+          // do segundo, e o teste passaria sem provar nada sobre o teto
+          payload: {
+            restaurant: validRestaurantBody,
+            user: { ...validUserBody, email: uniqueEmail() },
+          },
+        }),
+      );
+    }
+
+    // as primeiras cadastram de verdade (201); a excedente é recusada pelo
+    // limite, antes de criar linha nenhuma e antes de mandar e-mail nenhum
+    expect(
+      respostas.slice(0, REGISTER_RATE_LIMIT_MAX).map((r) => r.statusCode),
+    ).toEqual(Array(REGISTER_RATE_LIMIT_MAX).fill(201));
     expect(respostas.at(-1)?.statusCode).toBe(429);
   });
 

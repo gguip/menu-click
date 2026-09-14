@@ -9,6 +9,7 @@ import {
   LOGIN_RATE_LIMIT_MAX,
   PASSWORD_RESET_RATE_LIMIT_MAX,
   RATE_LIMIT_WINDOW,
+  REGISTER_RATE_LIMIT_MAX,
 } from "../limits.ts";
 import * as authService from "../services/auth.ts";
 import { track } from "../background.ts";
@@ -254,19 +255,33 @@ export async function authRoutes(app: FastifyInstance) {
   }>(
     "/auth/register",
     {
-      // sem conta ainda não há como se autenticar
-      config: { public: true },
+      config: {
+        // sem conta ainda não há como se autenticar
+        public: true,
+        // Teto próprio, e por IP — ver REGISTER_RATE_LIMIT_MAX em limits.ts.
+        // Desde que o cadastro dispara o e-mail de verificação, esta rota é
+        // anônima E manda e-mail para um endereço escolhido por quem chama:
+        // é o perfil do S25, e o teto global de 100/min deixava justamente
+        // ela de fora da proteção que as irmãs já têm. Por IP porque é esta
+        // rota que CRIA a conta — não há chave melhor, ao contrário do
+        // reenvio, que chaveia pela sessão.
+        rateLimit: {
+          max: REGISTER_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+        },
+      },
       schema: {
         tags: ["Autenticação"],
         operationId: "register",
         summary: "Cadastra restaurante e primeiro usuário",
         description:
-          "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`. Dispara um e-mail de confirmação; até o dono confirmar (`POST /auth/verify-email`), toda rota escopada no restaurante responde 403. O slug ou o e-mail podem estar presos por um **cadastro abandonado** — alguém que se cadastrou e nunca confirmou o e-mail: passados 7 dias, esse cadastro é removido na colisão e o novo é aceito com **201**, em vez do 409. É o caminho de volta de quem nunca recebeu a confirmação.",
+          "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`. Dispara um e-mail de confirmação; até o dono confirmar (`POST /auth/verify-email`), toda rota escopada no restaurante responde 403. O slug ou o e-mail podem estar presos por um **cadastro abandonado** — alguém que se cadastrou e nunca confirmou o e-mail: passados 7 dias, esse cadastro é removido na colisão e o novo é aceito com **201**, em vez do 409. É o caminho de volta de quem nunca recebeu a confirmação. Limite de 5 requisições por minuto por IP (429 ao estourar): cada cadastro manda um e-mail para um endereço escolhido por quem chama.",
         body: registerBodySchema,
         response: {
           201: registerResponseSchema,
           400: errorResponseSchema,
           409: errorResponseSchema,
+          429: errorResponseSchema,
         },
       },
     },
