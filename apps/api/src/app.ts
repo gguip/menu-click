@@ -11,7 +11,6 @@ import {
   KEEP_ALIVE_TIMEOUT_MS,
   RATE_LIMIT_MAX,
   RATE_LIMIT_WINDOW,
-  SHUTDOWN_DRAIN_TIMEOUT_MS,
   TRUST_PROXY,
 } from "./limits.ts";
 import type { FastifyError } from "fastify";
@@ -299,21 +298,17 @@ export async function buildApp() {
     // verificação e de recuperação). Sem isto, encerrar no meio faz o e-mail de
     // quem acabou de se cadastrar sumir sem sintoma nenhum.
     //
-    // ⚠️ Com PRAZO, e ele não é detalhe: a espera sem limite tornava o
-    // `app.close()` ilimitado (F26) e deixava o `pool.end()` abaixo pendurado
-    // atrás de um envio travado. Verificado numa revisão, pelo próprio
-    // `app.close()`. Vencido o prazo, o pool fecha de qualquer jeito e o envio
-    // que sobrou morre com o processo — perder um e-mail é melhor que não
-    // encerrar. Ver SHUTDOWN_DRAIN_TIMEOUT_MS em limits.ts.
+    // ⚠️ A espera tem PRAZO, e ele não é detalhe: sem limite, o `app.close()`
+    // ficava pendurado atrás de um envio travado e o `pool.end()` abaixo nunca
+    // rodava (F26). Verificado numa revisão, pelo próprio `app.close()`.
+    // Vencido o prazo, o pool fecha de qualquer jeito e o envio que sobrou
+    // morre com o processo — perder um e-mail é melhor que não encerrar.
     //
-    // ⚠️ ESTA LINHA NÃO TEM TESTE, e isso está escrito aqui porque medir é
-    // diferente de prometer: `test/background.test.ts` prende o prazo do
-    // `drainBackgroundWork`, mas tirar o ARGUMENTO daqui passa pela suíte
-    // inteira — verificado. Prender o call site custaria um teste de app que
-    // espera os 5 segundos e encerra o pool no meio do arquivo (o `afterEach`
-    // do `setup.ts` ainda dá `truncate` depois), e o preço não paga. Quem
-    // mexer nesta linha não vai ser avisado por nada além deste comentário.
-    await drainBackgroundWork(SHUTDOWN_DRAIN_TIMEOUT_MS);
+    // O prazo vem do PADRÃO de `drainBackgroundWork`, não de um argumento
+    // escrito aqui, e isso foi deliberado: enquanto o argumento morava nesta
+    // linha, apagá-lo recriava aquele defeito e nenhum teste avisava — a suíte
+    // inteira passava sem ele. Ver `SHUTDOWN_DRAIN_TIMEOUT_MS` em limits.ts.
+    await drainBackgroundWork();
 
     await pool.end();
   });

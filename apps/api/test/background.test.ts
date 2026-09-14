@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { drainBackgroundWork, track } from "../src/background.ts";
+import {
+  drainBackgroundWork,
+  drainBackgroundWorkUnbounded,
+  track,
+} from "../src/background.ts";
 
 /**
  * O registro de trabalho que roda depois da resposta (`src/background.ts`).
@@ -11,7 +15,7 @@ import { drainBackgroundWork, track } from "../src/background.ts";
  * branch aplicou duas mutações ao mesmo tempo e a suíte inteira passou.
  *
  * 🚨 Todo teste daqui LIBERA o trabalho que registrou antes de terminar. O
- * `afterEach` de `setup.ts` chama `drainBackgroundWork()` **sem prazo**, então
+ * `afterEach` de `setup.ts` chama `drainBackgroundWorkUnbounded()`, então
  * uma promessa que nunca resolve não deixaria o teste vermelho — penduraria a
  * suíte inteira.
  */
@@ -55,7 +59,7 @@ describe("trabalho depois da resposta", () => {
     // e o que sobrou continua correndo por conta própria: liberado, o dreno
     // sem prazo o encontra e espera
     envio.resolve();
-    await drainBackgroundWork();
+    await drainBackgroundWorkUnbounded();
     expect(terminou).toBe(true);
   });
 
@@ -75,7 +79,7 @@ describe("trabalho depois da resposta", () => {
 
     envio.reject(new Error("SMTP fora do ar"));
 
-    await expect(drainBackgroundWork()).resolves.toBeUndefined();
+    await expect(drainBackgroundWorkUnbounded()).resolves.toBeUndefined();
   });
 
   /**
@@ -101,13 +105,13 @@ describe("trabalho depois da resposta", () => {
 
     let primeiroVoltou = false;
     let segundoVoltou = false;
-    const primeiro = drainBackgroundWork().then(() => {
+    const primeiro = drainBackgroundWorkUnbounded().then(() => {
       primeiroVoltou = true;
       return terminou;
     });
     // começa com o primeiro já em espera: é a condição que a versão errada
     // atravessava
-    const segundo = drainBackgroundWork().then(() => {
+    const segundo = drainBackgroundWorkUnbounded().then(() => {
       segundoVoltou = true;
       return terminou;
     });

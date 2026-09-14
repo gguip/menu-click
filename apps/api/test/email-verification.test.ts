@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { escapeIdentifier } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { drainBackgroundWork } from "../src/background.ts";
+import { drainBackgroundWorkUnbounded } from "../src/background.ts";
 import { pool } from "../src/db/pool.ts";
 import { clearOutbox, outbox } from "../src/email.ts";
 import {
@@ -776,7 +776,7 @@ describe("bloqueio do painel por e-mail não verificado", () => {
 
       // o envio roda DEPOIS da resposta: sem drenar, conferir a caixa aqui só
       // provaria que o teste chegou antes dele
-      await drainBackgroundWork();
+      await drainBackgroundWorkUnbounded();
       expect(outbox.filter((email) => email.to === user.email)).toEqual([]);
 
       // e é por não existir link novo que o carimbo não tem como andar — antes

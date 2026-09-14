@@ -1,3 +1,5 @@
+import { SHUTDOWN_DRAIN_TIMEOUT_MS } from "./limits.ts";
+
 /**
  * Trabalho que continua depois da resposta.
  *
@@ -48,15 +50,16 @@ export function track(work: Promise<unknown>): void {
  * `afterEach` dos testes (para o `truncate` não disputar lock com um insert
  * que ficou correndo).
  *
- * `timeoutMs` limita a espera: vencido o prazo, a função volta e o que sobrou
- * segue correndo por conta própria. Só o encerramento passa esse argumento —
- * ver `SHUTDOWN_DRAIN_TIMEOUT_MS` em `limits.ts`. Sem ele a espera é
- * ilimitada, que é o que o teste quer: ali, trabalho que não termina é sintoma
- * a enxergar, não a esconder.
+ * **A espera tem prazo por padrão**, `SHUTDOWN_DRAIN_TIMEOUT_MS`: vencido ele,
+ * a função volta e o que sobrou segue correndo por conta própria. O padrão é
+ * esse porque o caminho perigoso é o de produção — esperar sem limite no
+ * `onClose` pendurava o `app.close()` atrás de um SMTP travado. Quem quiser
+ * mesmo esperar para sempre chama `drainBackgroundWorkUnbounded()`, que diz
+ * isso no nome; ninguém recria aquele defeito apagando um argumento.
  */
-export async function drainBackgroundWork(timeoutMs?: number): Promise<void> {
-  if (timeoutMs === undefined) return esperarTudo();
-
+export async function drainBackgroundWork(
+  timeoutMs: number = SHUTDOWN_DRAIN_TIMEOUT_MS,
+): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const prazo = new Promise<void>((resolve) => {
     timer = setTimeout(resolve, timeoutMs);
@@ -69,6 +72,26 @@ export async function drainBackgroundWork(timeoutMs?: number): Promise<void> {
     // processo pelo prazo inteiro — justamente no caminho do encerramento
     clearTimeout(timer);
   }
+}
+
+/**
+ * Espera SEM prazo nenhum.
+ *
+ * ⚠️ Existe para o teste, e o nome é comprido de propósito. O `afterEach` de
+ * `test/setup.ts` precisa que TODO o trabalho tenha acabado antes do
+ * `truncate` — um dreno que desista no meio traz de volta o deadlock entre o
+ * insert do token e o lock exclusivo do truncate, que foi o motivo deste
+ * módulo existir. E ali, trabalho que não termina é sintoma a enxergar.
+ *
+ * **Em código de produção, não.** Foi por esperar sem prazo que o `onClose`
+ * pendurou o `app.close()` atrás de um SMTP travado, com o `pool.end()` nunca
+ * rodando (F26). É por isso que o prazo virou o PADRÃO do
+ * `drainBackgroundWork` e a espera infinita virou esta função de nome feio:
+ * antes bastava alguém apagar um argumento para recriar aquele defeito, e
+ * nenhum teste avisaria. Agora recriá-lo exige chamar isto aqui, de propósito.
+ */
+export function drainBackgroundWorkUnbounded(): Promise<void> {
+  return esperarTudo();
 }
 
 /**

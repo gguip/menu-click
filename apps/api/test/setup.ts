@@ -1,5 +1,5 @@
 import { afterEach, beforeEach } from "vitest";
-import { drainBackgroundWork } from "../src/background.ts";
+import { drainBackgroundWorkUnbounded } from "../src/background.ts";
 import { pool } from "../src/db/pool.ts";
 
 /**
@@ -17,7 +17,7 @@ afterEach(async () => {
   // insere linha, e o `truncate` toma lock exclusivo — os dois colidem em
   // deadlock. Medido antes desta linha existir: em três execuções da suíte,
   // uma teve deadlock e uma falha de teste.
-  await drainBackgroundWork();
+  await drainBackgroundWorkUnbounded();
 
   await pool.query(
     `truncate table order_items, orders, customers,
