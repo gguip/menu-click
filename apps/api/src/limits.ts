@@ -106,6 +106,21 @@ export const EMAIL_VERIFICATION_RATE_LIMIT_MAX = 5;
 export const RATE_LIMIT_WINDOW = "1 minute";
 
 /**
+ * Quanto o encerramento espera pelo trabalho que roda depois da resposta (os
+ * e-mails de verificação e de recuperação) antes de fechar o pool.
+ *
+ * ⚠️ O prazo existe porque esperar sem limite é pior que perder o e-mail. O
+ * `onClose` é o caminho do `SIGTERM` (F26), e o nodemailer tem timeouts
+ * próprios largos — 2 minutos para conectar, 10 para o socket. Um SMTP travado
+ * seguraria o `app.close()` muito além dos 10 a 30 segundos que um
+ * orquestrador costuma dar, e aí quem encerra o processo é o SIGKILL: o pool
+ * nunca chega a fechar direito, que é exatamente o que o hook queria garantir.
+ * Cinco segundos dão folga para um envio normal terminar e mantêm o
+ * encerramento dentro de qualquer janela de deploy.
+ */
+export const SHUTDOWN_DRAIN_TIMEOUT_MS = 5_000;
+
+/**
  * Origens autorizadas a chamar a API de dentro de um navegador.
  *
  * Lista separada por vírgula em `CORS_ORIGINS`. **Sem a variável, nenhuma

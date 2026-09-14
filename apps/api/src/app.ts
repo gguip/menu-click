@@ -11,6 +11,7 @@ import {
   KEEP_ALIVE_TIMEOUT_MS,
   RATE_LIMIT_MAX,
   RATE_LIMIT_WINDOW,
+  SHUTDOWN_DRAIN_TIMEOUT_MS,
   TRUST_PROXY,
 } from "./limits.ts";
 import type { FastifyError } from "fastify";
@@ -297,7 +298,14 @@ export async function buildApp() {
     // Espera o trabalho que roda fora do caminho da resposta (os e-mails de
     // verificação e de recuperação). Sem isto, encerrar no meio faz o e-mail de
     // quem acabou de se cadastrar sumir sem sintoma nenhum.
-    await drainBackgroundWork();
+    //
+    // ⚠️ Com PRAZO, e ele não é detalhe: a espera sem limite tornava o
+    // `app.close()` ilimitado (F26) e deixava o `pool.end()` abaixo pendurado
+    // atrás de um envio travado. Verificado numa revisão, pelo próprio
+    // `app.close()`. Vencido o prazo, o pool fecha de qualquer jeito e o envio
+    // que sobrou morre com o processo — perder um e-mail é melhor que não
+    // encerrar. Ver SHUTDOWN_DRAIN_TIMEOUT_MS em limits.ts.
+    await drainBackgroundWork(SHUTDOWN_DRAIN_TIMEOUT_MS);
 
     await pool.end();
   });

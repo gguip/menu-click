@@ -24,11 +24,21 @@ const emAndamento = new Set<Promise<unknown>>();
  * Registra uma promessa que roda fora do caminho da resposta.
  *
  * Quem chama NÃO deve dar `await`: o ponto é justamente não esperar. O
- * `.catch` fica por conta de quem chama, porque só ele sabe o que logar.
+ * `.catch` de verdade — o que escreve no log — fica por conta de quem chama,
+ * porque só ele sabe o que logar.
+ *
+ * ⚠️ O `.catch(() => {})` do fim não substitui aquele, e não é redundante com
+ * ele. `work.finally(cb)` devolve uma promessa DERIVADA, que rejeita junto
+ * quando `work` rejeita; solta com `void`, ninguém a trata, e o Node derruba o
+ * processo por unhandled rejection — verificado, sai com código 1, e não há
+ * `process.on("unhandledRejection")` em lugar nenhum do projeto. Hoje as três
+ * chamadas põem o `.catch` antes de chamar aqui, então isto é rede e não
+ * conserto: ela troca "um e-mail que falhou derruba a API inteira" por "um
+ * e-mail que falhou some em silêncio". Pior que logar, muito melhor que cair.
  */
 export function track(work: Promise<unknown>): void {
   emAndamento.add(work);
-  void work.finally(() => emAndamento.delete(work));
+  void work.finally(() => emAndamento.delete(work)).catch(() => {});
 }
 
 /**
@@ -36,23 +46,57 @@ export function track(work: Promise<unknown>): void {
  *
  * Usado pelo `onClose` (para não perder e-mail no encerramento) e pelo
  * `afterEach` dos testes (para o `truncate` não disputar lock com um insert
- * que ficou correndo). Repete enquanto houver trabalho, porque uma tarefa
- * pode registrar outra.
+ * que ficou correndo).
+ *
+ * `timeoutMs` limita a espera: vencido o prazo, a função volta e o que sobrou
+ * segue correndo por conta própria. Só o encerramento passa esse argumento —
+ * ver `SHUTDOWN_DRAIN_TIMEOUT_MS` em `limits.ts`. Sem ele a espera é
+ * ilimitada, que é o que o teste quer: ali, trabalho que não termina é sintoma
+ * a enxergar, não a esconder.
  */
-export async function drainBackgroundWork(): Promise<void> {
+export async function drainBackgroundWork(timeoutMs?: number): Promise<void> {
+  if (timeoutMs === undefined) return esperarTudo();
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const prazo = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs);
+  });
+
+  try {
+    await Promise.race([esperarTudo(), prazo]);
+  } finally {
+    // sem isto o timer pendente segura o event loop e atrasa a saída do
+    // processo pelo prazo inteiro — justamente no caminho do encerramento
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * O laço: espera o que está registrado, TIRA do conjunto o que já esperou, e
+ * volta a conferir.
+ *
+ * ⚠️ Quem remove é este laço, depois do `await` — não o `finally` de `track()`
+ * —, e é essa a diferença entre um dreno que termina e um que não termina. Na
+ * primeira versão o laço só esperava, confiando no `finally` para esvaziar:
+ * mas o `await` retoma como microtask e pode chegar ANTES dele, e aí o `while`
+ * reentra com as mesmas promessas, já resolvidas, o `allSettled` volta na hora
+ * e vira laço quente. Foi medido: um teste ficou 707 segundos preso assim.
+ * Tirando explicitamente o que acabou de ser esperado, cada volta é menor que
+ * a anterior, sem depender de quando o `finally` roda.
+ *
+ * ⚠️ E o conjunto continua CHEIO durante a espera, também de propósito: um
+ * segundo dreno que comece no meio do primeiro enxerga o mesmo trabalho e
+ * espera por ele. A versão que esvaziava antes de esperar fazia o segundo ver
+ * conjunto vazio e voltar na hora dizendo "terminou" com trabalho ainda
+ * correndo — reproduzido numa revisão.
+ *
+ * Trabalho registrado durante a espera fica no conjunto e cai na volta
+ * seguinte, que é por que o laço existe.
+ */
+async function esperarTudo(): Promise<void> {
   while (emAndamento.size > 0) {
-    // ⚠️ Esvazia o conjunto ANTES de esperar, e isso não é detalhe.
-    //
-    // Esperando sem esvaziar, o `await` retoma como microtask e pode chegar
-    // antes dos `finally` que removem cada promessa — o `while` reentra com as
-    // mesmas, ja resolvidas, o `allSettled` volta na hora, e vira laco quente
-    // que nunca sai. Foi medido: um teste ficou 707 segundos preso assim.
-    //
-    // Tirando primeiro, cada volta espera exatamente o que estava registrado.
-    // Trabalho que se registrar durante a espera cai na volta seguinte, que e
-    // por isso que o laco existe.
     const pendentes = [...emAndamento];
-    emAndamento.clear();
     await Promise.allSettled(pendentes);
+    for (const promessa of pendentes) emAndamento.delete(promessa);
   }
 }
