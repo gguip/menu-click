@@ -205,7 +205,9 @@ it("o /auth/me diz que o restaurante não está verificado", async () => {
 
   const response = await app.inject({ method: "GET", url: "/auth/me", headers });
 
-  expect(response.json().restaurant.emailVerified).toBe(false);
+  // no TOPO do corpo, não aninhado: o `/auth/me` devolve `RestaurantUser`, e
+  // não há `restaurant` nele — conferido antes de escrever
+  expect(response.json().emailVerified).toBe(false);
 });
 
 it("restaurante verificado opera normalmente", async () => {
@@ -267,7 +269,7 @@ que importa: a alternativa seria uma segunda consulta no hook.
 
 - [ ] **Step 4: O `/auth/me`**
 
-`restaurant.emailVerified: boolean` no `schema.response`. **Booleano, não a
+`emailVerified: boolean` no topo do `schema.response` do `/auth/me` — o corpo é o `RestaurantUser`, não o restaurante. **Booleano, não a
 data**: quando a loja verificou é informação de auditoria, não do painel, e o
 `schema.response` é o que impede coluna nova de vazar (S10).
 
@@ -408,9 +410,33 @@ export async function findBySlug(
 }
 ```
 
-⚠️ **A criação de pedido resolve o restaurante pelo ID, não pelo slug.** Confira
-qual função ela usa: se não for o `findBySlug`, o filtro precisa ir também lá, e
-o teste do pedido é o que pega isso. **Não presuma que herda — verifique.**
+⚠️ **A criação de pedido NÃO herda este filtro, e isso já foi verificado.**
+
+Ela resolve por `restaurantsService.getById(restaurantId)`
+(`services/orders.ts:342`), e `getById` serve também `routes/restaurants.ts:94`
+e as transições de pedido do painel. **Não filtre dentro dele** — mudaria o
+significado de mais de vinte caminhos de painel, e só não quebraria hoje porque
+o hook bloqueia antes, o que é apoio frágil demais.
+
+A criação ganha um **assert próprio**, ao lado do `assertLojaAberta`, lançando
+`NotFoundError`:
+
+```ts
+/**
+ * Loja que não provou o e-mail não existe para o cliente — nem para pedir.
+ *
+ * 404 e não 403 pelo mesmo motivo do cardápio: do lado de fora ela tem que ser
+ * indistinguível de uma loja que não existe.
+ *
+ * ⚠️ Mora aqui, e não dentro do `getById`, porque aquele é usado por todo o
+ * painel. Filtrar lá faria vinte rotas mudarem de significado de uma vez.
+ */
+function assertLojaVisivel(restaurant: Restaurant, restaurantId: string): void {
+  if (restaurant.emailVerifiedAt === undefined) {
+    throw new NotFoundError(`Restaurante com id "${restaurantId}" não encontrado`);
+  }
+}
+```
 
 - [ ] **Step 4: Rodar, type-check, lint**
 
