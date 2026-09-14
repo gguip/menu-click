@@ -261,7 +261,7 @@ export async function authRoutes(app: FastifyInstance) {
         operationId: "register",
         summary: "Cadastra restaurante e primeiro usuário",
         description:
-          "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`. Dispara um e-mail de confirmação; até o dono confirmar (`POST /auth/verify-email`), toda rota escopada no restaurante responde 403.",
+          "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`. Dispara um e-mail de confirmação; até o dono confirmar (`POST /auth/verify-email`), toda rota escopada no restaurante responde 403. O slug ou o e-mail podem estar presos por um **cadastro abandonado** — alguém que se cadastrou e nunca confirmou o e-mail: passados 7 dias, esse cadastro é removido na colisão e o novo é aceito com **201**, em vez do 409. É o caminho de volta de quem nunca recebeu a confirmação.",
         body: registerBodySchema,
         response: {
           201: registerResponseSchema,
