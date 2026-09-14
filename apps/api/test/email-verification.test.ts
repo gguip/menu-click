@@ -642,9 +642,12 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       // 4. verifica — sem sessão nenhuma no caminho: é o token que prova quem é
       expect((await verifica(token)).statusCode).toBe(200);
 
-      // 5. opera: a MESMA requisição do passo 1, com a MESMA sessão. Verificar
-      // não devolve credencial nova, e é isso que este passo prende — se
-      // devolvesse, possuir o link já seria entrar
+      // 5. opera: a MESMA requisição do passo 1, com a MESMA sessão — a
+      // verificação libera o que já existe, sem ninguém ter que entrar de
+      // novo. (Que ela não devolve credencial nova é OUTRA propriedade, presa
+      // pelo teste "verificar não devolve sessão" e pelo `schema.response` da
+      // rota: reusar a sessão antiga passaria igual se o verify devolvesse
+      // token.)
       const produto = await app.inject({
         method: "POST",
         url: `/restaurants/${restaurant.id}/products`,
@@ -832,8 +835,15 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       );
 
       // a sessão de quem desistiu morre sozinha, sem ninguém apagar linha de
-      // `sessions`: a resolução do token junta `restaurant_users` filtrando
-      // `deleted_at is null`
+      // `sessions` — marcar o usuário basta.
+      //
+      // ⚠️ Este 401 NÃO prende o filtro `u.deleted_at is null` da query de
+      // sessão, embora ele seja o primeiro a disparar: o `/auth/me` tem a
+      // segunda rede do `getUser` (`services/auth.ts`) e responde 401 com o
+      // filtro ou sem ele — medido numa revisão, tirando o filtro a suíte
+      // inteira passava. Quem prende o filtro é a asserção em rota ESCOPADA
+      // de `auth-users.test.ts` ("a sessão do removido para de valer na
+      // hora").
       expect(
         (await app.inject({ method: "GET", url: "/auth/me", headers })).statusCode,
       ).toBe(401);
