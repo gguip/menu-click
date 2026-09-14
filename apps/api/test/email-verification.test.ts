@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { pool } from "../src/db/pool.ts";
+import { clearOutbox } from "../src/email.ts";
 import {
   buildTestApp,
   createRestaurant,
+  esperaEmail,
+  extraiToken,
   registerAndLogin,
   validDeliveryAddress,
 } from "./helpers.ts";
@@ -194,6 +198,206 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       });
 
       expect(response.statusCode).toBe(200);
+    });
+  });
+
+  /**
+   * `POST /auth/verify-email` (o mecanismo por trás do desbloqueio acima) e
+   * `POST /auth/resend-verification` — Task 4 do plano.
+   *
+   * Espelha `password-reset.test.ts` de perto, e por isso reaproveita os
+   * mesmos `esperaEmail`/`extraiToken` de `./helpers.ts` — duas cópias
+   * divergiriam no dia em que o formato do link mudasse.
+   *
+   * ⚠️ Nenhum teste aqui mede relógio. O de expiração envelhece a linha no
+   * BANCO (mesmo padrão de `password-reset.test.ts`).
+   */
+  describe("verificação por token e reenvio", () => {
+    it("o cadastro dispara o e-mail de verificação", async () => {
+      const { user } = await registerAndLogin(app);
+
+      const email = await esperaEmail(user.email);
+      expect(email.text).toContain("http");
+    });
+
+    it("verifica com o token e a loja passa a operar", async () => {
+      const { restaurant, headers, user } = await registerAndLogin(app);
+      const token = extraiToken((await esperaEmail(user.email)).text);
+
+      const verifica = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token },
+      });
+      expect(verifica.statusCode).toBe(200);
+
+      const produtos = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/products`,
+        headers,
+      });
+      expect(produtos.statusCode).toBe(200);
+    });
+
+    it("o token não serve duas vezes", async () => {
+      const { user } = await registerAndLogin(app);
+      const token = extraiToken((await esperaEmail(user.email)).text);
+
+      const primeira = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token },
+      });
+      expect(primeira.statusCode).toBe(200);
+
+      const segunda = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token },
+      });
+      expect(segunda.statusCode).toBe(400);
+    });
+
+    it("token expirado não serve", async () => {
+      const { user } = await registerAndLogin(app);
+      const token = extraiToken((await esperaEmail(user.email)).text);
+
+      // envelhece a linha no BANCO — nunca espera o relógio
+      await pool.query(
+        `update email_verification_tokens set expires_at = now() - interval '1 minute'
+          where restaurant_user_id = $1`,
+        [user.id],
+      );
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("token inventado não serve", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token: "um-token-que-nunca-existiu" },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("mensagem única para token inválido, expirado e já usado", async () => {
+      const inventado = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token: "outro-token-que-nunca-existiu" },
+      });
+
+      const { user: usuarioExpirado } = await registerAndLogin(app);
+      const tokenExpirado = extraiToken(
+        (await esperaEmail(usuarioExpirado.email)).text,
+      );
+      await pool.query(
+        `update email_verification_tokens set expires_at = now() - interval '1 minute'
+          where restaurant_user_id = $1`,
+        [usuarioExpirado.id],
+      );
+      const expirado = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token: tokenExpirado },
+      });
+
+      const { user: usuarioJaVerificado } = await registerAndLogin(app);
+      const tokenJaUsado = extraiToken(
+        (await esperaEmail(usuarioJaVerificado.email)).text,
+      );
+      await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token: tokenJaUsado },
+      });
+      const jaUsado = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token: tokenJaUsado },
+      });
+
+      expect(inventado.statusCode).toBe(400);
+      expect(expirado.statusCode).toBe(400);
+      expect(jaUsado.statusCode).toBe(400);
+
+      // distinguir diria a quem guarda um link velho se ele um dia existiu
+      const mensagens = new Set(
+        [inventado, expirado, jaUsado].map((r) => r.json().message),
+      );
+      expect(mensagens.size).toBe(1);
+    });
+
+    it("verificar não devolve sessão", async () => {
+      const { user } = await registerAndLogin(app);
+      const token = extraiToken((await esperaEmail(user.email)).text);
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token },
+      });
+
+      // devolver sessão aqui dispensaria o login: possuir o link já bastaria
+      expect(JSON.stringify(response.json())).not.toContain("token");
+    });
+
+    it("o reenvio manda outro link, e o novo funciona", async () => {
+      const { user, headers } = await registerAndLogin(app);
+      await esperaEmail(user.email); // consome o e-mail do cadastro
+      clearOutbox();
+
+      const reenvio = await app.inject({
+        method: "POST",
+        url: "/auth/resend-verification",
+        headers,
+      });
+      expect(reenvio.statusCode).toBe(202);
+
+      const novoToken = extraiToken((await esperaEmail(user.email)).text);
+      const verifica = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token: novoToken },
+      });
+      expect(verifica.statusCode).toBe(200);
+    });
+
+    it("o reenvio invalida o token anterior", async () => {
+      const { user, headers } = await registerAndLogin(app);
+      const tokenAntigo = extraiToken((await esperaEmail(user.email)).text);
+      clearOutbox();
+
+      const reenvio = await app.inject({
+        method: "POST",
+        url: "/auth/resend-verification",
+        headers,
+      });
+      expect(reenvio.statusCode).toBe(202);
+      // espera o trabalho em segundo plano (invalidar + criar + enviar)
+      // terminar antes de tentar o token velho
+      await esperaEmail(user.email);
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token: tokenAntigo },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it("o reenvio exige sessão", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/resend-verification",
+      });
+      expect(response.statusCode).toBe(401);
     });
   });
 });

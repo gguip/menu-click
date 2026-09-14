@@ -7105,7 +7105,7 @@
         "tags": [
           "Autenticação"
         ],
-        "description": "Consome o token que o cadastro mandou por e-mail e libera o painel (a loja passa a responder fora do 403 de `authenticate.ts`). Mensagem única para token inválido, expirado ou já usado — distinguir diria a quem guarda um link velho se ele um dia existiu. Não devolve sessão: quem verificou entra como sempre, por `POST /auth/login`.",
+        "description": "Consome o token que o cadastro (ou o reenvio, `POST /auth/resend-verification`) mandou por e-mail e libera o painel (a loja passa a responder fora do 403 de `authenticate.ts`). Mensagem única para token inválido, expirado ou já usado — distinguir diria a quem guarda um link velho se ele um dia existiu. Não devolve sessão: quem verificou entra como sempre, por `POST /auth/login`. Limite de 5 requisições por minuto por IP (429 ao estourar), mesmo perfil do `/auth/reset-password`.",
         "requestBody": {
           "required": true,
           "content": {
@@ -7144,6 +7144,80 @@
             }
           },
           "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/resend-verification": {
+      "post": {
+        "operationId": "resendEmailVerification",
+        "summary": "Reenvia o e-mail de verificação",
+        "tags": [
+          "Autenticação"
+        ],
+        "description": "Manda outro link de verificação para o e-mail de quem chama (nunca para outro endereço) e invalida o token anterior, para não deixar dois links vivos na caixa de entrada. Exige sessão, mas funciona com a loja ainda bloqueada — é o caminho de volta quando o e-mail do cadastro falhou (SMTP fora do ar) ou não chegou (S30).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
             "description": "Default Response",
             "content": {
               "application/json": {

@@ -5,6 +5,8 @@ import { clearOutbox, outbox } from "../src/email.ts";
 import {
   buildTestApp,
   createRestaurant,
+  esperaEmail,
+  extraiToken,
   uniqueEmail,
   validUserBody,
 } from "./helpers.ts";
@@ -43,15 +45,9 @@ describe("recuperação de senha", () => {
     clearOutbox();
   });
 
-  /** Espera o envio, que acontece FORA do caminho da resposta. */
-  async function esperaEmail(paraQuem: string) {
-    for (let i = 0; i < 50; i++) {
-      const achado = outbox.findLast((email) => email.to === paraQuem);
-      if (achado !== undefined) return achado;
-      await new Promise((r) => setTimeout(r, 20));
-    }
-    throw new Error(`nenhum e-mail para ${paraQuem}`);
-  }
+  // `esperaEmail` (espera o envio, que acontece FORA do caminho da resposta)
+  // vem de `./helpers.ts` — compartilhada com a verificação de e-mail, não
+  // duplicada aqui: duas cópias divergiriam no dia em que uma das duas mudar.
 
   /**
    * Dá tempo para o trabalho assíncrono (disparado sem `await` pela rota)
@@ -235,18 +231,8 @@ describe("recuperação de senha", () => {
    * o token que `/auth/forgot-password` mandou por e-mail.
    */
   describe("troca via POST /auth/reset-password", () => {
-    /**
-     * Extrai o token do link dentro do corpo do e-mail. O banco só guarda o
-     * hash (ver `tokens.ts`), então o token só existe aqui — no texto que o
-     * driver de console "enviou".
-     */
-    function extraiToken(texto: string): string {
-      const encontrado = texto.match(/token=([^\s&]+)/);
-      if (encontrado === null) {
-        throw new Error("e-mail sem link de recuperação");
-      }
-      return decodeURIComponent(encontrado[1]);
-    }
+    // `extraiToken` (extrai o token do link no corpo do e-mail) vem de
+    // `./helpers.ts` — mesma razão do `esperaEmail` acima.
 
     /** Pede a recuperação e devolve o token já extraído do e-mail. */
     async function pedeTokenDeRecuperacao(email: string): Promise<string> {

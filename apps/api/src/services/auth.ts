@@ -138,6 +138,14 @@ function verifyEmailLink(token: string): string {
   return `${base}?token=${encodeURIComponent(token)}`;
 }
 
+/** Assunto e corpo do e-mail de verificação — comum ao cadastro e ao reenvio. */
+function verificationEmailMessage(token: string): { subject: string; text: string } {
+  return {
+    subject: "Confirme o e-mail do seu restaurante no MenuClick",
+    text: `Confirme o e-mail do seu restaurante para liberar o painel. Use o link abaixo em até 24 horas:\n\n${verifyEmailLink(token)}\n\nSe não foi você, ignore este e-mail.`,
+  };
+}
+
 /**
  * Manda o e-mail que confirma o cadastro.
  *
@@ -147,12 +155,8 @@ function verifyEmailLink(token: string): string {
  * 201 já revelou que a conta existe); ficar fora do caminho da resposta é só
  * para não segurar uma conexão do pool numa chamada de rede.
  *
- * ⚠️ Este é o caminho MÍNIMO da verificação. O plano original deixa "o
- * cadastro dispara o e-mail" para a Task 4 — mas a Task 2 (o bloqueio em si)
- * só consegue testar o desbloqueio pelo fluxo de verdade se esse e-mail já
- * sair no cadastro, então ele nasceu aqui. Falta o reenvio (`/auth/resend-
- * verification`) e o teto de rate limit dedicado da rota de verificação —
- * ambos ficam para a Task 4, que espelha `requestPasswordReset` de perto.
+ * Não invalida token anterior (ao contrário do reenvio, `resendEmailVerifi-
+ * cation`): um usuário recém-criado não tem token nenhum para invalidar.
  */
 export async function sendEmailVerification(user: RestaurantUser): Promise<void> {
   const token = generateToken();
@@ -164,11 +168,49 @@ export async function sendEmailVerification(user: RestaurantUser): Promise<void>
     expiresAt,
   });
 
-  await sendEmail({
-    to: user.email,
-    subject: "Confirme o e-mail do seu restaurante no MenuClick",
-    text: `Confirme o e-mail do seu restaurante para liberar o painel. Use o link abaixo em até 24 horas:\n\n${verifyEmailLink(token)}\n\nSe não foi você, ignore este e-mail.`,
+  await sendEmail({ to: user.email, ...verificationEmailMessage(token) });
+}
+
+/**
+ * Reenvia o link de verificação — a outra ponta de `sendEmailVerification`,
+ * para quando o e-mail do cadastro não chegou (SMTP fora do ar naquele
+ * minuto) ou a pessoa só quer tentar de novo.
+ *
+ * Manda para o e-mail de QUEM CHAMA, nunca para outro endereço — o parâmetro
+ * é a sessão (`AuthContext`), não um e-mail arbitrário. Não há ambiguidade
+ * sobre "reenviar para quem": convidar um usuário é rota escopada em
+ * restaurante, portanto bloqueada enquanto a loja não verificar (S32/
+ * `authenticate.ts`) — então o único usuário capaz de chamar isto num
+ * restaurante ainda não verificado é o dono que acabou de se cadastrar.
+ *
+ * Invalida o token anterior ANTES de criar o novo, na mesma transação: sem
+ * isso, dois links ficariam vivos na caixa de entrada, e o mais velho
+ * continuaria funcionando.
+ *
+ * Chamada pela ROTA sem `await`, depois de responder 202 — mesmo motivo do
+ * `sendEmailVerification`/`requestPasswordReset`: não segurar uma conexão do
+ * pool durante a ida e volta do SMTP.
+ */
+export async function resendEmailVerification(auth: AuthContext): Promise<void> {
+  const user = await restaurantUsersRepository.findById(auth.userId);
+  // sessão válida apontando para usuário removido não deveria acontecer (a
+  // consulta de sessão já filtra `deleted_at is null`), mas o tipo permite
+  if (user === null) throw new UnauthorizedError("Sessão inválida");
+
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
+
+  await withTransaction(async (client) => {
+    await emailVerificationRepository.softDeleteLiveForUser(user.id, client);
+    await emailVerificationRepository.insert(
+      { restaurantUserId: user.id, tokenHash: hashToken(token), expiresAt },
+      client,
+    );
   });
+
+  // FORA da transação e depois do commit: sendEmail é rede, e segurar uma
+  // conexão do pool durante a ida e volta do SMTP é desperdício.
+  await sendEmail({ to: user.email, ...verificationEmailMessage(token) });
 }
 
 /**

@@ -91,6 +91,18 @@ export const DELIVERY_QUOTE_RATE_LIMIT_MAX = 20;
  */
 export const PASSWORD_RESET_RATE_LIMIT_MAX = 5;
 
+/**
+ * Teto do `/auth/verify-email`, mesmo perfil do S25: rota anônima, e o custo
+ * de uma tentativa não é o bcrypt (o token não passa por hash caro) — é o
+ * banco. O token tem 256 bits, então adivinhar um de verdade continua
+ * inviável mesmo sem este teto; o que ele limita é o tamanho da varredura que
+ * um IP consegue fazer contra a tabela por minuto, e evita que esta rota
+ * anônima divida o teto global de 100/min com as legítimas (cardápio,
+ * criação de pedido). Mesmo número do `/auth/reset-password`, que é a rota
+ * irmã (mesma forma de token, mesma exposição anônima).
+ */
+export const EMAIL_VERIFICATION_RATE_LIMIT_MAX = 5;
+
 export const RATE_LIMIT_WINDOW = "1 minute";
 
 /**

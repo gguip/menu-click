@@ -4,6 +4,7 @@ import type { CreateRestaurantInput } from "../domain/restaurant.ts";
 import type { CreateRestaurantUserInput } from "../domain/restaurant-user.ts";
 import { PASSWORD_MIN_LENGTH } from "../domain/restaurant-user.ts";
 import {
+  EMAIL_VERIFICATION_RATE_LIMIT_MAX,
   LOGIN_RATE_LIMIT_MAX,
   PASSWORD_RESET_RATE_LIMIT_MAX,
   RATE_LIMIT_WINDOW,
@@ -147,6 +148,18 @@ const verifyEmailResponseSchema = {
 };
 
 /**
+ * Mensagem genérica, mesmo formato do `/auth/forgot-password` (S10): não há
+ * pretexto para carregar mais que uma mensagem aqui, e o reenvio nunca teve
+ * token nem sessão para vazar.
+ */
+const resendVerificationResponseSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string" },
+  },
+};
+
+/**
  * O `/auth/me` de sempre, mais `emailVerified` NO TOPO — o corpo é o
  * `RestaurantUser`, e não há `restaurant` aninhado nele. Booleano, não a
  * data: quando a loja verificou é informação de auditoria, não do painel, e
@@ -281,23 +294,73 @@ export async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { token: string } }>(
     "/auth/verify-email",
     {
-      config: { public: true },
+      config: {
+        public: true,
+        // teto próprio: rota anônima, mesmo perfil do /auth/reset-password
+        // (S25) — ver EMAIL_VERIFICATION_RATE_LIMIT_MAX em limits.ts
+        rateLimit: {
+          max: EMAIL_VERIFICATION_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+        },
+      },
       schema: {
         tags: ["Autenticação"],
         operationId: "verifyEmail",
         summary: "Confirma o e-mail do restaurante",
         description:
-          "Consome o token que o cadastro mandou por e-mail e libera o painel (a loja passa a responder fora do 403 de `authenticate.ts`). Mensagem única para token inválido, expirado ou já usado — distinguir diria a quem guarda um link velho se ele um dia existiu. Não devolve sessão: quem verificou entra como sempre, por `POST /auth/login`.",
+          "Consome o token que o cadastro (ou o reenvio, `POST /auth/resend-verification`) mandou por e-mail e libera o painel (a loja passa a responder fora do 403 de `authenticate.ts`). Mensagem única para token inválido, expirado ou já usado — distinguir diria a quem guarda um link velho se ele um dia existiu. Não devolve sessão: quem verificou entra como sempre, por `POST /auth/login`. Limite de 5 requisições por minuto por IP (429 ao estourar), mesmo perfil do `/auth/reset-password`.",
         body: verifyEmailBodySchema,
         response: {
           200: verifyEmailResponseSchema,
           400: errorResponseSchema,
+          429: errorResponseSchema,
         },
       },
     },
     async (request) => {
       await authService.verifyEmail(request.body.token);
       return { message: "E-mail confirmado. O painel já está liberado" };
+    },
+  );
+
+  // Reenvia o link de verificação para o e-mail de QUEM CHAMA. Ao contrário
+  // de `/auth/verify-email`, exige sessão — mas funciona com a loja ainda
+  // bloqueada: sem `restaurantId` nos params, o hook de `authenticate.ts` não
+  // aplica o bloqueio por e-mail não verificado aqui (ele é o próprio botão
+  // que resolve esse bloqueio; bloquear a si mesmo seria circular).
+  app.post(
+    "/auth/resend-verification",
+    {
+      schema: {
+        tags: ["Autenticação"],
+        operationId: "resendEmailVerification",
+        summary: "Reenvia o e-mail de verificação",
+        description:
+          "Manda outro link de verificação para o e-mail de quem chama (nunca para outro endereço) e invalida o token anterior, para não deixar dois links vivos na caixa de entrada. Exige sessão, mas funciona com a loja ainda bloqueada — é o caminho de volta quando o e-mail do cadastro falhou (SMTP fora do ar) ou não chegou (S30).",
+        response: {
+          202: resendVerificationResponseSchema,
+          401: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const auth = requireAuth(request);
+      reply.code(202).send({
+        message: "Enviamos um novo link de verificação para o seu e-mail",
+      });
+
+      // Depois de responder, e sem `await` — mesmo motivo do cadastro e do
+      // `/auth/forgot-password`: e-mail é rede, e não pode segurar quem
+      // acabou de pedir o reenvio. Falha de envio vai só para o log, nunca o
+      // token (S13).
+      void authService.resendEmailVerification(auth).catch((error) => {
+        request.log.error(
+          { err: error },
+          "falha ao reenviar e-mail de verificação",
+        );
+      });
+
+      return reply;
     },
   );
 

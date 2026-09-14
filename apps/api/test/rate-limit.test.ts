@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  EMAIL_VERIFICATION_RATE_LIMIT_MAX,
   LOGIN_RATE_LIMIT_MAX,
   PASSWORD_RESET_RATE_LIMIT_MAX,
   RATE_LIMIT_MAX,
@@ -85,6 +86,32 @@ describe("rate limit", () => {
     expect(
       respostas.slice(0, PASSWORD_RESET_RATE_LIMIT_MAX).map((r) => r.statusCode),
     ).toEqual(Array(PASSWORD_RESET_RATE_LIMIT_MAX).fill(202));
+    expect(respostas.at(-1)?.statusCode).toBe(429);
+  });
+
+  it(`o ${EMAIL_VERIFICATION_RATE_LIMIT_MAX + 1}º uso de token do mesmo IP em /auth/verify-email é 429`, async () => {
+    // rota anônima, mesmo perfil do reset de senha (S25): teto próprio,
+    // separado do global
+    const remoteAddress = ipDedicado();
+    const payload = { token: "token-que-nao-existe" };
+
+    const respostas = [];
+    for (let i = 0; i < EMAIL_VERIFICATION_RATE_LIMIT_MAX + 1; i++) {
+      respostas.push(
+        await app.inject({
+          method: "POST",
+          url: "/auth/verify-email",
+          remoteAddress,
+          payload,
+        }),
+      );
+    }
+
+    expect(
+      respostas
+        .slice(0, EMAIL_VERIFICATION_RATE_LIMIT_MAX)
+        .map((r) => r.statusCode),
+    ).toEqual(Array(EMAIL_VERIFICATION_RATE_LIMIT_MAX).fill(400));
     expect(respostas.at(-1)?.statusCode).toBe(429);
   });
 

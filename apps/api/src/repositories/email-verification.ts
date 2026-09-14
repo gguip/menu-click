@@ -10,12 +10,6 @@ import type { EmailVerificationToken } from "../domain/email-verification.ts";
  * (`deleted_at is null`), e o que entra e sai daqui é sempre o **hash** do
  * token, nunca o valor — quem gera o token e calcula o hash é o serviço
  * (`src/tokens.ts`).
- *
- * ⚠️ Faltando de propósito, por agora: `softDeleteLiveForUser`. A recuperação
- * de senha tem uma porque o reenvio (`/auth/forgot-password`) pode acontecer
- * várias vezes e cada pedido novo invalida o anterior. Aqui o caminho mínimo
- * (cadastro → um token → verificação) não reenvia; o reenvio, e a função que
- * o acompanha, é trabalho da Task 4 do plano.
  */
 
 /** Linha da tabela `email_verification_tokens`, em snake_case. */
@@ -96,4 +90,29 @@ export async function markUsed(
     [id],
   );
   return rowCount === 1;
+}
+
+/**
+ * Invalida (soft delete) todo token ainda vivo de um usuário.
+ *
+ * É o que faz o reenvio substituir o token anterior em vez de deixar dois
+ * links vivos na caixa de entrada — mesma função, mesma forma, de
+ * `password-reset.softDeleteLiveForUser`. Recebe o `client` porque só faz
+ * sentido na mesma transação do `insert` do token novo.
+ */
+export async function softDeleteLiveForUser(
+  restaurantUserId: string,
+  db: Queryable = pool,
+): Promise<void> {
+  await db.query(
+    `update email_verification_tokens set deleted_at = now(), updated_at = now()
+      where restaurant_user_id = $1
+        and deleted_at is null
+        -- used_at is null importa: marcar como removido um token JA USADO
+        -- borraria a distincao que as duas colunas guardam -- deleted_at
+        -- significa "invalidado SEM ter sido usado". O que ja foi usado
+        -- (a loja ja verificou) fica como esta.
+        and used_at is null`,
+    [restaurantUserId],
+  );
 }
