@@ -278,6 +278,40 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       expect(response.statusCode).toBe(400);
     });
 
+    it("não diz 'painel liberado' quando a loja sumiu, nem queima o token", async () => {
+      // O estado é alcançável desde a liberação de cadastro abandonado: a loja
+      // que ninguém verificou é justamente a que a colisão de um cadastro novo
+      // remove, e justamente o dono dela é quem pode clicar no link atrasado.
+      // A corrida real é o commit da limpeza caindo entre o `findById` (fora
+      // da transação) e o `markEmailVerified` (dentro); aqui o mesmo caminho é
+      // alcançado sem corrida, removendo só o restaurante — o usuário
+      // continua vivo, que é o que o `findById` já tinha visto.
+      const { restaurant, user } = await registerAndLogin(app);
+      const token = extraiToken((await esperaEmail(user.email)).text);
+
+      await pool.query(
+        `update restaurants set deleted_at = now() where id = $1`,
+        [restaurant.id],
+      );
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token },
+      });
+      expect(response.statusCode).toBe(400);
+
+      // e o link de uso único NÃO foi gasto: o rollback o desqueima, senão a
+      // pessoa perderia a única credencial que tinha por uma verificação que
+      // não aconteceu
+      const { rows } = await pool.query(
+        `select used_at is null as intacto from email_verification_tokens
+          where restaurant_user_id = $1`,
+        [user.id],
+      );
+      expect(rows[0].intacto).toBe(true);
+    });
+
     it("token inventado não serve", async () => {
       const response = await app.inject({
         method: "POST",

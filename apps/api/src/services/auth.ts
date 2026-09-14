@@ -304,7 +304,21 @@ export async function verifyEmail(token: string): Promise<void> {
     const marcou = await emailVerificationRepository.markUsed(linha.id, client);
     if (!marcou) throw linkInvalido();
 
-    await restaurantsRepository.markEmailVerified(user.restaurantId, client);
+    // `false` = a loja sumiu entre o `findById` acima (que roda FORA desta
+    // transação) e este ponto. Desde a liberação de cadastro abandonado esse
+    // estado é alcançável: o cadastro que ninguém verificou é justamente o que
+    // a colisão de um cadastro novo remove, e é justamente o dono dele que
+    // pode estar clicando no link atrasado. Sem esta linha a rota responderia
+    // 200 "painel liberado" com a loja já removida — reproduzido.
+    //
+    // ⚠️ A checagem fica DENTRO da transação, e depois do `markUsed`, de
+    // propósito: é o rollback que desqueima o token. Lançar daqui de fora
+    // gastaria o link de uso único numa verificação que não aconteceu.
+    const verificou = await restaurantsRepository.markEmailVerified(
+      user.restaurantId,
+      client,
+    );
+    if (!verificou) throw linkInvalido();
   });
 }
 
