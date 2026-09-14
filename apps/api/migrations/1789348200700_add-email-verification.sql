@@ -15,6 +15,15 @@ alter table restaurants add column email_verified_at timestamptz;
 -- do deploy — o defeito exato que a feature de taxa de entrega quase embarcou,
 -- e que só a revisão da branch inteira pegou. A exigência vale para cadastro
 -- novo; quem já está aqui não muda de comportamento.
+--
+-- ⚠️ REAPLICAR esta migration depois de um `down` verifica quem nunca provou
+-- nada. Medido num banco de sonda, na sequência realista de operação (deploy,
+-- problema, rollback, correção, deploy de novo): todo cadastro feito na janela
+-- entre os dois deploys volta VERIFICADO, e o pedido de verificação em aberto
+-- dele some junto, porque a tabela é recriada vazia. O backfill está certo na
+-- primeira aplicação e não tem como distinguir a segunda — a coluna que
+-- guardaria a diferença é justamente a que acabou de ser criada. É consequência
+-- de operação, não defeito de SQL: nenhum teste possível a mostra.
 update restaurants set email_verified_at = now() where deleted_at is null;
 
 -- Espelha `password_reset_tokens`: mesma forma de token, mesmo soft delete.
