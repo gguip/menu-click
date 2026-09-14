@@ -151,6 +151,21 @@ function formataReais(centavos: number): string {
   return `R$ ${(centavos / 100).toFixed(2).replace(".", ",")}`;
 }
 
+/**
+ * Loja que não provou o e-mail não existe para o cliente - nem para pedir.
+ *
+ * 404 e não 403 pelo mesmo motivo do cardápio: do lado de fora ela tem que
+ * ser indistinguível de uma loja que não existe.
+ *
+ * Mora aqui, e não dentro do getById, porque aquele é usado por todo o
+ * painel. Filtrar lá faria vinte rotas mudarem de significado de uma vez.
+ */
+function assertLojaVisivel(restaurant: Restaurant, restaurantId: string): void {
+  if (restaurant.emailVerifiedAt === undefined) {
+    throw new NotFoundError(`Restaurante com id "${restaurantId}" não encontrado`);
+  }
+}
+
 async function assertLojaAberta(restaurant: Restaurant): Promise<void> {
   if (!restaurant.acceptingOrders) {
     throw new ConflictError(
@@ -340,6 +355,7 @@ export async function create(
   input: CreateOrderInput,
 ): Promise<CreatedOrder> {
   const restaurant = await restaurantsService.getById(restaurantId);
+  assertLojaVisivel(restaurant, restaurantId);
   await assertLojaAberta(restaurant);
   assertRestauranteAceita(restaurant, input.type);
   assertFormaAceita(restaurant, input.paymentMethod);

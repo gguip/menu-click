@@ -91,7 +91,77 @@ export const DELIVERY_QUOTE_RATE_LIMIT_MAX = 20;
  */
 export const PASSWORD_RESET_RATE_LIMIT_MAX = 5;
 
+/**
+ * Teto do `/auth/verify-email`, mesmo perfil do S25: rota anônima, e o custo
+ * de uma tentativa não é o bcrypt (o token não passa por hash caro) — é o
+ * banco. O token tem 256 bits, então adivinhar um de verdade continua
+ * inviável mesmo sem este teto; o que ele limita é o tamanho da varredura que
+ * um IP consegue fazer contra a tabela por minuto, e evita que esta rota
+ * anônima divida o teto global de 100/min com as legítimas (cardápio,
+ * criação de pedido). Mesmo número do `/auth/reset-password`, que é a rota
+ * irmã (mesma forma de token, mesma exposição anônima).
+ */
+export const EMAIL_VERIFICATION_RATE_LIMIT_MAX = 5;
+
+/**
+ * Teto do `/auth/resend-verification` — e aqui a chave **não é o IP**, que é a
+ * diferença que importa. A rota exige sessão, então existe sinal melhor que o
+ * endereço de rede: a conta. Por IP, duas lojas na mesma praça de alimentação
+ * (ou atrás do mesmo CGNAT) dividiriam o teto, e o botão de "não recebi o
+ * e-mail" pararia de funcionar para a segunda — justamente quem precisa dele
+ * (S30). O S25 manda usar IP em rota **anônima**, onde não há outra chave; não
+ * é o caso desta.
+ *
+ * O teto existe porque cada chamada manda um e-mail DE VERDADE. Sem ele a rota
+ * herda o teto global de 100/min e uma sessão sozinha dispara 100 envios por
+ * minuto: conta do provedor, e reputação do domínio — que é o que faz e-mail
+ * legítimo começar a cair na caixa de spam de quem não tem nada com isso.
+ * Três por minuto cobrem com folga "cliquei, não chegou, cliquei de novo".
+ */
+export const EMAIL_RESEND_RATE_LIMIT_MAX = 3;
+
+/**
+ * Teto do `/auth/register`, e ele chegou tarde: a rota só virou remetente de
+ * e-mail quando o cadastro passou a disparar o link de verificação. Até ali
+ * era uma rota anônima barata, e o teto global de 100/min bastava; hoje ela é
+ * exatamente o perfil que o S25 descreve, e era a única rota de e-mail do
+ * projeto sem teto próprio.
+ *
+ * Medido antes deste número existir: 120 cadastros do MESMO IP passaram 100 e
+ * dispararam 100 e-mails, para 100 endereços **escolhidos por quem chama** —
+ * 6.000 por hora de um endereço de rede só. Não dá para bombardear UM
+ * endereço (o segundo cadastro com o mesmo e-mail é 409 e não envia), então é
+ * spray e não alvo; mas o dano é o mesmo que o `/auth/forgot-password` já cita
+ * como razão do teto dele — conta do provedor e reputação de domínio, que é o
+ * que faz e-mail legítimo começar a cair no spam de quem não tem nada com
+ * isso. E cada tentativa ainda deixa restaurante, usuário e token no banco,
+ * segurando um slug e um e-mail pelos 7 dias da liberação de cadastro
+ * abandonado.
+ *
+ * Por IP, e não por conta: a rota é anônima — é ela que CRIA a conta —, então
+ * não existe chave melhor, que é o caso em que o S25 manda usar o IP. O
+ * `/auth/resend-verification` chaveia pelo usuário porque tem sessão; aqui não
+ * há nenhuma. Cinco por minuto é o mesmo das rotas irmãs de autenticação e
+ * cobre com folga quem erra o formulário algumas vezes seguidas.
+ */
+export const REGISTER_RATE_LIMIT_MAX = 5;
+
 export const RATE_LIMIT_WINDOW = "1 minute";
+
+/**
+ * Quanto o encerramento espera pelo trabalho que roda depois da resposta (os
+ * e-mails de verificação e de recuperação) antes de fechar o pool.
+ *
+ * ⚠️ O prazo existe porque esperar sem limite é pior que perder o e-mail. O
+ * `onClose` é o caminho do `SIGTERM` (F26), e o nodemailer tem timeouts
+ * próprios largos — 2 minutos para conectar, 10 para o socket. Um SMTP travado
+ * seguraria o `app.close()` muito além dos 10 a 30 segundos que um
+ * orquestrador costuma dar, e aí quem encerra o processo é o SIGKILL: o pool
+ * nunca chega a fechar direito, que é exatamente o que o hook queria garantir.
+ * Cinco segundos dão folga para um envio normal terminar e mantêm o
+ * encerramento dentro de qualquer janela de deploy.
+ */
+export const SHUTDOWN_DRAIN_TIMEOUT_MS = 5_000;
 
 /**
  * Origens autorizadas a chamar a API de dentro de um navegador.

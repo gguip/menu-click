@@ -1,15 +1,18 @@
 import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
-import { withTransaction } from "../db/pool.ts";
+import { isTransactionClient, withTransaction } from "../db/pool.ts";
+import type { Queryable } from "../db/pool.ts";
 import type { CreateRestaurantInput, Restaurant } from "../domain/restaurant.ts";
 import type {
   CreateRestaurantUserInput,
   RestaurantUser,
+  UserRole,
 } from "../domain/restaurant-user.ts";
 import { PASSWORD_MAX_BYTES } from "../domain/restaurant-user.ts";
 import { isUuid } from "../domain/uuid.ts";
 import type { AuthContext, IssuedSession } from "../domain/session.ts";
 import { PASSWORD_RESET_TOKEN_TTL_MS } from "../domain/password-reset.ts";
+import { EMAIL_VERIFICATION_TOKEN_TTL_MS } from "../domain/email-verification.ts";
 import {
   ConflictError,
   NotFoundError,
@@ -17,7 +20,9 @@ import {
   ValidationError,
 } from "../errors.ts";
 import { sendEmail } from "../email.ts";
+import * as emailVerificationRepository from "../repositories/email-verification.ts";
 import * as passwordResetRepository from "../repositories/password-reset.ts";
+import * as restaurantsRepository from "../repositories/restaurants.ts";
 import * as restaurantUsersRepository from "../repositories/restaurant-users.ts";
 import * as sessionsRepository from "../repositories/sessions.ts";
 import { generateToken, hashToken } from "../tokens.ts";
@@ -80,10 +85,49 @@ function assertPasswordFits(password: string): void {
 }
 
 /**
+ * Uma tentativa de inserir o usuário, protegida contra o efeito colateral de
+ * falhar dentro de uma transação.
+ *
+ * ⚠️ Mesmo remédio do `tryInsert` de `services/restaurants.ts`, e pelo mesmo
+ * motivo: capturar o `23505` em JavaScript **não desfaz o estado do
+ * Postgres**. O comando falhou DENTRO da transação, então o bloco está
+ * abortado e a próxima query estoura `current transaction is aborted`.
+ * Enquanto a colisão de e-mail virava 409 na hora isso não aparecia — o
+ * rollback resolvia —, mas agora ela é seguida de uma limpeza e de uma segunda
+ * tentativa, que são queries.
+ *
+ * Fora de transação (pool) não há o que proteger, e `savepoint` ali é erro.
+ */
+async function tryInsertUser(
+  restaurantId: string,
+  data: { name: string; email: string; passwordHash: string; role: UserRole },
+  db: Queryable,
+): Promise<RestaurantUser | null> {
+  if (!isTransactionClient(db)) {
+    return restaurantUsersRepository.insert(restaurantId, data, db);
+  }
+
+  // nome fixo, escrito no código: identificador não aceita $n (S3)
+  await db.query("savepoint user_attempt");
+  const created = await restaurantUsersRepository.insert(restaurantId, data, db);
+  await db.query(
+    created === null
+      ? "rollback to savepoint user_attempt"
+      : "release savepoint user_attempt",
+  );
+  return created;
+}
+
+/**
  * Cadastro: cria o restaurante e o primeiro usuário dele, numa transação.
  *
  * Não devolve sessão — cadastrar e entrar são duas operações, e emitir token
  * aqui faria o cadastro ter dois efeitos. Quem cadastrou chama `/auth/login`.
+ *
+ * Os dois inserts podem colidir com um **cadastro abandonado** — alguém que se
+ * cadastrou e nunca verificou o e-mail. O slug é tratado dentro do
+ * `restaurantsService.create`; o e-mail, aqui. Ver
+ * `releaseAbandonedRegistration`.
  */
 export async function register(input: {
   restaurant: CreateRestaurantInput;
@@ -95,25 +139,44 @@ export async function register(input: {
   // milissegundos, e segurar uma conexão do pool por esse tempo é desperdício
   const passwordHash = await bcrypt.hash(input.user.password, BCRYPT_ROUNDS);
 
+  const userData = {
+    name: input.user.name,
+    email: input.user.email,
+    passwordHash,
+    // o primeiro usuário é sempre o dono: ele acabou de criar o restaurante, e
+    // um restaurante sem nenhum owner não teria como convidar ninguém nem se
+    // remover
+    role: "owner" as const,
+  };
+
   return withTransaction(async (client) => {
     const restaurant = await restaurantsService.create(
       input.restaurant,
       client,
     );
 
-    const user = await restaurantUsersRepository.insert(
-      restaurant.id,
-      {
-        name: input.user.name,
-        email: input.user.email,
-        passwordHash,
-        // o primeiro usuário é sempre o dono: ele acabou de criar o
-        // restaurante, e um restaurante sem nenhum owner não teria como
-        // convidar ninguém nem se remover
-        role: "owner",
-      },
-      client,
-    );
+    let user = await tryInsertUser(restaurant.id, userData, client);
+
+    if (user === null) {
+      // O e-mail está ocupado — e este é o caso MAIS comum da liberação de
+      // cadastro abandonado: alguém que não recebeu o e-mail de verificação e
+      // tenta se cadastrar de novo com o mesmo endereço. Se quem o segura é um
+      // cadastro abandonado, ele sai de cena e a segunda tentativa passa.
+      //
+      // Repetir só o insert do usuário, e não o `register` inteiro: o bcrypt já
+      // rodou e o restaurante novo já existe nesta transação.
+      const holderId = await restaurantUsersRepository.findRestaurantIdByEmail(
+        input.user.email,
+        client,
+      );
+      if (
+        holderId !== null &&
+        (await restaurantsService.releaseAbandonedRegistration(holderId, client))
+      ) {
+        user = await tryInsertUser(restaurant.id, userData, client);
+      }
+    }
+
     if (user === null) {
       // rollback desfaz o restaurante junto: cadastro é tudo ou nada
       throw new ConflictError(
@@ -122,6 +185,149 @@ export async function register(input: {
     }
 
     return { restaurant, user };
+  });
+}
+
+/**
+ * Base da URL do link de verificação, e o link em si. Mesma forma de
+ * `passwordResetLink`, lida do ambiente a cada chamada pelo mesmo motivo.
+ */
+function verifyEmailLink(token: string): string {
+  const base =
+    process.env.EMAIL_VERIFICATION_URL ?? "http://localhost:5173/verificar-email";
+  return `${base}?token=${encodeURIComponent(token)}`;
+}
+
+/** Assunto e corpo do e-mail de verificação — comum ao cadastro e ao reenvio. */
+function verificationEmailMessage(token: string): { subject: string; text: string } {
+  return {
+    subject: "Confirme o e-mail do seu restaurante no MenuClick",
+    text: `Confirme o e-mail do seu restaurante para liberar o painel. Use o link abaixo em até 24 horas:\n\n${verifyEmailLink(token)}\n\nSe não foi você, ignore este e-mail.`,
+  };
+}
+
+/**
+ * Manda o e-mail que confirma o cadastro.
+ *
+ * Chamada pela ROTA sem `await`, depois de responder o 201 — mesmo motivo do
+ * `requestPasswordReset`: SMTP é rede, e não pode segurar quem acabou de criar
+ * a conta. Diferente da recuperação, não há oráculo de tempo a fechar aqui (o
+ * 201 já revelou que a conta existe); ficar fora do caminho da resposta é só
+ * para não segurar uma conexão do pool numa chamada de rede.
+ *
+ * Não invalida token anterior (ao contrário do reenvio, `resendEmailVerifi-
+ * cation`): um usuário recém-criado não tem token nenhum para invalidar.
+ */
+export async function sendEmailVerification(user: RestaurantUser): Promise<void> {
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
+
+  await emailVerificationRepository.insert({
+    restaurantUserId: user.id,
+    tokenHash: hashToken(token),
+    expiresAt,
+  });
+
+  await sendEmail({ to: user.email, ...verificationEmailMessage(token) });
+}
+
+/**
+ * Reenvia o link de verificação — a outra ponta de `sendEmailVerification`,
+ * para quando o e-mail do cadastro não chegou (SMTP fora do ar naquele
+ * minuto) ou a pessoa só quer tentar de novo.
+ *
+ * Manda para o e-mail de QUEM CHAMA, nunca para outro endereço — o parâmetro
+ * é a sessão (`AuthContext`), não um e-mail arbitrário. Não há ambiguidade
+ * sobre "reenviar para quem": convidar um usuário é rota escopada em
+ * restaurante, portanto bloqueada enquanto a loja não verificar (S32/
+ * `authenticate.ts`) — então o único usuário capaz de chamar isto num
+ * restaurante ainda não verificado é o dono que acabou de se cadastrar.
+ *
+ * Invalida o token anterior ANTES de criar o novo, na mesma transação: sem
+ * isso, dois links ficariam vivos na caixa de entrada, e o mais velho
+ * continuaria funcionando.
+ *
+ * Chamada pela ROTA sem `await`, depois de responder 202 — mesmo motivo do
+ * `sendEmailVerification`/`requestPasswordReset`: não segurar uma conexão do
+ * pool durante a ida e volta do SMTP.
+ *
+ * ⚠️ Loja já verificada não recebe nada, e a resposta continua a MESMA (202,
+ * emitido antes daqui): quem chama não tem por que aprender algo novo com ela.
+ * O que se poupa não é só o envio — é o carimbo. Sem esta guarda, reenviar e
+ * verificar de novo reescrevia `email_verified_at` (medido: o carimbo andava),
+ * e "quando esta loja provou o e-mail" deixava de ser respondível. Acesso não
+ * muda em nada: a loja já está liberada.
+ */
+export async function resendEmailVerification(auth: AuthContext): Promise<void> {
+  if (auth.emailVerified) return;
+
+  const user = await restaurantUsersRepository.findById(auth.userId);
+  // sessão válida apontando para usuário removido não deveria acontecer (a
+  // consulta de sessão já filtra `deleted_at is null`), mas o tipo permite
+  if (user === null) throw new UnauthorizedError("Sessão inválida");
+
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
+
+  await withTransaction(async (client) => {
+    await emailVerificationRepository.softDeleteLiveForUser(user.id, client);
+    await emailVerificationRepository.insert(
+      { restaurantUserId: user.id, tokenHash: hashToken(token), expiresAt },
+      client,
+    );
+  });
+
+  // FORA da transação e depois do commit: sendEmail é rede, e segurar uma
+  // conexão do pool durante a ida e volta do SMTP é desperdício.
+  await sendEmail({ to: user.email, ...verificationEmailMessage(token) });
+}
+
+/**
+ * Consome o token de verificação e libera o painel do restaurante.
+ *
+ * Mensagem única para token inválido, expirado ou já usado — mesmo motivo do
+ * `resetPassword`: distinguir diria a quem guarda um link velho se ele um dia
+ * existiu. `findLiveByHash` já filtra os três casos no SQL; a checagem aqui
+ * não repete nenhum, só decide o que fazer com `null`.
+ */
+export async function verifyEmail(token: string): Promise<void> {
+  const linkInvalido = () =>
+    new ValidationError(
+      "Link de verificação inválido, expirado ou já usado",
+    );
+
+  const linha = await emailVerificationRepository.findLiveByHash(
+    hashToken(token),
+  );
+  if (linha === null) throw linkInvalido();
+
+  const user = await restaurantUsersRepository.findById(linha.restaurantUserId);
+  // sessão viva apontando para usuário removido não deveria acontecer (mesmo
+  // raciocínio do `getUser`), mas o tipo permite
+  if (user === null) throw linkInvalido();
+
+  await withTransaction(async (client) => {
+    // é este `update ... where used_at is null` — não a checagem de cima —
+    // que serializa duas verificações concorrentes com o MESMO token; a de
+    // cima é só saída antecipada, igual em `resetPassword`
+    const marcou = await emailVerificationRepository.markUsed(linha.id, client);
+    if (!marcou) throw linkInvalido();
+
+    // `false` = a loja sumiu entre o `findById` acima (que roda FORA desta
+    // transação) e este ponto. Desde a liberação de cadastro abandonado esse
+    // estado é alcançável: o cadastro que ninguém verificou é justamente o que
+    // a colisão de um cadastro novo remove, e é justamente o dono dele que
+    // pode estar clicando no link atrasado. Sem esta linha a rota responderia
+    // 200 "painel liberado" com a loja já removida — reproduzido.
+    //
+    // ⚠️ A checagem fica DENTRO da transação, e depois do `markUsed`, de
+    // propósito: é o rollback que desqueima o token. Lançar daqui de fora
+    // gastaria o link de uso único numa verificação que não aconteceu.
+    const verificou = await restaurantsRepository.markEmailVerified(
+      user.restaurantId,
+      client,
+    );
+    if (!verificou) throw linkInvalido();
   });
 }
 
@@ -387,6 +593,16 @@ export async function listUsers(
  *
  * O hash sai da transação — aqui nem há transação, mas vale a mesma razão do
  * `register`: bcrypt a custo 12 leva centenas de milissegundos.
+ *
+ * ⚠️ O 409 daqui é definitivo, e NÃO chama `releaseAbandonedRegistration` — o
+ * contraste com o `register` é deliberado, não esquecimento. Se o e-mail do
+ * convidado estiver preso por um cadastro abandonado e antigo, esta rota
+ * responde 409 para sempre, enquanto `POST /auth/register` com o mesmo
+ * endereço libera o cadastro preso e passa. A diferença é quem está pedindo:
+ * no cadastro, quem chama está provando que quer aquele endereço para si;
+ * aqui, um dono destruiria o cadastro pendente de um TERCEIRO só por
+ * convidá-lo, que é um poder que ninguém pediu. Quem está preso se destrava
+ * pelo próprio cadastro, não pelo convite de outra pessoa.
  */
 export async function createUser(
   restaurantId: string,

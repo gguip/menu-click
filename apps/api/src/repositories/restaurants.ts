@@ -48,6 +48,7 @@ type RestaurantRow = {
   free_delivery_above_in_cents: number | null;
   delivery_fee_to_arrange: boolean;
   minimum_order_in_cents: number;
+  email_verified_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -87,6 +88,11 @@ function toRestaurant(row: RestaurantRow): Restaurant {
       : { freeDeliveryAboveInCents: row.free_delivery_above_in_cents }),
     deliveryFeeToArrange: row.delivery_fee_to_arrange,
     minimumOrderInCents: row.minimum_order_in_cents,
+    // emailVerifiedAt é opcional: quando é NULL no banco (não verificou), a
+    // chave nem entra na resposta — mesmo padrão do logoUrl.
+    ...(row.email_verified_at === null
+      ? {}
+      : { emailVerifiedAt: row.email_verified_at.toISOString() }),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -214,7 +220,12 @@ export async function findBySlug(
   db: Queryable = pool,
 ): Promise<Restaurant | null> {
   const { rows } = await db.query<RestaurantRow>(
-    "select * from restaurants where slug = $1 and deleted_at is null",
+    // email_verified_at is not null fica AO LADO do deleted_at is null, e não
+    // por acaso: do ponto de vista de quem está de fora, loja que não provou
+    // o e-mail e loja removida são a mesma coisa - não existem. Um filtro, um
+    // lugar, e cardápio, cotação e pedido herdam.
+    `select * from restaurants
+      where slug = $1 and deleted_at is null and email_verified_at is not null`,
     [slug],
   );
   return rows.length === 0 ? null : toRestaurant(rows[0]);
@@ -330,6 +341,37 @@ export async function update(
 }
 
 /**
+ * Marca a loja como tendo provado o e-mail. `false` = não existe (ou foi
+ * removida) com esse id. Chamada só pelo fluxo de verificação
+ * (`services/auth.ts`), depois que o token já foi conferido e consumido.
+ *
+ * Não checa `email_verified_at is null` antes de gravar, e quem impede o MESMO
+ * token de valer duas vezes é o `markUsed` de `email_verification_tokens` —
+ * não esta função.
+ *
+ * ⚠️ Não leia isso como "reverificar é inofensivo", que é o que estava escrito
+ * aqui antes e não é verdade: o carimbo é a resposta para "quando esta loja
+ * provou o e-mail", e regravá-lo apaga essa resposta. Quem protege o carimbo
+ * hoje é a guarda de `resendEmailVerification` (loja já verificada não recebe
+ * link novo, então não há segundo link para gastar). Sobra uma janela de
+ * milissegundos, medida numa revisão: uma verificação que commita entre o hook
+ * ler a sessão e o trabalho de fundo rodar ainda gera um link. Fechá-la aqui,
+ * com `and email_verified_at is null` no `where`, é barato — mas transforma um
+ * clique atrasado em 400, e isso é decisão de produto, não refatoração.
+ */
+export async function markEmailVerified(
+  id: string,
+  db: Queryable = pool,
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `update restaurants set email_verified_at = now(), updated_at = now()
+      where id = $1 and deleted_at is null`,
+    [id],
+  );
+  return rowCount === 1;
+}
+
+/**
  * Soft delete do restaurante. Devolve `false` quando não havia registro vivo
  * com esse id — o `and deleted_at is null` é o que impede sobrescrever a data
  * original numa segunda remoção (D1).
@@ -342,6 +384,59 @@ export async function softDelete(
     `update restaurants set deleted_at = now()
       where id = $1 and deleted_at is null`,
     [id],
+  );
+  return rowCount === 1;
+}
+
+/**
+ * Id do restaurante vivo com esse slug — **verificado ou não**.
+ *
+ * Separado do `findBySlug` de propósito: aquele é a busca do cardápio público
+ * e por isso exige `email_verified_at is not null`, o que aqui seria o
+ * contrário do que se procura. Quem chama é a liberação de cadastro
+ * abandonado, e o que ela precisa saber é quem segura o slug no índice único
+ * — o índice não filtra verificação nenhuma.
+ */
+export async function findIdBySlug(
+  slug: string,
+  db: Queryable = pool,
+): Promise<string | null> {
+  const { rows } = await db.query<{ id: string }>(
+    "select id from restaurants where slug = $1 and deleted_at is null",
+    [slug],
+  );
+  return rows.length === 0 ? null : rows[0].id;
+}
+
+/**
+ * Marca o restaurante como removido **só se ele for um cadastro abandonado**:
+ * não verificado e criado há mais de `abandonedAfterDays` dias. `false` = não
+ * é (ou não existe), e nada foi escrito.
+ *
+ * As duas condições estão aqui, num lugar só, porque a colisão tem DOIS
+ * pontos de entrada — o slug (`services/restaurants.ts`) e o e-mail
+ * (`services/auth.ts`). Duplicar a regra nos dois seria garantir que um dia só
+ * um deles fosse corrigido.
+ *
+ * O prazo chega como parâmetro, e não como constante daqui: quantos dias é
+ * regra de negócio, e ela mora no domínio (`ABANDONED_REGISTRATION_DAYS`).
+ * `make_interval` recebe o número como `$n` — é valor, não identificador (S3).
+ *
+ * ⚠️ Não faz a cascata: quem marca o usuário junto é o serviço, na mesma
+ * transação (D3). O usuário importa porque é ele que segura o e-mail.
+ */
+export async function softDeleteIfAbandoned(
+  id: string,
+  abandonedAfterDays: number,
+  db: Queryable = pool,
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `update restaurants set deleted_at = now()
+      where id = $1
+        and deleted_at is null
+        and email_verified_at is null
+        and created_at < now() - make_interval(days => $2)`,
+    [id, abandonedAfterDays],
   );
   return rowCount === 1;
 }

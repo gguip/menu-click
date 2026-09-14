@@ -5,6 +5,7 @@ import {
   buildTestApp,
   login,
   registerRestaurant,
+  verifyRestaurantEmail,
 } from "./helpers.ts";
 
 const NONEXISTENT_ID = "00000000-0000-0000-0000-000000000000";
@@ -28,8 +29,16 @@ describe("acesso ao painel", () => {
     await app.close();
   });
 
+  /**
+   * ⚠️ Verifica o e-mail pelo fluxo real antes de devolver: este arquivo cria
+   * usuários adicionais e os testa em rotas escopadas em restaurante
+   * (`/restaurants/:restaurantId/users`), que agora exigem loja verificada
+   * (`routes/authenticate.ts`). Sem isto, toda ação bateria em 403 antes de
+   * chegar na checagem de papel/acesso que o arquivo existe para testar.
+   */
   async function cadastrar() {
     const { restaurant, user, password } = await registerRestaurant(app);
+    await verifyRestaurantEmail(app, user.email);
     const token = await login(app, user.email, password);
     return { restaurant, user, password, token, headers: authHeaders(token) };
   }
@@ -297,8 +306,12 @@ describe("acesso ao painel", () => {
   });
 
   describe("remoção de usuário", () => {
+    // ⚠️ Verifica o e-mail do dono antes de convidar: convidar já é uma rota
+    // escopada em restaurante (`/restaurants/:restaurantId/users`), que agora
+    // exige loja verificada — mesmo raciocínio do `cadastrar()` lá em cima.
     async function cenario() {
       const { restaurant, user, password } = await registerRestaurant(app);
+      await verifyRestaurantEmail(app, user.email);
       const dono = {
         restaurant,
         user,
@@ -335,12 +348,25 @@ describe("acesso ao painel", () => {
 
     /**
      * Não é preciso revogar as sessões na mão: a resolução do token junta
-     * `restaurant_users` filtrando `deleted_at is null`. Este teste é o que
-     * garante que essa propriedade não se perca numa refatoração da query.
+     * `restaurant_users` filtrando `deleted_at is null`
+     * (`repositories/sessions.ts`). Este teste é o que garante que essa
+     * propriedade não se perca numa refatoração da query.
+     *
+     * ⚠️ E quem a garante é a asserção da rota ESCOPADA, não a do
+     * `/auth/me` — não troque uma pela outra. O `/auth/me` tem uma segunda
+     * rede: a guarda defensiva de `getUser` (`services/auth.ts`) responde 401
+     * quando o usuário não está mais vivo, então ele devolve 401 com o filtro
+     * na query ou sem ele. Medido numa revisão: removendo
+     * `and u.deleted_at is null` de `findActiveByTokenHash`, a suíte inteira
+     * (567 testes) passava — o filtro que faz o token do removido parar de
+     * valer em produtos, pedidos e usuários não tinha cobertura nenhuma no
+     * projeto. Rota escopada não tem a segunda rede: se o token voltar a
+     * resolver, ela responde 200.
      */
     it("a sessão do removido para de valer na hora", async () => {
       const { dono, staff, staffPassword } = await cenario();
       const token = await login(app, staff.email, staffPassword);
+      const produtos = `/restaurants/${dono.restaurant.id}/products`;
 
       const antes = await app.inject({
         method: "GET",
@@ -348,6 +374,15 @@ describe("acesso ao painel", () => {
         headers: authHeaders(token),
       });
       expect(antes.statusCode).toBe(200);
+
+      // e o atendente opera normalmente ENQUANTO existe: sem isto, o 401 de
+      // baixo poderia ser falta de permissão em vez de sessão morta
+      const operavaAntes = await app.inject({
+        method: "GET",
+        url: produtos,
+        headers: authHeaders(token),
+      });
+      expect(operavaAntes.statusCode).toBe(200);
 
       await app.inject({
         method: "DELETE",
@@ -361,6 +396,14 @@ describe("acesso ao painel", () => {
         headers: authHeaders(token),
       });
       expect(depois.statusCode).toBe(401);
+
+      // ⚠️ A asserção que prende o filtro da query de sessão (ver o docblock)
+      const escopada = await app.inject({
+        method: "GET",
+        url: produtos,
+        headers: authHeaders(token),
+      });
+      expect(escopada.statusCode).toBe(401);
     });
 
     /**

@@ -14,6 +14,7 @@ import {
   TRUST_PROXY,
 } from "./limits.ts";
 import type { FastifyError } from "fastify";
+import { drainBackgroundWork } from "./background.ts";
 import { pool } from "./db/pool.ts";
 import {
   ConflictError,
@@ -293,6 +294,22 @@ export async function buildApp() {
 
   // Fecha o pool junto com o app (F26).
   app.addHook("onClose", async () => {
+    // Espera o trabalho que roda fora do caminho da resposta (os e-mails de
+    // verificação e de recuperação). Sem isto, encerrar no meio faz o e-mail de
+    // quem acabou de se cadastrar sumir sem sintoma nenhum.
+    //
+    // ⚠️ A espera tem PRAZO, e ele não é detalhe: sem limite, o `app.close()`
+    // ficava pendurado atrás de um envio travado e o `pool.end()` abaixo nunca
+    // rodava (F26). Verificado numa revisão, pelo próprio `app.close()`.
+    // Vencido o prazo, o pool fecha de qualquer jeito e o envio que sobrou
+    // morre com o processo — perder um e-mail é melhor que não encerrar.
+    //
+    // O prazo vem do PADRÃO de `drainBackgroundWork`, não de um argumento
+    // escrito aqui, e isso foi deliberado: enquanto o argumento morava nesta
+    // linha, apagá-lo recriava aquele defeito e nenhum teste avisava — a suíte
+    // inteira passava sem ele. Ver `SHUTDOWN_DRAIN_TIMEOUT_MS` em limits.ts.
+    await drainBackgroundWork();
+
     await pool.end();
   });
 

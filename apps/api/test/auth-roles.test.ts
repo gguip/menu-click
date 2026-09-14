@@ -7,6 +7,7 @@ import {
   createRestaurant,
   login,
   registerRestaurant,
+  verifyRestaurantEmail,
 } from "./helpers.ts";
 
 /**
@@ -35,9 +36,19 @@ describe("papel do usuário", () => {
    * A rota que cria `staff` chega no commit seguinte; aqui o que importa é a
    * checagem, não como o papel foi parar lá.
    */
-  /** Cadastra, entra e devolve o par de credenciais — a senha inclusive. */
+  /**
+   * Cadastra, entra e devolve o par de credenciais — a senha inclusive.
+   *
+   * ⚠️ Verifica o e-mail pelo fluxo real antes de devolver: este helper é
+   * local (duplica `registerAndLogin`, não `createRestaurant`) justamente
+   * para expor a senha em texto, mas as checagens deste arquivo são todas de
+   * PAPEL — dono vs. `staff` — não de bloqueio por e-mail, e sem verificar
+   * aqui toda ação de `staff`/`owner` bateria em 403 antes de chegar na
+   * checagem que o arquivo existe para testar.
+   */
   async function cadastrar() {
     const { restaurant, user, password } = await registerRestaurant(app);
+    await verifyRestaurantEmail(app, user.email);
     const token = await login(app, user.email, password);
     return { restaurant, user, password, headers: authHeaders(token) };
   }

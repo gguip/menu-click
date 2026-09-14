@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../src/app.ts";
+import { clearOutbox, outbox } from "../src/email.ts";
 import { currentTestIp } from "./setup.ts";
 
 /**
@@ -46,16 +47,82 @@ export const validRestaurantBody = {
  * sete dias, não deixam instante nenhum descoberto (verificado com valores no
  * limite: 00:00:00, 23:59:00, 23:59:59 e a virada para o dia seguinte).
  */
-const GRADE_SEMPRE_ABERTA = Array.from({ length: 7 }, (_, weekday) => weekday).flatMap(
-  (weekday) => [
-    { weekday, opensAt: "00:00", closesAt: "23:59" },
-    { weekday, opensAt: "23:59", closesAt: "00:00" },
-  ],
-);
+export const GRADE_SEMPRE_ABERTA = Array.from(
+  { length: 7 },
+  (_, weekday) => weekday,
+).flatMap((weekday) => [
+  { weekday, opensAt: "00:00", closesAt: "23:59" },
+  { weekday, opensAt: "23:59", closesAt: "00:00" },
+]);
 
 /**
- * Cria um restaurante — hoje isso significa **cadastrar**, porque não existe
- * mais restaurante sem dono (`POST /restaurants` deixou de existir).
+ * Espera o envio de um e-mail para ESTE endereço, e só este — nunca "o
+ * último do outbox". `createRestaurant` cadastra um restaurante atrás do
+ * outro o tempo todo, e cada cadastro dispara um e-mail de verificação quase
+ * junto do anterior: pegar "o último" faria o segundo restaurante roubar o
+ * token do primeiro.
+ *
+ * O envio acontece FORA do caminho da resposta (a rota dispara sem `await`),
+ * daí o polling: não é medição de tempo, é a janela para o trabalho em
+ * segundo plano já ter rodado — mesmo raciocínio do polling equivalente em
+ * `password-reset.test.ts`.
+ */
+export async function esperaEmail(paraQuem: string) {
+  for (let i = 0; i < 50; i++) {
+    const achado = outbox.findLast((email) => email.to === paraQuem);
+    if (achado !== undefined) return achado;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  throw new Error(`nenhum e-mail para ${paraQuem}`);
+}
+
+/**
+ * Extrai o token do link dentro do corpo de um e-mail. O banco só guarda o
+ * hash (`src/tokens.ts`), então o token só existe aqui — no texto que o
+ * driver de console "enviou".
+ */
+export function extraiToken(texto: string): string {
+  const encontrado = texto.match(/token=([^\s&]+)/);
+  if (encontrado === null) {
+    throw new Error("e-mail sem link de token");
+  }
+  return decodeURIComponent(encontrado[1]);
+}
+
+/**
+ * ⚠️ Completa a verificação de e-mail pelo caminho de verdade: lê o token do
+ * e-mail que o cadastro disparou e chama `POST /auth/verify-email`.
+ *
+ * Poderia ser um `update` direto na coluna `email_verified_at`, que seria
+ * mais rápido. Pelo fluxo é melhor por dois motivos: toda a suíte passa a
+ * exercitar cadastro -> verificação de graça, e o dia em que esse caminho
+ * quebrar não vai depender de alguém lembrar de testá-lo.
+ *
+ * Lê o e-mail POR ENDEREÇO (`esperaEmail(email)`), nunca "o último do
+ * outbox" — ver o comentário de `esperaEmail`.
+ */
+export async function verifyRestaurantEmail(
+  app: FastifyInstance,
+  email: string,
+): Promise<void> {
+  const enviado = await esperaEmail(email);
+  const token = extraiToken(enviado.text);
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/auth/verify-email",
+    payload: { token },
+  });
+  if (response.statusCode !== 200) {
+    throw new Error(`verifyRestaurantEmail falhou: ${response.body}`);
+  }
+}
+
+/**
+ * Cria um restaurante — hoje isso significa **cadastrar e verificar**,
+ * porque não existe mais restaurante sem dono (`POST /restaurants` deixou de
+ * existir) e, desde o bloqueio por e-mail, nenhuma rota de gestão funciona
+ * antes de a loja confirmar o e-mail (403 — ver `routes/authenticate.ts`).
  *
  * Devolve o restaurante com `token` e `headers` junto: quase toda rota de
  * gestão precisa deles, e passá-los à parte espalharia o mesmo par por todos
@@ -71,6 +138,9 @@ const GRADE_SEMPRE_ABERTA = Array.from({ length: 7 }, (_, weekday) => weekday).f
  * dono para pedir a recuperação — sem perder a grade de horário que este
  * helper já registra (chamar `registerAndLogin` direto perderia isso, e aí
  * nenhum pedido passaria).
+ *
+ * `registerAndLogin`, em contraste, **não** verifica: é ele que os testes
+ * usam quando querem uma loja ainda bloqueada.
  */
 export async function createRestaurant(
   app: FastifyInstance,
@@ -79,6 +149,17 @@ export async function createRestaurant(
   const { restaurant, user, token } = await registerAndLogin(app, {
     restaurant: overrides,
   });
+
+  await verifyRestaurantEmail(app, user.email as string);
+
+  // ⚠️ Limpa o outbox depois de consumir o e-mail de confirmação: é a única
+  // sobra que a verificação deixa, e ela é para ESTE helper, não para quem
+  // chamou. Sem isto, todo teste que criasse um restaurante e depois esperasse
+  // (ou conferisse a ausência de) um e-mail para o MESMO dono encontraria essa
+  // sobra — foi exatamente o que quebrou `password-reset.test.ts`, que só
+  // conhecia um tipo de e-mail por endereço até este commit.
+  clearOutbox();
+
   const withHeaders = {
     ...restaurant,
     token,

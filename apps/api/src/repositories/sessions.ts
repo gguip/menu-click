@@ -29,9 +29,16 @@ export async function insert(
 /**
  * Resolve o hash de um token em quem está autenticado, ou `null`.
  *
- * Uma query só, com o join que já traz o `restaurant_id` do usuário: é a
- * consulta que roda em toda requisição autenticada, então ela não pode virar
- * duas idas ao banco.
+ * Uma query só, com os joins que já trazem o `restaurant_id` do usuário e a
+ * verificação de e-mail da loja: é a consulta que roda em toda requisição
+ * autenticada, então ela não pode virar duas idas ao banco.
+ *
+ * ⚠️ O join com `restaurants` NÃO é de graça, e vale dizer o preço em vez de
+ * escondê-lo: `email_verified_at` mora no restaurante, não no usuário (ver a
+ * migration da verificação de e-mail), então carregar `emailVerified` na
+ * sessão custa um join a mais — por chave primária, então barato, mas é o
+ * caminho mais quente do painel. Continua sendo **uma** ida ao banco, que é o
+ * que importa: a alternativa seria uma segunda consulta em `authenticate.ts`.
  *
  * Os três filtros importam pelo mesmo motivo — sessão expirada, revogada ou de
  * usuário removido tem que se comportar como token inexistente:
@@ -50,14 +57,31 @@ export async function findActiveByTokenHash(
     restaurant_user_id: string;
     restaurant_id: string;
     role: AuthContext["role"];
+    email_verified: boolean;
   }>(
-    `select s.id, s.restaurant_user_id, u.restaurant_id, u.role
+    `select s.id, s.restaurant_user_id, u.restaurant_id, u.role,
+            r.email_verified_at is not null as email_verified
        from sessions s
        join restaurant_users u on u.id = s.restaurant_user_id
+       join restaurants r on r.id = u.restaurant_id
       where s.token_hash = $1
         and s.expires_at > now()
         and s.deleted_at is null
-        and u.deleted_at is null`,
+        and u.deleted_at is null
+        -- ⚠️ O join com restaurants NAO filtra r.deleted_at, e isso e
+        -- deliberado -- foi questionado numa revisao, entao fica escrito.
+        --
+        -- Remover o restaurante NAO derruba a sessao do dono: a cascata marca
+        -- produtos, categorias, grupos, horarios e bairros, mas nao o usuario.
+        -- Com a sessao viva, toda rota escopada responde 404 pelo ensureExists
+        -- ("sumiu"), que e a mensagem certa para quem acabou de apagar a
+        -- propria loja. Filtrando aqui, ela passaria a responder 401 ("quem e
+        -- voce?"), e quem apagou de proposito acharia que deu problema no
+        -- login. Ha teste prendendo o 404.
+        --
+        -- Nada vaza por isso: o /auth/me devolve o USUARIO, que de fato
+        -- continua existindo, e nenhum campo do restaurante sai por ali.
+        -- O join esta aqui so para trazer email_verified_at.`,
     [tokenHash],
   );
   if (rows.length === 0) return null;
@@ -67,6 +91,7 @@ export async function findActiveByTokenHash(
     userId: rows[0].restaurant_user_id,
     restaurantId: rows[0].restaurant_id,
     role: rows[0].role,
+    emailVerified: rows[0].email_verified,
   };
 }
 

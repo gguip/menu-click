@@ -7,6 +7,7 @@ import type {
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
+import { ABANDONED_REGISTRATION_DAYS } from "../domain/email-verification.ts";
 import { SLUG_MAX_LENGTH, slugify } from "../domain/slug.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { isValidTimezone } from "../domain/timezone.ts";
@@ -17,6 +18,7 @@ import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as productsRepository from "../repositories/products.ts";
 import * as restaurantsRepository from "../repositories/restaurants.ts";
+import * as restaurantUsersRepository from "../repositories/restaurant-users.ts";
 
 /**
  * Serviço de restaurantes: **a regra de negócio**.
@@ -99,6 +101,94 @@ async function tryInsert(
 }
 
 /**
+ * Marca como removido o cadastro abandonado — o restaurante **e o usuário
+ * dele** —, liberando o slug e o e-mail que ele segurava. `false` = não é
+ * cadastro abandonado (ou não existe), e nada foi escrito.
+ *
+ * O usuário vai junto porque é ele que segura o e-mail no índice único;
+ * liberar só o slug deixaria metade do problema de pé — e a metade que dói
+ * mais, que é a pessoa que não recebeu o e-mail de verificação e tenta se
+ * cadastrar de novo com o mesmo endereço.
+ *
+ * Chamada dos DOIS pontos de colisão: o slug, aqui mesmo (`create`), e o
+ * e-mail, no `register` de `services/auth.ts`.
+ *
+ * ⚠️ Isto é seguro por uma razão específica, e ela precisa continuar verdadeira:
+ * um restaurante não verificado está bloqueado de TODAS as rotas de gestão
+ * (`routes/authenticate.ts` responde 403), então não tem cardápio, categoria,
+ * produto nem pedido. Apagar um é apagar uma linha vazia.
+ *
+ * Se um dia alguma rota de gestão deixar de exigir verificação, esta limpeza
+ * deixa de ser inofensiva — e nada aqui vai avisar. **E o modo de falha é pior
+ * e mais quieto que "apaga uma linha cheia": as filhas ficam ÓRFÃS.** Medido,
+ * forçando o estado no banco: produto, categoria, grade de horário e bairro
+ * atendido continuam todos com `deleted_at is null` apontando para um
+ * restaurante morto, e nenhuma cascata jamais os alcança — a cascata de
+ * verdade mora no `remove()` daqui, e esta limpeza **não a usa**, de propósito,
+ * porque sob a premissa não há o que cascatear. O resultado seria lixo
+ * permanente, invisível pela API e impossível de remover por ela.
+ *
+ * O pedido fica de fora dessa conta, e não por descuido: ele nunca cascateia a
+ * partir do restaurante (é histórico, não catálogo), então pedido vivo sob
+ * restaurante morto é o estado normal também depois do `remove()` — não é
+ * sintoma desta limpeza.
+ */
+export async function releaseAbandonedRegistration(
+  restaurantId: string,
+  db: Queryable = pool,
+): Promise<boolean> {
+  // as duas marcas valem juntas ou não valem (D3). Dentro de uma transação,
+  // usa a que já existe — abrir outra mandaria as queries por OUTRA conexão,
+  // fora do bloco de quem chamou.
+  return isTransactionClient(db)
+    ? markAbandonedRemoved(restaurantId, db)
+    : withTransaction((client) => markAbandonedRemoved(restaurantId, client));
+}
+
+async function markAbandonedRemoved(
+  restaurantId: string,
+  db: Queryable,
+): Promise<boolean> {
+  // a condição ("não verificado E com mais de 7 dias") mora inteira no
+  // repositório, numa query só: é ela que separa esta limpeza de um apagador
+  // de lojas, e ela não pode existir em dois lugares
+  const liberado = await restaurantsRepository.softDeleteIfAbandoned(
+    restaurantId,
+    ABANDONED_REGISTRATION_DAYS,
+    db,
+  );
+  if (!liberado) return false;
+
+  await restaurantUsersRepository.softDeleteByRestaurant(restaurantId, db);
+  return true;
+}
+
+/**
+ * Uma tentativa de inserir com este slug que, ao colidir, olha se quem o
+ * segura é um cadastro abandonado — e, se for, o libera e tenta uma segunda
+ * (e última) vez.
+ *
+ * A consulta a mais só acontece na colisão, que é o ponto de fazer a limpeza
+ * aqui em vez de numa rotina agendada (que o projeto não tem) ou no próprio
+ * índice único (que o Postgres recusa: `functions in index predicate must be
+ * marked IMMUTABLE`, e `now()` não é).
+ */
+async function tryInsertReleasingAbandoned(
+  input: CreateRestaurantInput,
+  slug: string,
+  db: Queryable,
+): Promise<Restaurant | null> {
+  const created = await tryInsert(input, slug, db);
+  if (created !== null) return created;
+
+  const holderId = await restaurantsRepository.findIdBySlug(slug, db);
+  if (holderId === null) return null;
+  if (!(await releaseAbandonedRegistration(holderId, db))) return null;
+
+  return tryInsert(input, slug, db);
+}
+
+/**
  * Recusa um fuso que o sistema não conhece, com **400**.
  *
  * O JSON Schema não tem como expressar isto — a lista de fusos é do sistema
@@ -122,7 +212,7 @@ export async function create(
   assertTimezoneValida(input.timezone);
 
   if (input.slug !== undefined) {
-    const created = await tryInsert(input, input.slug, db);
+    const created = await tryInsertReleasingAbandoned(input, input.slug, db);
     if (created === null) {
       throw new ConflictError(`O slug "${input.slug}" já está em uso`);
     }
@@ -138,7 +228,7 @@ export async function create(
     const slug =
       attempt === 0 && base !== "" ? base : [base, suffix].filter(Boolean).join("-");
 
-    const created = await tryInsert(input, slug, db);
+    const created = await tryInsertReleasingAbandoned(input, slug, db);
     if (created !== null) return created;
   }
 

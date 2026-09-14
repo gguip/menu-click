@@ -125,6 +125,17 @@ export type Restaurant = CreateRestaurantInput & {
   deliveryFeeToArrange: boolean;
   /** Idem: `not null default 0`. */
   minimumOrderInCents: number;
+  /**
+   * Quando a loja provou o e-mail. AUSENTE (não `null`) enquanto não
+   * verificou — mesmo padrão do `logoUrl`/`freeDeliveryAboveInCents`: a
+   * coluna é nula, e o mapper só inclui a chave quando há valor.
+   *
+   * Não é exposto em `restaurantResponseSchema` (S10): hoje só existe para o
+   * bloqueio de painel (o hook usa `emailVerified` da sessão, não este campo)
+   * e para quem lê o restaurante inteiro internamente precisar saber se ele
+   * está verificado sem uma segunda consulta.
+   */
+  emailVerifiedAt?: string;
   createdAt: string;
   updatedAt: string;
 };

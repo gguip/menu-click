@@ -37,6 +37,9 @@ const ROTAS_PUBLICAS = new Set([
   "POST /auth/forgot-password",
   // é o próprio token do e-mail que prova quem é, não a sessão
   "POST /auth/reset-password",
+  // a loja bloqueada ainda não tem sessão que sirva para nada além de ler o
+  // próprio bloqueio — é o token do e-mail que prova quem é aqui também
+  "POST /auth/verify-email",
   "POST /restaurants/:restaurantId/orders",
   // o acompanhamento: quem pediu não tem conta, e quem autoriza é o token
   // devolvido na criação do pedido — não a sessão. A rota HTTP é o gêmeo do

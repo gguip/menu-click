@@ -213,3 +213,62 @@ export async function softDelete(
   );
   return rowCount === 1;
 }
+
+/**
+ * Restaurante do usuário vivo com esse e-mail, ou `null`.
+ *
+ * É a ponta "e-mail" da liberação de cadastro abandonado: o índice único
+ * parcial de `email` garante no máximo um vivo, e quem decide o que fazer com
+ * o restaurante encontrado é o serviço.
+ *
+ * Não filtra o restaurante por `deleted_at`, e é honesto dizer que isso **não
+ * compra nada**: o serviço só recusa quando o restaurante está morto, então
+ * filtrar `r.deleted_at is null` aqui daria exatamente o mesmo resultado final
+ * (`null` → sem liberação → 409). Fica sem o filtro porque quem segura o
+ * e-mail é o usuário, e a pergunta desta consulta é "quem segura", não "o
+ * restaurante dele está vivo" — quem responde a segunda é o `WHERE` do
+ * `softDeleteIfAbandoned`, num comando só.
+ *
+ * ⚠️ A consequência, por extenso: **quem teve o restaurante removido pelo
+ * próprio dono segura aquele e-mail para sempre.** É o único jeito de existir
+ * usuário vivo sob restaurante morto — `DELETE /restaurants/:id` não marca os
+ * usuários (ver `softDeleteByRestaurant` abaixo), e um cadastro não verificado
+ * nem chega àquela rota (403). Reciclar e-mail de loja encerrada de propósito
+ * é outra pergunta, com o S30 no meio, e não é a que esta limpeza responde:
+ * ela é sobre cadastro **abandonado e não verificado**.
+ */
+export async function findRestaurantIdByEmail(
+  email: string,
+  db: Queryable = pool,
+): Promise<string | null> {
+  const { rows } = await db.query<{ restaurant_id: string }>(
+    `select restaurant_id from restaurant_users
+      where email = $1 and deleted_at is null`,
+    [email],
+  );
+  return rows.length === 0 ? null : rows[0].restaurant_id;
+}
+
+/**
+ * Soft delete de TODOS os usuários vivos de um restaurante. Devolve quantos
+ * foram marcados.
+ *
+ * Existe para a liberação de cadastro abandonado, que precisa levar o usuário
+ * junto do restaurante: é ele que segura o e-mail no índice único, e marcar só
+ * o restaurante deixaria metade do problema de pé.
+ *
+ * ⚠️ Não é a cascata do `DELETE /restaurants/:id` — aquele deixa os usuários
+ * vivos de propósito (ver `services/restaurants.ts`), e mudar isso aqui seria
+ * mudar o comportamento daquele por tabela.
+ */
+export async function softDeleteByRestaurant(
+  restaurantId: string,
+  db: Queryable = pool,
+): Promise<number> {
+  const { rowCount } = await db.query(
+    `update restaurant_users set deleted_at = now()
+      where restaurant_id = $1 and deleted_at is null`,
+    [restaurantId],
+  );
+  return rowCount ?? 0;
+}

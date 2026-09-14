@@ -32,4 +32,13 @@ export type AuthContext = {
    * custa nenhuma ida a mais ao banco.
    */
   role: UserRole;
+  /**
+   * Se a LOJA (não o usuário) já provou o e-mail. Também vem da mesma query
+   * — mas aqui o preço é maior que o do `role`: `email_verified_at` mora em
+   * `restaurants`, então resolver isto é um JOIN A MAIS em toda requisição
+   * autenticada (ver `repositories/sessions.ts`). Continua sendo **uma** ida
+   * ao banco, que é o que importa; a alternativa seria uma segunda consulta
+   * no hook de `authenticate.ts`.
+   */
+  emailVerified: boolean;
 };
