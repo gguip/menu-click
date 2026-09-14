@@ -305,6 +305,14 @@ export async function buildApp() {
     // `app.close()`. Vencido o prazo, o pool fecha de qualquer jeito e o envio
     // que sobrou morre com o processo — perder um e-mail é melhor que não
     // encerrar. Ver SHUTDOWN_DRAIN_TIMEOUT_MS em limits.ts.
+    //
+    // ⚠️ ESTA LINHA NÃO TEM TESTE, e isso está escrito aqui porque medir é
+    // diferente de prometer: `test/background.test.ts` prende o prazo do
+    // `drainBackgroundWork`, mas tirar o ARGUMENTO daqui passa pela suíte
+    // inteira — verificado. Prender o call site custaria um teste de app que
+    // espera os 5 segundos e encerra o pool no meio do arquivo (o `afterEach`
+    // do `setup.ts` ainda dá `truncate` depois), e o preço não paga. Quem
+    // mexer nesta linha não vai ser avisado por nada além deste comentário.
     await drainBackgroundWork(SHUTDOWN_DRAIN_TIMEOUT_MS);
 
     await pool.end();
