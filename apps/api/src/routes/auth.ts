@@ -380,7 +380,12 @@ export async function authRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const auth = requireAuth(request);
       reply.code(202).send({
-        message: "Enviamos um novo link de verificação para o seu e-mail",
+        // A frase serve aos dois casos de propósito: loja já verificada
+        // recebe este mesmo 202 e nada é enviado (a resposta tem que ser
+        // idêntica), então afirmar o envio seria mentir para metade de quem
+        // chama.
+        message:
+          "Se o e-mail do seu restaurante ainda não estiver confirmado, enviamos um novo link para ele",
       });
 
       // Depois de responder, e sem `await` — mesmo motivo do cadastro e do
