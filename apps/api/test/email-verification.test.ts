@@ -431,6 +431,31 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       expect(novo.json().restaurant.id).not.toBe(restaurant.id);
     });
 
+    it("libera o slug DERIVADO do nome, sem sufixo de desempate", async () => {
+      // É o exemplo que a spec usa para justificar a feature: "a segunda
+      // 'Pizzaria do João' ganha sufixo por causa de uma primeira que nunca
+      // existiu de fato". O teste acima cobre o slug EXPLÍCITO, que é o outro
+      // ramo do `create()` — este cobre o derivado, e sem ele trocar
+      // `tryInsertReleasingAbandoned` por `tryInsert` no laço do sufixo passa
+      // despercebido.
+      const { restaurant } = await registerAndLogin(app, {
+        restaurant: { name: "Pizzaria do João" },
+      });
+      expect(restaurant.slug).toBe("pizzaria-do-joao"); // sem sufixo: é o 1º
+
+      await pool.query(
+        `update restaurants set created_at = now() - interval '8 days' where id = $1`,
+        [restaurant.id],
+      );
+
+      // mesmo NOME, nenhum slug enviado: quem resolve o endereço é o servidor
+      const novo = await registerResponse(app, { name: "Pizzaria do João" });
+
+      expect(novo.statusCode).toBe(201);
+      // o slug base de volta, e não `pizzaria-do-joao-a1b2c3`
+      expect(novo.json().restaurant.slug).toBe("pizzaria-do-joao");
+    });
+
     it("libera o e-mail de cadastro abandonado", async () => {
       // o caso MAIS comum: a pessoa não recebeu o e-mail e tenta de novo
       const { user } = await registerAndLogin(app, {
@@ -452,6 +477,41 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       expect(novo.statusCode).toBe(201);
       expect(novo.json().user.email).toBe(user.email);
       expect(novo.json().user.id).not.toBe(user.id);
+    });
+
+    it("o 409 do e-mail desfaz a liberação do slug", async () => {
+      // ⚠️ A liberação roda DENTRO da transação de quem chamou (D3), e é isso
+      // que este teste prende. Se ela abrisse transação própria, o cadastro
+      // abaixo — que libera o slug e só DEPOIS descobre que o e-mail está
+      // ocupado por uma conta viva — responderia 409 com o cadastro abandonado
+      // já apagado para sempre: perda de dado numa requisição que não criou
+      // nada.
+      const { restaurant: abandonado, user: donoAbandonado } =
+        await registerAndLogin(app, { restaurant: { slug: "quase-liberada" } });
+      await pool.query(
+        `update restaurants set created_at = now() - interval '8 days' where id = $1`,
+        [abandonado.id],
+      );
+
+      // o e-mail vem de uma loja VIVA e verificada: o slug libera, o e-mail não
+      const viva = await createRestaurant(app);
+
+      const response = await registerResponse(
+        app,
+        { slug: "quase-liberada" },
+        { email: viva.ownerEmail },
+      );
+      expect(response.statusCode).toBe(409);
+
+      // e o abandonado continua de pé, restaurante E usuário
+      const { rows } = await pool.query(
+        `select
+           (select deleted_at is null from restaurants where id = $1) as loja_viva,
+           (select deleted_at is null from restaurant_users where id = $2) as dono_vivo`,
+        [abandonado.id, donoAbandonado.id],
+      );
+      expect(rows[0].loja_viva).toBe(true);
+      expect(rows[0].dono_vivo).toBe(true);
     });
 
     it("NÃO libera cadastro recente", async () => {
