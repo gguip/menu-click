@@ -156,6 +156,14 @@ describe("rate limit", () => {
     expect(respostas.at(-1)?.statusCode).toBe(429);
   });
 
+  it("o cadastro tem teto próprio, muito abaixo do global", () => {
+    // o teste acima escala com a constante — ele mede 6 de 5, e mediria 101 de
+    // 100 —, então subir o número sozinho não o derruba. Esta asserção é o que
+    // impede o cadastro de voltar em silêncio para o teto global, exatamente
+    // como a equivalente do login logo abaixo.
+    expect(REGISTER_RATE_LIMIT_MAX).toBeLessThan(RATE_LIMIT_MAX);
+  });
+
   /**
    * O teto do reenvio é o único do projeto que NÃO é por IP, e estes dois
    * testes prendem a decisão pelos dois lados: trocar de IP não escapa dele, e
