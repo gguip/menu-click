@@ -7216,7 +7216,7 @@
         "tags": [
           "Autenticação"
         ],
-        "description": "Manda outro link de verificação para o e-mail de quem chama (nunca para outro endereço) e invalida o token anterior, para não deixar dois links vivos na caixa de entrada. Exige sessão, mas funciona com a loja ainda bloqueada — é o caminho de volta quando o e-mail do cadastro falhou (SMTP fora do ar) ou não chegou (S30). Limite de 3 requisições por minuto **por usuário** (429 ao estourar), e não por IP: quem gasta o envio é a conta, e por IP duas lojas na mesma rede dividiriam o teto.",
+        "description": "Manda outro link de verificação para o e-mail de quem chama (nunca para outro endereço) e invalida o token anterior, para não deixar dois links vivos na caixa de entrada. Exige sessão, mas funciona com a loja ainda bloqueada — é o caminho de volta quando o e-mail do cadastro falhou (SMTP fora do ar) ou não chegou (S30). Limite de 3 requisições por minuto **por usuário** (429 ao estourar), e não por IP: quem gasta o envio é a conta, e por IP duas lojas na mesma rede dividiriam o teto. Loja **já verificada** recebe o mesmo 202 e nada é enviado — a resposta é idêntica nos dois casos, e o carimbo de quando ela provou o e-mail fica onde está.",
         "security": [
           {
             "bearerAuth": []
