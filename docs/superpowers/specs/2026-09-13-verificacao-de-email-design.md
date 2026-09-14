@@ -137,10 +137,21 @@ removido** — e disso o cardápio e a cotação de frete herdam.
 ⚠️ **A criação de pedido NÃO herda, e a diferença é real.** Ela resolve o
 restaurante por `getById` (pelo id da rota, não pelo slug).
 
-`getById` tem **4 chamadores**, conferidos: a criação de pedido (público) e três
-de painel — as duas transições de status e o `GET /restaurants/:id`. Filtrar
-dentro dele funcionaria, porque os três de painel já são bloqueados pelo hook
-antes de chegar lá. **A decisão é apertada**, e é honesto dizer isso.
+`getById` tem **4 chamadores**, conferidos um a um pela função que os contém
+(e não por número de linha, que foi como eu errei isto duas vezes):
+
+| Chamador | Superfície |
+| --- | --- |
+| `services/orders.ts` → `create()` | **pública** — a criação de pedido |
+| `services/orders.ts` → `listByRestaurant()` | painel |
+| `services/orders.ts` → `summary()` | painel |
+| `routes/restaurants.ts:94` | painel |
+
+As transições de status **não** entram: elas usam `ensureExists`, outra função.
+
+Filtrar dentro do `getById` funcionaria, porque os três de painel já são
+bloqueados pelo hook antes de chegar lá. **A decisão é apertada**, e é honesto
+dizer isso.
 
 O assert próprio vence por dois motivos, nenhum deles dramático: `getById` é um
 "pegue o restaurante por id" de propósito geral, e fazê-lo esconder loja não

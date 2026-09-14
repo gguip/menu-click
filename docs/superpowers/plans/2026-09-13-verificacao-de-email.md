@@ -413,9 +413,10 @@ export async function findBySlug(
 ⚠️ **A criação de pedido NÃO herda este filtro, e isso já foi verificado.**
 
 Ela resolve por `restaurantsService.getById(restaurantId)`
-(`services/orders.ts:342`). Esse `getById` tem **4 chamadores**, conferidos: a
-criação de pedido (público) e três de painel — as transições em
-`services/orders.ts:585,618` e o `routes/restaurants.ts:94`.
+(`services/orders.ts:342`). Esse `getById` tem **4 chamadores**, conferidos pela função que os contém:
+`create()` (a criação de pedido, pública), `listByRestaurant()` e `summary()`
+(painel), e `routes/restaurants.ts:94` (painel). As transições de status **não**
+entram — usam `ensureExists`.
 
 **Não filtre dentro dele.** Filtrar funcionaria (os três de painel já são
 bloqueados pelo hook antes), então a decisão é apertada — mas `getById` é um
