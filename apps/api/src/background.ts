@@ -41,6 +41,18 @@ export function track(work: Promise<unknown>): void {
  */
 export async function drainBackgroundWork(): Promise<void> {
   while (emAndamento.size > 0) {
-    await Promise.allSettled([...emAndamento]);
+    // ⚠️ Esvazia o conjunto ANTES de esperar, e isso não é detalhe.
+    //
+    // Esperando sem esvaziar, o `await` retoma como microtask e pode chegar
+    // antes dos `finally` que removem cada promessa — o `while` reentra com as
+    // mesmas, ja resolvidas, o `allSettled` volta na hora, e vira laco quente
+    // que nunca sai. Foi medido: um teste ficou 707 segundos preso assim.
+    //
+    // Tirando primeiro, cada volta espera exatamente o que estava registrado.
+    // Trabalho que se registrar durante a espera cai na volta seguinte, que e
+    // por isso que o laco existe.
+    const pendentes = [...emAndamento];
+    emAndamento.clear();
+    await Promise.allSettled(pendentes);
   }
 }
