@@ -10,6 +10,7 @@ import {
   RATE_LIMIT_WINDOW,
 } from "../limits.ts";
 import * as authService from "../services/auth.ts";
+import { track } from "../background.ts";
 import { requireAuth } from "./authenticate.ts";
 import {
   createRestaurantBodySchema,
@@ -277,12 +278,14 @@ export async function authRoutes(app: FastifyInstance) {
       // `requestPasswordReset`. Falha de envio vai só para o log (nunca o
       // token, S13); a loja fica bloqueada, sem caminho de reenvio até a
       // Task 4.
-      void authService.sendEmailVerification(created.user).catch((error) => {
-        request.log.error(
-          { err: error },
-          "falha ao enviar e-mail de verificação",
-        );
-      });
+      track(
+        authService.sendEmailVerification(created.user).catch((error) => {
+          request.log.error(
+            { err: error },
+            "falha ao enviar e-mail de verificação",
+          );
+        }),
+      );
 
       return created;
     },
@@ -353,12 +356,14 @@ export async function authRoutes(app: FastifyInstance) {
       // `/auth/forgot-password`: e-mail é rede, e não pode segurar quem
       // acabou de pedir o reenvio. Falha de envio vai só para o log, nunca o
       // token (S13).
-      void authService.resendEmailVerification(auth).catch((error) => {
-        request.log.error(
-          { err: error },
-          "falha ao reenviar e-mail de verificação",
-        );
-      });
+      track(
+        authService.resendEmailVerification(auth).catch((error) => {
+          request.log.error(
+            { err: error },
+            "falha ao reenviar e-mail de verificação",
+          );
+        }),
+      );
 
       return reply;
     },
@@ -430,9 +435,11 @@ export async function authRoutes(app: FastifyInstance) {
       // `requestPasswordReset` em `services/auth.ts`. Falha de envio vai só
       // para o log, sem o token (S13): contar ao cliente que o envio falhou
       // também diria que o e-mail existe.
-      void authService.requestPasswordReset(request.body.email).catch((error) => {
-        request.log.error({ err: error }, "falha ao processar recuperação de senha");
-      });
+      track(
+        authService.requestPasswordReset(request.body.email).catch((error) => {
+          request.log.error({ err: error }, "falha ao processar recuperação de senha");
+        }),
+      );
 
       return reply;
     },

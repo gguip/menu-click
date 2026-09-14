@@ -14,6 +14,7 @@ import {
   TRUST_PROXY,
 } from "./limits.ts";
 import type { FastifyError } from "fastify";
+import { drainBackgroundWork } from "./background.ts";
 import { pool } from "./db/pool.ts";
 import {
   ConflictError,
@@ -293,6 +294,11 @@ export async function buildApp() {
 
   // Fecha o pool junto com o app (F26).
   app.addHook("onClose", async () => {
+    // Espera o trabalho que roda fora do caminho da resposta (os e-mails de
+    // verificação e de recuperação). Sem isto, encerrar no meio faz o e-mail de
+    // quem acabou de se cadastrar sumir sem sintoma nenhum.
+    await drainBackgroundWork();
+
     await pool.end();
   });
 
