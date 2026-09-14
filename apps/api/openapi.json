@@ -7195,7 +7195,7 @@
         "tags": [
           "Autenticação"
         ],
-        "description": "Manda outro link de verificação para o e-mail de quem chama (nunca para outro endereço) e invalida o token anterior, para não deixar dois links vivos na caixa de entrada. Exige sessão, mas funciona com a loja ainda bloqueada — é o caminho de volta quando o e-mail do cadastro falhou (SMTP fora do ar) ou não chegou (S30).",
+        "description": "Manda outro link de verificação para o e-mail de quem chama (nunca para outro endereço) e invalida o token anterior, para não deixar dois links vivos na caixa de entrada. Exige sessão, mas funciona com a loja ainda bloqueada — é o caminho de volta quando o e-mail do cadastro falhou (SMTP fora do ar) ou não chegou (S30). Limite de 3 requisições por minuto **por usuário** (429 ao estourar), e não por IP: quem gasta o envio é a conta, e por IP duas lojas na mesma rede dividiriam o teto.",
         "security": [
           {
             "bearerAuth": []
@@ -7218,6 +7218,27 @@
             }
           },
           "401": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Default Response",
             "content": {
               "application/json": {

@@ -4,6 +4,7 @@ import type { CreateRestaurantInput } from "../domain/restaurant.ts";
 import type { CreateRestaurantUserInput } from "../domain/restaurant-user.ts";
 import { PASSWORD_MIN_LENGTH } from "../domain/restaurant-user.ts";
 import {
+  EMAIL_RESEND_RATE_LIMIT_MAX,
   EMAIL_VERIFICATION_RATE_LIMIT_MAX,
   LOGIN_RATE_LIMIT_MAX,
   PASSWORD_RESET_RATE_LIMIT_MAX,
@@ -334,15 +335,30 @@ export async function authRoutes(app: FastifyInstance) {
   app.post(
     "/auth/resend-verification",
     {
+      config: {
+        // Teto próprio, e por USUÁRIO — ver EMAIL_RESEND_RATE_LIMIT_MAX em
+        // limits.ts. Cada chamada manda um e-mail de verdade; sem teto, uma
+        // sessão só dispara os 100/min do limite global.
+        rateLimit: {
+          max: EMAIL_RESEND_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+          // O hook de autenticação é de INSTÂNCIA e o do limitador é de ROTA,
+          // então a sessão já está resolvida quando esta função roda — a mesma
+          // ordem que o CLAUDE.md documenta para o teto do login. O `?? ip` é
+          // o caminho que não acontece: sem sessão, a rota já respondeu 401.
+          keyGenerator: (request) => request.auth?.userId ?? request.ip,
+        },
+      },
       schema: {
         tags: ["Autenticação"],
         operationId: "resendEmailVerification",
         summary: "Reenvia o e-mail de verificação",
         description:
-          "Manda outro link de verificação para o e-mail de quem chama (nunca para outro endereço) e invalida o token anterior, para não deixar dois links vivos na caixa de entrada. Exige sessão, mas funciona com a loja ainda bloqueada — é o caminho de volta quando o e-mail do cadastro falhou (SMTP fora do ar) ou não chegou (S30).",
+          "Manda outro link de verificação para o e-mail de quem chama (nunca para outro endereço) e invalida o token anterior, para não deixar dois links vivos na caixa de entrada. Exige sessão, mas funciona com a loja ainda bloqueada — é o caminho de volta quando o e-mail do cadastro falhou (SMTP fora do ar) ou não chegou (S30). Limite de 3 requisições por minuto **por usuário** (429 ao estourar), e não por IP: quem gasta o envio é a conta, e por IP duas lojas na mesma rede dividiriam o teto.",
         response: {
           202: resendVerificationResponseSchema,
           401: errorResponseSchema,
+          429: errorResponseSchema,
         },
       },
     },

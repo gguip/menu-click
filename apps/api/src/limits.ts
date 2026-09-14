@@ -103,6 +103,23 @@ export const PASSWORD_RESET_RATE_LIMIT_MAX = 5;
  */
 export const EMAIL_VERIFICATION_RATE_LIMIT_MAX = 5;
 
+/**
+ * Teto do `/auth/resend-verification` — e aqui a chave **não é o IP**, que é a
+ * diferença que importa. A rota exige sessão, então existe sinal melhor que o
+ * endereço de rede: a conta. Por IP, duas lojas na mesma praça de alimentação
+ * (ou atrás do mesmo CGNAT) dividiriam o teto, e o botão de "não recebi o
+ * e-mail" pararia de funcionar para a segunda — justamente quem precisa dele
+ * (S30). O S25 manda usar IP em rota **anônima**, onde não há outra chave; não
+ * é o caso desta.
+ *
+ * O teto existe porque cada chamada manda um e-mail DE VERDADE. Sem ele a rota
+ * herda o teto global de 100/min e uma sessão sozinha dispara 100 envios por
+ * minuto: conta do provedor, e reputação do domínio — que é o que faz e-mail
+ * legítimo começar a cair na caixa de spam de quem não tem nada com isso.
+ * Três por minuto cobrem com folga "cliquei, não chegou, cliquei de novo".
+ */
+export const EMAIL_RESEND_RATE_LIMIT_MAX = 3;
+
 export const RATE_LIMIT_WINDOW = "1 minute";
 
 /**

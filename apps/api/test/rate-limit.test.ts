@@ -1,12 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  EMAIL_RESEND_RATE_LIMIT_MAX,
   EMAIL_VERIFICATION_RATE_LIMIT_MAX,
   LOGIN_RATE_LIMIT_MAX,
   PASSWORD_RESET_RATE_LIMIT_MAX,
   RATE_LIMIT_MAX,
 } from "../src/limits.ts";
-import { buildTestApp, registerRestaurant } from "./helpers.ts";
+import {
+  buildTestApp,
+  registerAndLogin,
+  registerRestaurant,
+} from "./helpers.ts";
 
 /**
  * Rate limit por IP.
@@ -113,6 +118,62 @@ describe("rate limit", () => {
         .map((r) => r.statusCode),
     ).toEqual(Array(EMAIL_VERIFICATION_RATE_LIMIT_MAX).fill(400));
     expect(respostas.at(-1)?.statusCode).toBe(429);
+  });
+
+  /**
+   * O teto do reenvio é o único do projeto que NÃO é por IP, e estes dois
+   * testes prendem a decisão pelos dois lados: trocar de IP não escapa dele, e
+   * gastar a cota não atinge a loja vizinha.
+   *
+   * Por isso as chamadas saem de IPs DIFERENTES de propósito — com chave por
+   * IP, as quatro passariam e o teste não provaria nada.
+   */
+  it(`o ${EMAIL_RESEND_RATE_LIMIT_MAX + 1}º reenvio da mesma sessão é 429, mesmo trocando de IP`, async () => {
+    const { headers } = await registerAndLogin(app);
+
+    const respostas = [];
+    for (let i = 0; i < EMAIL_RESEND_RATE_LIMIT_MAX + 1; i++) {
+      respostas.push(
+        await app.inject({
+          method: "POST",
+          url: "/auth/resend-verification",
+          remoteAddress: ipDedicado(),
+          headers,
+        }),
+      );
+    }
+
+    expect(
+      respostas.slice(0, EMAIL_RESEND_RATE_LIMIT_MAX).map((r) => r.statusCode),
+    ).toEqual(Array(EMAIL_RESEND_RATE_LIMIT_MAX).fill(202));
+    expect(respostas.at(-1)?.statusCode).toBe(429);
+  });
+
+  it("o reenvio esgotado de uma loja não tranca a loja vizinha no mesmo IP", async () => {
+    // é o motivo de a chave não ser o IP: duas lojas numa praça de alimentação
+    // saem do mesmo endereço, e "não recebi o e-mail" precisa continuar
+    // funcionando para a segunda (S30)
+    const compartilhado = ipDedicado();
+    const gastadora = await registerAndLogin(app);
+    const vizinha = await registerAndLogin(app);
+
+    for (let i = 0; i < EMAIL_RESEND_RATE_LIMIT_MAX + 1; i++) {
+      await app.inject({
+        method: "POST",
+        url: "/auth/resend-verification",
+        remoteAddress: compartilhado,
+        headers: gastadora.headers,
+      });
+    }
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/resend-verification",
+      remoteAddress: compartilhado,
+      headers: vizinha.headers,
+    });
+
+    expect(response.statusCode).toBe(202);
   });
 
   it(`o ${LOGIN_RATE_LIMIT_MAX + 1}º login do mesmo IP é 429`, async () => {
