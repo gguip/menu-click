@@ -1,10 +1,12 @@
 import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
-import { withTransaction } from "../db/pool.ts";
+import { isTransactionClient, withTransaction } from "../db/pool.ts";
+import type { Queryable } from "../db/pool.ts";
 import type { CreateRestaurantInput, Restaurant } from "../domain/restaurant.ts";
 import type {
   CreateRestaurantUserInput,
   RestaurantUser,
+  UserRole,
 } from "../domain/restaurant-user.ts";
 import { PASSWORD_MAX_BYTES } from "../domain/restaurant-user.ts";
 import { isUuid } from "../domain/uuid.ts";
@@ -83,10 +85,49 @@ function assertPasswordFits(password: string): void {
 }
 
 /**
+ * Uma tentativa de inserir o usuário, protegida contra o efeito colateral de
+ * falhar dentro de uma transação.
+ *
+ * ⚠️ Mesmo remédio do `tryInsert` de `services/restaurants.ts`, e pelo mesmo
+ * motivo: capturar o `23505` em JavaScript **não desfaz o estado do
+ * Postgres**. O comando falhou DENTRO da transação, então o bloco está
+ * abortado e a próxima query estoura `current transaction is aborted`.
+ * Enquanto a colisão de e-mail virava 409 na hora isso não aparecia — o
+ * rollback resolvia —, mas agora ela é seguida de uma limpeza e de uma segunda
+ * tentativa, que são queries.
+ *
+ * Fora de transação (pool) não há o que proteger, e `savepoint` ali é erro.
+ */
+async function tryInsertUser(
+  restaurantId: string,
+  data: { name: string; email: string; passwordHash: string; role: UserRole },
+  db: Queryable,
+): Promise<RestaurantUser | null> {
+  if (!isTransactionClient(db)) {
+    return restaurantUsersRepository.insert(restaurantId, data, db);
+  }
+
+  // nome fixo, escrito no código: identificador não aceita $n (S3)
+  await db.query("savepoint user_attempt");
+  const created = await restaurantUsersRepository.insert(restaurantId, data, db);
+  await db.query(
+    created === null
+      ? "rollback to savepoint user_attempt"
+      : "release savepoint user_attempt",
+  );
+  return created;
+}
+
+/**
  * Cadastro: cria o restaurante e o primeiro usuário dele, numa transação.
  *
  * Não devolve sessão — cadastrar e entrar são duas operações, e emitir token
  * aqui faria o cadastro ter dois efeitos. Quem cadastrou chama `/auth/login`.
+ *
+ * Os dois inserts podem colidir com um **cadastro abandonado** — alguém que se
+ * cadastrou e nunca verificou o e-mail. O slug é tratado dentro do
+ * `restaurantsService.create`; o e-mail, aqui. Ver
+ * `releaseAbandonedRegistration`.
  */
 export async function register(input: {
   restaurant: CreateRestaurantInput;
@@ -98,25 +139,44 @@ export async function register(input: {
   // milissegundos, e segurar uma conexão do pool por esse tempo é desperdício
   const passwordHash = await bcrypt.hash(input.user.password, BCRYPT_ROUNDS);
 
+  const userData = {
+    name: input.user.name,
+    email: input.user.email,
+    passwordHash,
+    // o primeiro usuário é sempre o dono: ele acabou de criar o restaurante, e
+    // um restaurante sem nenhum owner não teria como convidar ninguém nem se
+    // remover
+    role: "owner" as const,
+  };
+
   return withTransaction(async (client) => {
     const restaurant = await restaurantsService.create(
       input.restaurant,
       client,
     );
 
-    const user = await restaurantUsersRepository.insert(
-      restaurant.id,
-      {
-        name: input.user.name,
-        email: input.user.email,
-        passwordHash,
-        // o primeiro usuário é sempre o dono: ele acabou de criar o
-        // restaurante, e um restaurante sem nenhum owner não teria como
-        // convidar ninguém nem se remover
-        role: "owner",
-      },
-      client,
-    );
+    let user = await tryInsertUser(restaurant.id, userData, client);
+
+    if (user === null) {
+      // O e-mail está ocupado — e este é o caso MAIS comum da liberação de
+      // cadastro abandonado: alguém que não recebeu o e-mail de verificação e
+      // tenta se cadastrar de novo com o mesmo endereço. Se quem o segura é um
+      // cadastro abandonado, ele sai de cena e a segunda tentativa passa.
+      //
+      // Repetir só o insert do usuário, e não o `register` inteiro: o bcrypt já
+      // rodou e o restaurante novo já existe nesta transação.
+      const holderId = await restaurantUsersRepository.findRestaurantIdByEmail(
+        input.user.email,
+        client,
+      );
+      if (
+        holderId !== null &&
+        (await restaurantsService.releaseAbandonedRegistration(holderId, client))
+      ) {
+        user = await tryInsertUser(restaurant.id, userData, client);
+      }
+    }
+
     if (user === null) {
       // rollback desfaz o restaurante junto: cadastro é tudo ou nada
       throw new ConflictError(

@@ -9,6 +9,7 @@ import {
   esperaEmail,
   extraiToken,
   registerAndLogin,
+  registerResponse,
   validDeliveryAddress,
 } from "./helpers.ts";
 
@@ -398,6 +399,97 @@ describe("bloqueio do painel por e-mail não verificado", () => {
         url: "/auth/resend-verification",
       });
       expect(response.statusCode).toBe(401);
+    });
+  });
+
+  /**
+   * Task 5 do plano: quem se cadastra e nunca verifica segura duas coisas
+   * escassas — o slug e o e-mail —, e a verificação torna o abandono mais
+   * provável, porque cria um passo a mais onde desistir. A limpeza é
+   * preguiçosa: acontece na colisão seguinte, que é exatamente quando importa.
+   *
+   * ⚠️ Nenhum teste aqui espera o relógio. O cadastro é envelhecido no BANCO
+   * (`created_at = now() - interval '8 days'`), o mesmo padrão do teste de
+   * token expirado acima.
+   */
+  describe("cadastro abandonado libera slug e e-mail", () => {
+    it("libera o slug de cadastro abandonado", async () => {
+      const { restaurant } = await registerAndLogin(app, {
+        restaurant: { slug: "abandonada" },
+      });
+      // envelhece o cadastro em vez de esperar 7 dias
+      await pool.query(
+        `update restaurants set created_at = now() - interval '8 days' where id = $1`,
+        [restaurant.id],
+      );
+
+      const novo = await registerResponse(app, { slug: "abandonada" });
+
+      expect(novo.statusCode).toBe(201);
+      expect(novo.json().restaurant.slug).toBe("abandonada");
+      // é outro cadastro, não o antigo revivido
+      expect(novo.json().restaurant.id).not.toBe(restaurant.id);
+    });
+
+    it("libera o e-mail de cadastro abandonado", async () => {
+      // o caso MAIS comum: a pessoa não recebeu o e-mail e tenta de novo
+      const { user } = await registerAndLogin(app, {
+        restaurant: { slug: "sem-o-email" },
+      });
+      await pool.query(
+        `update restaurants set created_at = now() - interval '8 days'
+          where id = (select restaurant_id from restaurant_users where id = $1)`,
+        [user.id],
+      );
+
+      // slug diferente de propósito: quem falha aqui é o e-mail, e só ele
+      const novo = await registerResponse(
+        app,
+        { slug: "sem-o-email-de-novo" },
+        { email: user.email },
+      );
+
+      expect(novo.statusCode).toBe(201);
+      expect(novo.json().user.email).toBe(user.email);
+      expect(novo.json().user.id).not.toBe(user.id);
+    });
+
+    it("NÃO libera cadastro recente", async () => {
+      // 7 dias ainda não passaram: o slug ganha sufixo, o e-mail é 409
+      const { restaurant, user } = await registerAndLogin(app, {
+        restaurant: { name: "Pizzaria Recente" },
+      });
+
+      const mesmoNome = await registerResponse(app, { name: "Pizzaria Recente" });
+      expect(mesmoNome.statusCode).toBe(201);
+      expect(mesmoNome.json().restaurant.slug).not.toBe(restaurant.slug);
+      expect(mesmoNome.json().restaurant.slug).toMatch(/^pizzaria-recente-/);
+
+      const mesmoEmail = await registerResponse(app, {}, { email: user.email });
+      expect(mesmoEmail.statusCode).toBe(409);
+    });
+
+    it("NÃO libera cadastro verificado, por mais antigo que seja", async () => {
+      // envelhece um restaurante VERIFICADO e confirma que ele não é tocado
+      const restaurante = await createRestaurant(app, { slug: "veterana" });
+      await pool.query(
+        `update restaurants set created_at = now() - interval '400 days' where id = $1`,
+        [restaurante.id],
+      );
+
+      const mesmoSlug = await registerResponse(app, { slug: "veterana" });
+      expect(mesmoSlug.statusCode).toBe(409);
+
+      const mesmoEmail = await registerResponse(
+        app,
+        { slug: "outra-veterana" },
+        { email: restaurante.ownerEmail },
+      );
+      expect(mesmoEmail.statusCode).toBe(409);
+
+      // e a loja continua de pé, atendendo pelo mesmo slug
+      const response = await app.inject({ method: "GET", url: "/menu/veterana" });
+      expect(response.statusCode).toBe(200);
     });
   });
 });

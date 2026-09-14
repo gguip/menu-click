@@ -378,3 +378,56 @@ export async function softDelete(
   );
   return rowCount === 1;
 }
+
+/**
+ * Id do restaurante vivo com esse slug — **verificado ou não**.
+ *
+ * Separado do `findBySlug` de propósito: aquele é a busca do cardápio público
+ * e por isso exige `email_verified_at is not null`, o que aqui seria o
+ * contrário do que se procura. Quem chama é a liberação de cadastro
+ * abandonado, e o que ela precisa saber é quem segura o slug no índice único
+ * — o índice não filtra verificação nenhuma.
+ */
+export async function findIdBySlug(
+  slug: string,
+  db: Queryable = pool,
+): Promise<string | null> {
+  const { rows } = await db.query<{ id: string }>(
+    "select id from restaurants where slug = $1 and deleted_at is null",
+    [slug],
+  );
+  return rows.length === 0 ? null : rows[0].id;
+}
+
+/**
+ * Marca o restaurante como removido **só se ele for um cadastro abandonado**:
+ * não verificado e criado há mais de `abandonedAfterDays` dias. `false` = não
+ * é (ou não existe), e nada foi escrito.
+ *
+ * As duas condições estão aqui, num lugar só, porque a colisão tem DOIS
+ * pontos de entrada — o slug (`services/restaurants.ts`) e o e-mail
+ * (`services/auth.ts`). Duplicar a regra nos dois seria garantir que um dia só
+ * um deles fosse corrigido.
+ *
+ * O prazo chega como parâmetro, e não como constante daqui: quantos dias é
+ * regra de negócio, e ela mora no domínio (`ABANDONED_REGISTRATION_DAYS`).
+ * `make_interval` recebe o número como `$n` — é valor, não identificador (S3).
+ *
+ * ⚠️ Não faz a cascata: quem marca o usuário junto é o serviço, na mesma
+ * transação (D3). O usuário importa porque é ele que segura o e-mail.
+ */
+export async function softDeleteIfAbandoned(
+  id: string,
+  abandonedAfterDays: number,
+  db: Queryable = pool,
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `update restaurants set deleted_at = now()
+      where id = $1
+        and deleted_at is null
+        and email_verified_at is null
+        and created_at < now() - make_interval(days => $2)`,
+    [id, abandonedAfterDays],
+  );
+  return rowCount === 1;
+}

@@ -30,3 +30,16 @@ export type EmailVerificationToken = {
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * Quantos dias um cadastro pode ficar sem verificar antes de ser considerado
+ * **abandonado** — e de o slug e o e-mail dele voltarem a ficar disponíveis na
+ * colisão seguinte.
+ *
+ * 7 dias é folgado de propósito: o token de verificação vale 24 horas, e quem
+ * só lê o e-mail no fim de semana ainda tem o reenvio (`/auth/resend-
+ * verification`) para se destravar sem perder o cadastro. Um prazo curto
+ * transformaria "demorei para confirmar" em "perdi o endereço para outra
+ * pessoa".
+ */
+export const ABANDONED_REGISTRATION_DAYS = 7;

@@ -213,3 +213,50 @@ export async function softDelete(
   );
   return rowCount === 1;
 }
+
+/**
+ * Restaurante do usuário vivo com esse e-mail, ou `null`.
+ *
+ * É a ponta "e-mail" da liberação de cadastro abandonado: o índice único
+ * parcial de `email` garante no máximo um vivo, e quem decide o que fazer com
+ * o restaurante encontrado é o serviço.
+ *
+ * Não filtra o restaurante por `deleted_at` — quem segura o e-mail é o
+ * usuário, e o estado do restaurante é justamente o que o serviço vai
+ * examinar depois.
+ */
+export async function findRestaurantIdByEmail(
+  email: string,
+  db: Queryable = pool,
+): Promise<string | null> {
+  const { rows } = await db.query<{ restaurant_id: string }>(
+    `select restaurant_id from restaurant_users
+      where email = $1 and deleted_at is null`,
+    [email],
+  );
+  return rows.length === 0 ? null : rows[0].restaurant_id;
+}
+
+/**
+ * Soft delete de TODOS os usuários vivos de um restaurante. Devolve quantos
+ * foram marcados.
+ *
+ * Existe para a liberação de cadastro abandonado, que precisa levar o usuário
+ * junto do restaurante: é ele que segura o e-mail no índice único, e marcar só
+ * o restaurante deixaria metade do problema de pé.
+ *
+ * ⚠️ Não é a cascata do `DELETE /restaurants/:id` — aquele deixa os usuários
+ * vivos de propósito (ver `services/restaurants.ts`), e mudar isso aqui seria
+ * mudar o comportamento daquele por tabela.
+ */
+export async function softDeleteByRestaurant(
+  restaurantId: string,
+  db: Queryable = pool,
+): Promise<number> {
+  const { rowCount } = await db.query(
+    `update restaurant_users set deleted_at = now()
+      where restaurant_id = $1 and deleted_at is null`,
+    [restaurantId],
+  );
+  return rowCount ?? 0;
+}
