@@ -593,6 +593,16 @@ export async function listUsers(
  *
  * O hash sai da transação — aqui nem há transação, mas vale a mesma razão do
  * `register`: bcrypt a custo 12 leva centenas de milissegundos.
+ *
+ * ⚠️ O 409 daqui é definitivo, e NÃO chama `releaseAbandonedRegistration` — o
+ * contraste com o `register` é deliberado, não esquecimento. Se o e-mail do
+ * convidado estiver preso por um cadastro abandonado e antigo, esta rota
+ * responde 409 para sempre, enquanto `POST /auth/register` com o mesmo
+ * endereço libera o cadastro preso e passa. A diferença é quem está pedindo:
+ * no cadastro, quem chama está provando que quer aquele endereço para si;
+ * aqui, um dono destruiria o cadastro pendente de um TERCEIRO só por
+ * convidá-lo, que é um poder que ninguém pediu. Quem está preso se destrava
+ * pelo próprio cadastro, não pelo convite de outra pessoa.
  */
 export async function createUser(
   restaurantId: string,
