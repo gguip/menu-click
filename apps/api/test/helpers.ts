@@ -47,12 +47,13 @@ export const validRestaurantBody = {
  * sete dias, não deixam instante nenhum descoberto (verificado com valores no
  * limite: 00:00:00, 23:59:00, 23:59:59 e a virada para o dia seguinte).
  */
-const GRADE_SEMPRE_ABERTA = Array.from({ length: 7 }, (_, weekday) => weekday).flatMap(
-  (weekday) => [
-    { weekday, opensAt: "00:00", closesAt: "23:59" },
-    { weekday, opensAt: "23:59", closesAt: "00:00" },
-  ],
-);
+export const GRADE_SEMPRE_ABERTA = Array.from(
+  { length: 7 },
+  (_, weekday) => weekday,
+).flatMap((weekday) => [
+  { weekday, opensAt: "00:00", closesAt: "23:59" },
+  { weekday, opensAt: "23:59", closesAt: "00:00" },
+]);
 
 /**
  * Espera o envio de um e-mail para ESTE endereço, e só este — nunca "o

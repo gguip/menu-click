@@ -1,16 +1,21 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
+import { escapeIdentifier } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.ts";
 import { clearOutbox } from "../src/email.ts";
 import {
+  GRADE_SEMPRE_ABERTA,
   buildTestApp,
+  createProduct,
   createRestaurant,
   esperaEmail,
   extraiToken,
   registerAndLogin,
   registerResponse,
+  validCustomerBody,
   validDeliveryAddress,
+  validProductBody,
 } from "./helpers.ts";
 
 /**
@@ -584,6 +589,332 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       // e a loja continua de pé, atendendo pelo mesmo slug
       const response = await app.inject({ method: "GET", url: "/menu/veterana" });
       expect(response.statusCode).toBe(200);
+    });
+  });
+
+  /**
+   * O caminho inteiro numa peça só — e os ataques contra ele.
+   *
+   * Os blocos acima cobrem cada peça isolada: o 403 do hook, o 404 do
+   * cardápio, o token, o reenvio, a liberação do cadastro abandonado. Este
+   * existe porque "cada peça funciona" não é a mesma afirmação que "a loja
+   * nova chega do cadastro até o primeiro pedido" — entre as peças há ordem,
+   * estado e credencial trocando de mão, e é aí que ninguém estava olhando.
+   */
+  describe("ponta a ponta: do cadastro ao primeiro pedido", () => {
+    /** O gesto que a pessoa faz ao clicar no link do e-mail. */
+    const verifica = (token: string) =>
+      app.inject({
+        method: "POST",
+        url: "/auth/verify-email",
+        payload: { token },
+      });
+
+    it("a loja nova: bloqueada, invisível, e liberada pelo link do e-mail", async () => {
+      const { restaurant, user, headers } = await registerAndLogin(app, {
+        restaurant: { slug: "cantina-da-esquina" },
+      });
+
+      // 1. tenta operar antes de verificar: 403 — e a mensagem diz ONDE fica o
+      // caminho de volta. Sem isso o painel só sabe que não pode, e a pessoa
+      // que nunca recebeu o e-mail não tem o que clicar (S30)
+      const antes = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/products`,
+        headers,
+        payload: validProductBody,
+      });
+      expect(antes.statusCode).toBe(403);
+      expect(antes.json().message).toContain("/auth/resend-verification");
+
+      // 2. tenta abrir o PRÓPRIO cardápio: 404. É a loja dela, ela está
+      // logada, e mesmo assim o endereço público não existe
+      const cardapioAntes = await app.inject({
+        method: "GET",
+        url: "/menu/cantina-da-esquina",
+      });
+      expect(cardapioAntes.statusCode).toBe(404);
+
+      // 3. o link chega por e-mail, e o token só existe ali: o banco guarda o
+      // hash (`src/tokens.ts`)
+      const token = extraiToken((await esperaEmail(user.email)).text);
+
+      // 4. verifica — sem sessão nenhuma no caminho: é o token que prova quem é
+      expect((await verifica(token)).statusCode).toBe(200);
+
+      // 5. opera: a MESMA requisição do passo 1, com a MESMA sessão. Verificar
+      // não devolve credencial nova, e é isso que este passo prende — se
+      // devolvesse, possuir o link já seria entrar
+      const produto = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/products`,
+        headers,
+        payload: validProductBody,
+      });
+      expect(produto.statusCode).toBe(201);
+
+      const grade = await app.inject({
+        method: "PUT",
+        url: `/restaurants/${restaurant.id}/opening-hours`,
+        headers,
+        payload: { openingHours: GRADE_SEMPRE_ABERTA },
+      });
+      expect(grade.statusCode).toBe(200);
+
+      // 6. aparece: o cardápio abre, e com o produto dentro
+      const cardapio = await app.inject({
+        method: "GET",
+        url: "/menu/cantina-da-esquina/products",
+      });
+      expect(cardapio.statusCode).toBe(200);
+      const secoes = cardapio.json().data as { products: { name: string }[] }[];
+      const nomes = secoes.flatMap((secao) => secao.products.map((p) => p.name));
+      expect(nomes).toContain(validProductBody.name);
+
+      // 7. e o cliente do QR consegue pedir. A criação de pedido é o único
+      // caminho público que NÃO herda o filtro do slug (ela resolve a loja por
+      // id, com um assert próprio em `services/orders.ts`): este passo é o lado
+      // positivo do mesmo assert que o teste "e não dá para criar pedido nela"
+      // prende pelo lado negativo.
+      const pedido = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "dine_in",
+          customer: validCustomerBody,
+          items: [{ productId: produto.json().id, quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+      expect(pedido.statusCode).toBe(201);
+    });
+
+    it("reusar o link não desfaz nada — e continua sem servir", async () => {
+      const { restaurant, user, headers } = await registerAndLogin(app);
+      const token = extraiToken((await esperaEmail(user.email)).text);
+
+      expect((await verifica(token)).statusCode).toBe(200);
+      const segunda = await verifica(token);
+      expect(segunda.statusCode).toBe(400);
+
+      // o que o teste do uso único não olha: a recusa não mexeu na loja. Um
+      // clique repetido no mesmo link do e-mail — que é o jeito mais provável
+      // de alguém cair no 400 — não pode devolver o painel ao estado bloqueado
+      const produtos = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/products`,
+        headers,
+      });
+      expect(produtos.statusCode).toBe(200);
+    });
+
+    it("o link de uma loja não verifica a outra", async () => {
+      const alvo = await registerAndLogin(app, {
+        restaurant: { slug: "loja-alvo" },
+      });
+      const vizinha = await registerAndLogin(app, {
+        restaurant: { slug: "loja-vizinha" },
+      });
+
+      const tokenDaVizinha = extraiToken(
+        (await esperaEmail(vizinha.user.email)).text,
+      );
+      expect((await verifica(tokenDaVizinha)).statusCode).toBe(200);
+
+      // a vizinha abriu...
+      expect(
+        (await app.inject({ method: "GET", url: "/menu/loja-vizinha" }))
+          .statusCode,
+      ).toBe(200);
+
+      // ...e o alvo continua exatamente como estava. O token aponta para o
+      // USUÁRIO que provou o endereço, e quem é marcado é o restaurante DELE:
+      // não existe token que libere loja de terceiro
+      const painel = await app.inject({
+        method: "GET",
+        url: `/restaurants/${alvo.restaurant.id}/products`,
+        headers: alvo.headers,
+      });
+      expect(painel.statusCode).toBe(403);
+      expect(
+        (await app.inject({ method: "GET", url: "/menu/loja-alvo" })).statusCode,
+      ).toBe(404);
+    });
+
+    it("verificar de novo, com link novo, não derruba a loja já verificada", async () => {
+      const { restaurant, user, headers } = await registerAndLogin(app);
+      const primeiro = extraiToken((await esperaEmail(user.email)).text);
+      expect((await verifica(primeiro)).statusCode).toBe(200);
+      clearOutbox();
+
+      // o reenvio continua respondendo depois de verificada — não há checagem
+      // de "já verificou", e ela não faria falta: o teto é por USUÁRIO
+      // (3/min), então quem gasta o envio gasta do próprio teto
+      const reenvio = await app.inject({
+        method: "POST",
+        url: "/auth/resend-verification",
+        headers,
+      });
+      expect(reenvio.statusCode).toBe(202);
+
+      const segundo = extraiToken((await esperaEmail(user.email)).text);
+      expect(segundo).not.toBe(primeiro);
+
+      // a segunda verificação é inofensiva: só recarimba `email_verified_at`,
+      // que ninguém lê além de "é nulo?". A loja continua operando e aparecendo
+      expect((await verifica(segundo)).statusCode).toBe(200);
+
+      const produtos = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/products`,
+        headers,
+      });
+      expect(produtos.statusCode).toBe(200);
+    });
+
+    it("a sessão verificada não opera na loja de outro", async () => {
+      const minha = await createRestaurant(app);
+      const { restaurant: alheia } = await registerAndLogin(app, {
+        restaurant: { slug: "alheia" },
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/restaurants/${alheia.id}/products`,
+        headers: minha.headers,
+        payload: validProductBody,
+      });
+
+      // 404, e não 403: o escopo é conferido ANTES da verificação no hook, e
+      // essa ordem é o que impede o status de contar que aquela loja existe
+      expect(response.statusCode).toBe(404);
+    });
+
+    it("ninguém pede na loja que ainda não verificou, nem com produto de outra", async () => {
+      const minha = await createRestaurant(app);
+      const produto = await createProduct(app, minha);
+      const { restaurant: bloqueada } = await registerAndLogin(app);
+
+      const pedido = await app.inject({
+        method: "POST",
+        url: `/restaurants/${bloqueada.id}/orders`,
+        payload: {
+          type: "dine_in",
+          customer: validCustomerBody,
+          items: [{ productId: produto.id, quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+
+      // 404 pela LOJA, não pelo produto: a visibilidade é conferida antes de
+      // qualquer item. Se fosse depois, a resposta ainda seria 404, mas o
+      // pedido teria sido montado com um item de outro cardápio antes de
+      // morrer — e a mensagem contaria qual dos dois faltou
+      expect(pedido.statusCode).toBe(404);
+      expect(pedido.json().message).toContain(bloqueada.id);
+    });
+
+    it("a liberação do cadastro abandonado expulsa quem estava dentro", async () => {
+      const { restaurant, user, headers } = await registerAndLogin(app, {
+        restaurant: { slug: "desistiu" },
+      });
+      const linkAtrasado = extraiToken((await esperaEmail(user.email)).text);
+
+      // envelhece o cadastro no BANCO, nunca esperando os 7 dias
+      await pool.query(
+        `update restaurants set created_at = now() - interval '8 days' where id = $1`,
+        [restaurant.id],
+      );
+
+      // outra pessoa chega e leva o slug
+      expect((await registerResponse(app, { slug: "desistiu" })).statusCode).toBe(
+        201,
+      );
+
+      // a sessão de quem desistiu morre sozinha, sem ninguém apagar linha de
+      // `sessions`: a resolução do token junta `restaurant_users` filtrando
+      // `deleted_at is null`
+      expect(
+        (await app.inject({ method: "GET", url: "/auth/me", headers })).statusCode,
+      ).toBe(401);
+
+      // e o link que ficou na caixa de entrada dele não verifica — muito menos
+      // o cadastro de quem chegou depois, que é dono do mesmo slug agora
+      expect((await verifica(linkAtrasado)).statusCode).toBe(400);
+    });
+
+    it("a loja bloqueada não acumula nada — a premissa da liberação", async () => {
+      const { restaurant, headers } = await registerAndLogin(app);
+
+      // as rotas de gestão que CRIAM, alteram ou removem dado da loja. O 403
+      // vem do hook, antes da validação do corpo, então o payload vazio basta
+      const tentativas = [
+        ["POST", `/restaurants/${restaurant.id}/products`],
+        ["POST", `/restaurants/${restaurant.id}/categories`],
+        ["POST", `/restaurants/${restaurant.id}/option-groups`],
+        ["POST", `/restaurants/${restaurant.id}/users`],
+        ["PUT", `/restaurants/${restaurant.id}/opening-hours`],
+        ["PUT", `/restaurants/${restaurant.id}/delivery-neighborhoods`],
+        ["PATCH", `/restaurants/${restaurant.id}`],
+        // o DELETE também: a verificação é conferida ANTES do `ownerOnly`, e
+        // a consequência é que nem o dono desfaz o próprio cadastro enquanto
+        // não verificar — quem se cadastrou errado espera a liberação dos 7
+        // dias, que é o único caminho que solta o slug
+        ["DELETE", `/restaurants/${restaurant.id}`],
+      ] as const;
+
+      for (const [method, url] of tentativas) {
+        const response = await app.inject({
+          method,
+          url,
+          headers,
+          payload: method === "DELETE" ? undefined : {},
+        });
+        expect(response.statusCode, `${method} ${url}`).toBe(403);
+      }
+
+      // e o pedido, que é público e não passa pelo hook: 404, pelo assert
+      // próprio de `services/orders.ts`
+      const pedido = await app.inject({
+        method: "POST",
+        url: `/restaurants/${restaurant.id}/orders`,
+        payload: {
+          type: "dine_in",
+          customer: validCustomerBody,
+          items: [{ productId: randomUUID(), quantity: 1 }],
+          paymentMethod: "cash",
+        },
+      });
+      expect(pedido.statusCode).toBe(404);
+
+      // ⚠️ É esta contagem que sustenta a liberação de cadastro abandonado:
+      // ela marca o restaurante e o usuário, e NÃO cascateia para as filhas.
+      // Sob a premissa não há o que cascatear; no dia em que uma rota de
+      // gestão deixar de exigir verificação, o que sobra não é uma linha a
+      // mais removida — são filhas VIVAS apontando para um restaurante morto,
+      // fora do alcance de qualquer cascata.
+      //
+      // A lista de tabelas vem do catálogo do Postgres, e não escrita à mão,
+      // para tabela filha nova entrar aqui sem ninguém precisar lembrar.
+      const { rows: filhas } = await pool.query<{ tabela: string }>(
+        `select table_name as tabela from information_schema.columns
+          where table_schema = 'public' and column_name = 'restaurant_id'
+            and table_name <> 'restaurant_users'
+          order by table_name`,
+      );
+      expect(filhas.length).toBeGreaterThan(0);
+
+      for (const { tabela } of filhas) {
+        // o identificador vem do catálogo, nunca do cliente — e ainda assim
+        // passa pelo `escapeIdentifier` do próprio `pg`, que é o que o S3
+        // manda usar quando o identificador é mesmo dinâmico
+        const { rows } = await pool.query<{ n: number }>(
+          `select count(*)::int as n from ${escapeIdentifier(tabela)}
+            where restaurant_id = $1`,
+          [restaurant.id],
+        );
+        expect(rows[0].n, `${tabela} deveria estar vazia`).toBe(0);
+      }
     });
   });
 });
