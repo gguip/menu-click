@@ -81,6 +81,27 @@ export function installAuth(app: FastifyInstance): void {
       );
     }
 
+    /**
+     * A loja precisa ter provado o e-mail para operar.
+     *
+     * Vale para toda rota escopada em restaurante, POR PADRÃO — rota nova
+     * nasce bloqueada, pelo mesmo raciocínio do `public`: esquecer uma linha
+     * fecha em vez de abrir, e os dois erros não custam a mesma coisa.
+     *
+     * 403 e não 404, e é a segunda situação do projeto em que 403 é o certo:
+     * a sessão é válida e o restaurante É o da sessão, então a existência já
+     * é conhecida. O 404 do S19 continua valendo para restaurante alheio — e
+     * note que ele é conferido ACIMA desta linha: quem tenta o restaurante de
+     * outro continua recebendo 404, verificado ou não. Invertendo a ordem,
+     * alguém descobriria que o restaurante de outra pessoa existe só por
+     * receber 403 em vez de 404 — há teste para isso.
+     */
+    if (restaurantId !== undefined && request.auth?.emailVerified !== true) {
+      throw new ForbiddenError(
+        "Confirme o e-mail do restaurante para usar o painel. Reenvie o link em POST /auth/resend-verification",
+      );
+    }
+
     // Permissão, depois de identidade e escopo. 403 e não 404: o restaurante é
     // o da sessão, então a existência dele já é conhecida — esconder aqui
     // mandaria quem está no painel procurar o problema no lugar errado.

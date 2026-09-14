@@ -122,6 +122,45 @@ const registerResponseSchema = {
   },
 };
 
+const verifyEmailBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["token"],
+  properties: {
+    // mesmo raciocínio do token de recuperação: opaco para quem valida, sem
+    // `format` nem tamanho fixo — o que não bate com hash nenhum já cai na
+    // mesma mensagem de "inválido"
+    token: { type: "string", minLength: 1 },
+  },
+};
+
+/**
+ * Sem restaurante nem usuário no corpo — o gêmeo do `/auth/reset-password` na
+ * barreira de saída (S10): esta rota não devolve sessão, então nem pretexto
+ * há para carregar mais que uma mensagem.
+ */
+const verifyEmailResponseSchema = {
+  type: "object",
+  properties: {
+    message: { type: "string" },
+  },
+};
+
+/**
+ * O `/auth/me` de sempre, mais `emailVerified` NO TOPO — o corpo é o
+ * `RestaurantUser`, e não há `restaurant` aninhado nele. Booleano, não a
+ * data: quando a loja verificou é informação de auditoria, não do painel, e
+ * declarar só o booleano aqui é o que impede a data de vazar por engano
+ * (S10) — mesmo raciocínio do `deleted_at` nunca aparecer numa resposta.
+ */
+const currentUserResponseSchema = {
+  type: "object",
+  properties: {
+    ...userResponseSchema.properties,
+    emailVerified: { type: "boolean" },
+  },
+};
+
 const loginBodySchema = {
   type: "object",
   additionalProperties: false,
@@ -207,7 +246,7 @@ export async function authRoutes(app: FastifyInstance) {
         operationId: "register",
         summary: "Cadastra restaurante e primeiro usuário",
         description:
-          "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`.",
+          "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`. Dispara um e-mail de confirmação; até o dono confirmar (`POST /auth/verify-email`), toda rota escopada no restaurante responde 403.",
         body: registerBodySchema,
         response: {
           201: registerResponseSchema,
@@ -219,7 +258,46 @@ export async function authRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const created = await authService.register(request.body);
       reply.code(201);
+
+      // Depois de responder, e sem `await`: e-mail é rede, e não pode
+      // segurar quem acabou de criar a conta — mesmo motivo do
+      // `requestPasswordReset`. Falha de envio vai só para o log (nunca o
+      // token, S13); a loja fica bloqueada, sem caminho de reenvio até a
+      // Task 4.
+      void authService.sendEmailVerification(created.user).catch((error) => {
+        request.log.error(
+          { err: error },
+          "falha ao enviar e-mail de verificação",
+        );
+      });
+
       return created;
+    },
+  );
+
+  // Consome o token de `/auth/register`. Pública pelo mesmo motivo do
+  // reset de senha: é o próprio token que prova quem é, não uma sessão — a
+  // loja ainda está bloqueada e não tem como se autenticar de outro jeito.
+  app.post<{ Body: { token: string } }>(
+    "/auth/verify-email",
+    {
+      config: { public: true },
+      schema: {
+        tags: ["Autenticação"],
+        operationId: "verifyEmail",
+        summary: "Confirma o e-mail do restaurante",
+        description:
+          "Consome o token que o cadastro mandou por e-mail e libera o painel (a loja passa a responder fora do 403 de `authenticate.ts`). Mensagem única para token inválido, expirado ou já usado — distinguir diria a quem guarda um link velho se ele um dia existiu. Não devolve sessão: quem verificou entra como sempre, por `POST /auth/login`.",
+        body: verifyEmailBodySchema,
+        response: {
+          200: verifyEmailResponseSchema,
+          400: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      await authService.verifyEmail(request.body.token);
+      return { message: "E-mail confirmado. O painel já está liberado" };
     },
   );
 
@@ -364,12 +442,16 @@ export async function authRoutes(app: FastifyInstance) {
         operationId: "getCurrentUser",
         summary: "Quem é o dono da sessão",
         description:
-          "Devolve o usuário e o restaurante a que ele pertence — é como o front descobre o `restaurantId` para montar as demais chamadas.",
-        response: { 200: userResponseSchema, 401: errorResponseSchema },
+          "Devolve o usuário e o restaurante a que ele pertence — é como o front descobre o `restaurantId` para montar as demais chamadas. Traz `emailVerified` no topo: é o que o painel usa para saber se falta desbloquear (e mostrar o convite a reenviar o link).",
+        response: { 200: currentUserResponseSchema, 401: errorResponseSchema },
       },
     },
     async (request) => {
-      return authService.getUser(requireAuth(request).userId);
+      const auth = requireAuth(request);
+      const user = await authService.getUser(auth.userId);
+      // emailVerified vem da SESSÃO (já resolvida no hook), não de uma nova
+      // consulta ao restaurante — é o mesmo booleano que bloqueia o painel.
+      return { ...user, emailVerified: auth.emailVerified };
     },
   );
 

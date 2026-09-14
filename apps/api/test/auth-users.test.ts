@@ -5,6 +5,7 @@ import {
   buildTestApp,
   login,
   registerRestaurant,
+  verifyRestaurantEmail,
 } from "./helpers.ts";
 
 const NONEXISTENT_ID = "00000000-0000-0000-0000-000000000000";
@@ -28,8 +29,16 @@ describe("acesso ao painel", () => {
     await app.close();
   });
 
+  /**
+   * ⚠️ Verifica o e-mail pelo fluxo real antes de devolver: este arquivo cria
+   * usuários adicionais e os testa em rotas escopadas em restaurante
+   * (`/restaurants/:restaurantId/users`), que agora exigem loja verificada
+   * (`routes/authenticate.ts`). Sem isto, toda ação bateria em 403 antes de
+   * chegar na checagem de papel/acesso que o arquivo existe para testar.
+   */
   async function cadastrar() {
     const { restaurant, user, password } = await registerRestaurant(app);
+    await verifyRestaurantEmail(app, user.email);
     const token = await login(app, user.email, password);
     return { restaurant, user, password, token, headers: authHeaders(token) };
   }
@@ -297,8 +306,12 @@ describe("acesso ao painel", () => {
   });
 
   describe("remoção de usuário", () => {
+    // ⚠️ Verifica o e-mail do dono antes de convidar: convidar já é uma rota
+    // escopada em restaurante (`/restaurants/:restaurantId/users`), que agora
+    // exige loja verificada — mesmo raciocínio do `cadastrar()` lá em cima.
     async function cenario() {
       const { restaurant, user, password } = await registerRestaurant(app);
+      await verifyRestaurantEmail(app, user.email);
       const dono = {
         restaurant,
         user,

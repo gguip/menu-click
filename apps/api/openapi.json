@@ -6778,7 +6778,7 @@
         "tags": [
           "Autenticação"
         ],
-        "description": "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`.",
+        "description": "As duas coisas numa transação: e-mail já cadastrado desfaz o restaurante junto, senão sobraria um registro que ninguém consegue acessar. Não devolve sessão — entrar é `POST /auth/login`. Dispara um e-mail de confirmação; até o dono confirmar (`POST /auth/verify-email`), toda rota escopada no restaurante responde 403.",
         "requestBody": {
           "required": true,
           "content": {
@@ -7075,6 +7075,75 @@
             }
           },
           "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-email": {
+      "post": {
+        "operationId": "verifyEmail",
+        "summary": "Confirma o e-mail do restaurante",
+        "tags": [
+          "Autenticação"
+        ],
+        "description": "Consome o token que o cadastro mandou por e-mail e libera o painel (a loja passa a responder fora do 403 de `authenticate.ts`). Mensagem única para token inválido, expirado ou já usado — distinguir diria a quem guarda um link velho se ele um dia existiu. Não devolve sessão: quem verificou entra como sempre, por `POST /auth/login`.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
             "description": "Default Response",
             "content": {
               "application/json": {
@@ -7411,7 +7480,7 @@
         "tags": [
           "Autenticação"
         ],
-        "description": "Devolve o usuário e o restaurante a que ele pertence — é como o front descobre o `restaurantId` para montar as demais chamadas.",
+        "description": "Devolve o usuário e o restaurante a que ele pertence — é como o front descobre o `restaurantId` para montar as demais chamadas. Traz `emailVerified` no topo: é o que o painel usa para saber se falta desbloquear (e mostrar o convite a reenviar o link).",
         "security": [
           {
             "bearerAuth": []
@@ -7445,6 +7514,9 @@
                     },
                     "updatedAt": {
                       "type": "string"
+                    },
+                    "emailVerified": {
+                      "type": "boolean"
                     }
                   }
                 }

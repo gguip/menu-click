@@ -48,6 +48,7 @@ type RestaurantRow = {
   free_delivery_above_in_cents: number | null;
   delivery_fee_to_arrange: boolean;
   minimum_order_in_cents: number;
+  email_verified_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -87,6 +88,11 @@ function toRestaurant(row: RestaurantRow): Restaurant {
       : { freeDeliveryAboveInCents: row.free_delivery_above_in_cents }),
     deliveryFeeToArrange: row.delivery_fee_to_arrange,
     minimumOrderInCents: row.minimum_order_in_cents,
+    // emailVerifiedAt é opcional: quando é NULL no banco (não verificou), a
+    // chave nem entra na resposta — mesmo padrão do logoUrl.
+    ...(row.email_verified_at === null
+      ? {}
+      : { emailVerifiedAt: row.email_verified_at.toISOString() }),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -327,6 +333,28 @@ export async function update(
     values,
   );
   return rows.length === 0 ? null : toRestaurant(rows[0]);
+}
+
+/**
+ * Marca a loja como tendo provado o e-mail. `false` = não existe (ou foi
+ * removida) com esse id. Chamada só pelo fluxo de verificação
+ * (`services/auth.ts`), depois que o token já foi conferido e consumido.
+ *
+ * Não checa `email_verified_at is null` antes de gravar: reverificar uma loja
+ * já verificada é inofensivo (só troca a data para uma mais recente), e quem
+ * impede o MESMO token de valer duas vezes é o `markUsed` de
+ * `email_verification_tokens` — não esta função.
+ */
+export async function markEmailVerified(
+  id: string,
+  db: Queryable = pool,
+): Promise<boolean> {
+  const { rowCount } = await db.query(
+    `update restaurants set email_verified_at = now(), updated_at = now()
+      where id = $1 and deleted_at is null`,
+    [id],
+  );
+  return rowCount === 1;
 }
 
 /**

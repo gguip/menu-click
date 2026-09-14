@@ -10,6 +10,7 @@ import { PASSWORD_MAX_BYTES } from "../domain/restaurant-user.ts";
 import { isUuid } from "../domain/uuid.ts";
 import type { AuthContext, IssuedSession } from "../domain/session.ts";
 import { PASSWORD_RESET_TOKEN_TTL_MS } from "../domain/password-reset.ts";
+import { EMAIL_VERIFICATION_TOKEN_TTL_MS } from "../domain/email-verification.ts";
 import {
   ConflictError,
   NotFoundError,
@@ -17,7 +18,9 @@ import {
   ValidationError,
 } from "../errors.ts";
 import { sendEmail } from "../email.ts";
+import * as emailVerificationRepository from "../repositories/email-verification.ts";
 import * as passwordResetRepository from "../repositories/password-reset.ts";
+import * as restaurantsRepository from "../repositories/restaurants.ts";
 import * as restaurantUsersRepository from "../repositories/restaurant-users.ts";
 import * as sessionsRepository from "../repositories/sessions.ts";
 import { generateToken, hashToken } from "../tokens.ts";
@@ -122,6 +125,84 @@ export async function register(input: {
     }
 
     return { restaurant, user };
+  });
+}
+
+/**
+ * Base da URL do link de verificação, e o link em si. Mesma forma de
+ * `passwordResetLink`, lida do ambiente a cada chamada pelo mesmo motivo.
+ */
+function verifyEmailLink(token: string): string {
+  const base =
+    process.env.EMAIL_VERIFICATION_URL ?? "http://localhost:5173/verificar-email";
+  return `${base}?token=${encodeURIComponent(token)}`;
+}
+
+/**
+ * Manda o e-mail que confirma o cadastro.
+ *
+ * Chamada pela ROTA sem `await`, depois de responder o 201 — mesmo motivo do
+ * `requestPasswordReset`: SMTP é rede, e não pode segurar quem acabou de criar
+ * a conta. Diferente da recuperação, não há oráculo de tempo a fechar aqui (o
+ * 201 já revelou que a conta existe); ficar fora do caminho da resposta é só
+ * para não segurar uma conexão do pool numa chamada de rede.
+ *
+ * ⚠️ Este é o caminho MÍNIMO da verificação. O plano original deixa "o
+ * cadastro dispara o e-mail" para a Task 4 — mas a Task 2 (o bloqueio em si)
+ * só consegue testar o desbloqueio pelo fluxo de verdade se esse e-mail já
+ * sair no cadastro, então ele nasceu aqui. Falta o reenvio (`/auth/resend-
+ * verification`) e o teto de rate limit dedicado da rota de verificação —
+ * ambos ficam para a Task 4, que espelha `requestPasswordReset` de perto.
+ */
+export async function sendEmailVerification(user: RestaurantUser): Promise<void> {
+  const token = generateToken();
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
+
+  await emailVerificationRepository.insert({
+    restaurantUserId: user.id,
+    tokenHash: hashToken(token),
+    expiresAt,
+  });
+
+  await sendEmail({
+    to: user.email,
+    subject: "Confirme o e-mail do seu restaurante no MenuClick",
+    text: `Confirme o e-mail do seu restaurante para liberar o painel. Use o link abaixo em até 24 horas:\n\n${verifyEmailLink(token)}\n\nSe não foi você, ignore este e-mail.`,
+  });
+}
+
+/**
+ * Consome o token de verificação e libera o painel do restaurante.
+ *
+ * Mensagem única para token inválido, expirado ou já usado — mesmo motivo do
+ * `resetPassword`: distinguir diria a quem guarda um link velho se ele um dia
+ * existiu. `findLiveByHash` já filtra os três casos no SQL; a checagem aqui
+ * não repete nenhum, só decide o que fazer com `null`.
+ */
+export async function verifyEmail(token: string): Promise<void> {
+  const linkInvalido = () =>
+    new ValidationError(
+      "Link de verificação inválido, expirado ou já usado",
+    );
+
+  const linha = await emailVerificationRepository.findLiveByHash(
+    hashToken(token),
+  );
+  if (linha === null) throw linkInvalido();
+
+  const user = await restaurantUsersRepository.findById(linha.restaurantUserId);
+  // sessão viva apontando para usuário removido não deveria acontecer (mesmo
+  // raciocínio do `getUser`), mas o tipo permite
+  if (user === null) throw linkInvalido();
+
+  await withTransaction(async (client) => {
+    // é este `update ... where used_at is null` — não a checagem de cima —
+    // que serializa duas verificações concorrentes com o MESMO token; a de
+    // cima é só saída antecipada, igual em `resetPassword`
+    const marcou = await emailVerificationRepository.markUsed(linha.id, client);
+    if (!marcou) throw linkInvalido();
+
+    await restaurantsRepository.markEmailVerified(user.restaurantId, client);
   });
 }
 
