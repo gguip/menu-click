@@ -2,8 +2,9 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { escapeIdentifier } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { drainBackgroundWork } from "../src/background.ts";
 import { pool } from "../src/db/pool.ts";
-import { clearOutbox } from "../src/email.ts";
+import { clearOutbox, outbox } from "../src/email.ts";
 import {
   GRADE_SEMPRE_ABERTA,
   buildTestApp,
@@ -610,6 +611,18 @@ describe("bloqueio do painel por e-mail não verificado", () => {
         payload: { token },
       });
 
+    /**
+     * Quando a loja provou o e-mail. Vai direto ao banco porque a API não
+     * expõe a data — o `/auth/me` devolve só o booleano (S10).
+     */
+    const verificadoEm = async (restaurantId: string) => {
+      const { rows } = await pool.query(
+        `select email_verified_at from restaurants where id = $1`,
+        [restaurantId],
+      );
+      return rows[0].email_verified_at as Date;
+    };
+
     it("a loja nova: bloqueada, invisível, e liberada pelo link do e-mail", async () => {
       const { restaurant, user, headers } = await registerAndLogin(app, {
         restaurant: { slug: "cantina-da-esquina" },
@@ -744,15 +757,16 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       ).toBe(404);
     });
 
-    it("verificar de novo, com link novo, não derruba a loja já verificada", async () => {
+    it("o reenvio na loja já verificada não manda nada, e o carimbo fica onde estava", async () => {
       const { restaurant, user, headers } = await registerAndLogin(app);
       const primeiro = extraiToken((await esperaEmail(user.email)).text);
       expect((await verifica(primeiro)).statusCode).toBe(200);
       clearOutbox();
 
-      // o reenvio continua respondendo depois de verificada — não há checagem
-      // de "já verificou", e ela não faria falta: o teto é por USUÁRIO
-      // (3/min), então quem gasta o envio gasta do próprio teto
+      const carimbo = await verificadoEm(restaurant.id);
+
+      // a resposta é a MESMA da loja não verificada, de propósito: o reenvio
+      // não é oráculo de estado nenhum
       const reenvio = await app.inject({
         method: "POST",
         url: "/auth/resend-verification",
@@ -760,13 +774,18 @@ describe("bloqueio do painel por e-mail não verificado", () => {
       });
       expect(reenvio.statusCode).toBe(202);
 
-      const segundo = extraiToken((await esperaEmail(user.email)).text);
-      expect(segundo).not.toBe(primeiro);
+      // o envio roda DEPOIS da resposta: sem drenar, conferir a caixa aqui só
+      // provaria que o teste chegou antes dele
+      await drainBackgroundWork();
+      expect(outbox.filter((email) => email.to === user.email)).toEqual([]);
 
-      // a segunda verificação é inofensiva: só recarimba `email_verified_at`,
-      // que ninguém lê além de "é nulo?". A loja continua operando e aparecendo
-      expect((await verifica(segundo)).statusCode).toBe(200);
+      // e é por não existir link novo que o carimbo não tem como andar — antes
+      // desta guarda, reenviar e verificar de novo reescrevia
+      // `email_verified_at`, e "quando esta loja provou o e-mail" deixava de
+      // ser respondível
+      expect(await verificadoEm(restaurant.id)).toEqual(carimbo);
 
+      // a guarda não trocou o 202 por recusa nem mexeu no acesso
       const produtos = await app.inject({
         method: "GET",
         url: `/restaurants/${restaurant.id}/products`,

@@ -250,8 +250,17 @@ export async function sendEmailVerification(user: RestaurantUser): Promise<void>
  * Chamada pela ROTA sem `await`, depois de responder 202 — mesmo motivo do
  * `sendEmailVerification`/`requestPasswordReset`: não segurar uma conexão do
  * pool durante a ida e volta do SMTP.
+ *
+ * ⚠️ Loja já verificada não recebe nada, e a resposta continua a MESMA (202,
+ * emitido antes daqui): quem chama não tem por que aprender algo novo com ela.
+ * O que se poupa não é só o envio — é o carimbo. Sem esta guarda, reenviar e
+ * verificar de novo reescrevia `email_verified_at` (medido: o carimbo andava),
+ * e "quando esta loja provou o e-mail" deixava de ser respondível. Acesso não
+ * muda em nada: a loja já está liberada.
  */
 export async function resendEmailVerification(auth: AuthContext): Promise<void> {
+  if (auth.emailVerified) return;
+
   const user = await restaurantUsersRepository.findById(auth.userId);
   // sessão válida apontando para usuário removido não deveria acontecer (a
   // consulta de sessão já filtra `deleted_at is null`), mas o tipo permite
