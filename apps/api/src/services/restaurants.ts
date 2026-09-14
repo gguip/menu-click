@@ -121,12 +121,17 @@ async function tryInsert(
  * Se um dia alguma rota de gestão deixar de exigir verificação, esta limpeza
  * deixa de ser inofensiva — e nada aqui vai avisar. **E o modo de falha é pior
  * e mais quieto que "apaga uma linha cheia": as filhas ficam ÓRFÃS.** Medido,
- * forçando o estado no banco: produto, categoria, grade de horário, bairro
- * atendido e pedido continuam todos com `deleted_at is null` apontando para um
+ * forçando o estado no banco: produto, categoria, grade de horário e bairro
+ * atendido continuam todos com `deleted_at is null` apontando para um
  * restaurante morto, e nenhuma cascata jamais os alcança — a cascata de
  * verdade mora no `remove()` daqui, e esta limpeza **não a usa**, de propósito,
  * porque sob a premissa não há o que cascatear. O resultado seria lixo
  * permanente, invisível pela API e impossível de remover por ela.
+ *
+ * O pedido fica de fora dessa conta, e não por descuido: ele nunca cascateia a
+ * partir do restaurante (é histórico, não catálogo), então pedido vivo sob
+ * restaurante morto é o estado normal também depois do `remove()` — não é
+ * sintoma desta limpeza.
  */
 export async function releaseAbandonedRegistration(
   restaurantId: string,
