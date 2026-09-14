@@ -67,7 +67,21 @@ export async function findActiveByTokenHash(
       where s.token_hash = $1
         and s.expires_at > now()
         and s.deleted_at is null
-        and u.deleted_at is null`,
+        and u.deleted_at is null
+        -- ⚠️ O join com restaurants NAO filtra r.deleted_at, e isso e
+        -- deliberado -- foi questionado numa revisao, entao fica escrito.
+        --
+        -- Remover o restaurante NAO derruba a sessao do dono: a cascata marca
+        -- produtos, categorias, grupos, horarios e bairros, mas nao o usuario.
+        -- Com a sessao viva, toda rota escopada responde 404 pelo ensureExists
+        -- ("sumiu"), que e a mensagem certa para quem acabou de apagar a
+        -- propria loja. Filtrando aqui, ela passaria a responder 401 ("quem e
+        -- voce?"), e quem apagou de proposito acharia que deu problema no
+        -- login. Ha teste prendendo o 404.
+        --
+        -- Nada vaza por isso: o /auth/me devolve o USUARIO, que de fato
+        -- continua existindo, e nenhum campo do restaurante sai por ali.
+        -- O join esta aqui so para trazer email_verified_at.`,
     [tokenHash],
   );
   if (rows.length === 0) return null;
