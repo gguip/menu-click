@@ -115,11 +115,18 @@ async function tryInsert(
  *
  * ⚠️ Isto é seguro por uma razão específica, e ela precisa continuar verdadeira:
  * um restaurante não verificado está bloqueado de TODAS as rotas de gestão
- * (Task 2), então não tem cardápio, categoria, produto nem pedido. Apagar um é
- * apagar uma linha vazia.
+ * (`routes/authenticate.ts` responde 403), então não tem cardápio, categoria,
+ * produto nem pedido. Apagar um é apagar uma linha vazia.
  *
  * Se um dia alguma rota de gestão deixar de exigir verificação, esta limpeza
- * deixa de ser inofensiva — e nada aqui vai avisar.
+ * deixa de ser inofensiva — e nada aqui vai avisar. **E o modo de falha é pior
+ * e mais quieto que "apaga uma linha cheia": as filhas ficam ÓRFÃS.** Medido,
+ * forçando o estado no banco: produto, categoria, grade de horário, bairro
+ * atendido e pedido continuam todos com `deleted_at is null` apontando para um
+ * restaurante morto, e nenhuma cascata jamais os alcança — a cascata de
+ * verdade mora no `remove()` daqui, e esta limpeza **não a usa**, de propósito,
+ * porque sob a premissa não há o que cascatear. O resultado seria lixo
+ * permanente, invisível pela API e impossível de remover por ela.
  */
 export async function releaseAbandonedRegistration(
   restaurantId: string,

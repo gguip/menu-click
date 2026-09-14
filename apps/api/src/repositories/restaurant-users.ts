@@ -221,9 +221,21 @@ export async function softDelete(
  * parcial de `email` garante no máximo um vivo, e quem decide o que fazer com
  * o restaurante encontrado é o serviço.
  *
- * Não filtra o restaurante por `deleted_at` — quem segura o e-mail é o
- * usuário, e o estado do restaurante é justamente o que o serviço vai
- * examinar depois.
+ * Não filtra o restaurante por `deleted_at`, e é honesto dizer que isso **não
+ * compra nada**: o serviço só recusa quando o restaurante está morto, então
+ * filtrar `r.deleted_at is null` aqui daria exatamente o mesmo resultado final
+ * (`null` → sem liberação → 409). Fica sem o filtro porque quem segura o
+ * e-mail é o usuário, e a pergunta desta consulta é "quem segura", não "o
+ * restaurante dele está vivo" — quem responde a segunda é o `WHERE` do
+ * `softDeleteIfAbandoned`, num comando só.
+ *
+ * ⚠️ A consequência, por extenso: **quem teve o restaurante removido pelo
+ * próprio dono segura aquele e-mail para sempre.** É o único jeito de existir
+ * usuário vivo sob restaurante morto — `DELETE /restaurants/:id` não marca os
+ * usuários (ver `softDeleteByRestaurant` abaixo), e um cadastro não verificado
+ * nem chega àquela rota (403). Reciclar e-mail de loja encerrada de propósito
+ * é outra pergunta, com o S30 no meio, e não é a que esta limpeza responde:
+ * ela é sobre cadastro **abandonado e não verificado**.
  */
 export async function findRestaurantIdByEmail(
   email: string,
