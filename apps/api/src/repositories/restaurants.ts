@@ -345,10 +345,19 @@ export async function update(
  * removida) com esse id. Chamada só pelo fluxo de verificação
  * (`services/auth.ts`), depois que o token já foi conferido e consumido.
  *
- * Não checa `email_verified_at is null` antes de gravar: reverificar uma loja
- * já verificada é inofensivo (só troca a data para uma mais recente), e quem
- * impede o MESMO token de valer duas vezes é o `markUsed` de
- * `email_verification_tokens` — não esta função.
+ * Não checa `email_verified_at is null` antes de gravar, e quem impede o MESMO
+ * token de valer duas vezes é o `markUsed` de `email_verification_tokens` —
+ * não esta função.
+ *
+ * ⚠️ Não leia isso como "reverificar é inofensivo", que é o que estava escrito
+ * aqui antes e não é verdade: o carimbo é a resposta para "quando esta loja
+ * provou o e-mail", e regravá-lo apaga essa resposta. Quem protege o carimbo
+ * hoje é a guarda de `resendEmailVerification` (loja já verificada não recebe
+ * link novo, então não há segundo link para gastar). Sobra uma janela de
+ * milissegundos, medida numa revisão: uma verificação que commita entre o hook
+ * ler a sessão e o trabalho de fundo rodar ainda gera um link. Fechá-la aqui,
+ * com `and email_verified_at is null` no `where`, é barato — mas transforma um
+ * clique atrasado em 400, e isso é decisão de produto, não refatoração.
  */
 export async function markEmailVerified(
   id: string,
