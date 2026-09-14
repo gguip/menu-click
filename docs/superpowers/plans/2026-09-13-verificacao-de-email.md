@@ -413,10 +413,15 @@ export async function findBySlug(
 ⚠️ **A criação de pedido NÃO herda este filtro, e isso já foi verificado.**
 
 Ela resolve por `restaurantsService.getById(restaurantId)`
-(`services/orders.ts:342`), e `getById` serve também `routes/restaurants.ts:94`
-e as transições de pedido do painel. **Não filtre dentro dele** — mudaria o
-significado de mais de vinte caminhos de painel, e só não quebraria hoje porque
-o hook bloqueia antes, o que é apoio frágil demais.
+(`services/orders.ts:342`). Esse `getById` tem **4 chamadores**, conferidos: a
+criação de pedido (público) e três de painel — as transições em
+`services/orders.ts:585,618` e o `routes/restaurants.ts:94`.
+
+**Não filtre dentro dele.** Filtrar funcionaria (os três de painel já são
+bloqueados pelo hook antes), então a decisão é apertada — mas `getById` é um
+"pegue o restaurante por id" de propósito geral, e escondê-los ali muda o
+contrato para todo chamador futuro, com a correção dependendo de uma ordem de
+hook que ninguém vê ao ler a função.
 
 A criação ganha um **assert próprio**, ao lado do `assertLojaAberta`, lançando
 `NotFoundError`:

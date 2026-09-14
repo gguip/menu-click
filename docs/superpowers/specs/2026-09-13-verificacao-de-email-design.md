@@ -135,12 +135,21 @@ errado.
 removido** — e disso o cardápio e a cotação de frete herdam.
 
 ⚠️ **A criação de pedido NÃO herda, e a diferença é real.** Ela resolve o
-restaurante por `getById` (pelo id da rota, não pelo slug), e `getById` também
-serve mais de vinte caminhos de painel. Filtrar lá dentro mudaria o significado
-de todos eles — inofensivo hoje só porque o hook bloqueia antes, o que é
-raciocínio frágil demais para virar desenho. Então a criação ganha um **assert
-próprio**, ao lado das outras recusas públicas de pedido. São dois lugares, e
-está escrito para ninguém "consolidar" os dois num filtro só e quebrar o painel.
+restaurante por `getById` (pelo id da rota, não pelo slug).
+
+`getById` tem **4 chamadores**, conferidos: a criação de pedido (público) e três
+de painel — as duas transições de status e o `GET /restaurants/:id`. Filtrar
+dentro dele funcionaria, porque os três de painel já são bloqueados pelo hook
+antes de chegar lá. **A decisão é apertada**, e é honesto dizer isso.
+
+O assert próprio vence por dois motivos, nenhum deles dramático: `getById` é um
+"pegue o restaurante por id" de propósito geral, e fazê-lo esconder loja não
+verificada muda o contrato para todo chamador futuro; e os três de painel só
+ficam corretos porque o hook roda antes, o que é uma dependência de ordem que
+ninguém veria ao ler `getById`.
+
+São dois lugares, e está escrito para ninguém "consolidar" os dois sem saber o
+que está trocando.
 
 **404, não 403.** Do lado de fora, uma loja que ainda não provou o e-mail tem
 que ser indistinguível de uma que não existe. 403 diria "existe, mas não
