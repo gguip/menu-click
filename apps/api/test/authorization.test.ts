@@ -28,6 +28,8 @@ const ROTAS_PUBLICAS = new Set([
   "GET /health",
   "GET /menu/:slug",
   "GET /menu/:slug/products",
+  // resolve o QR code da mesa para o rótulo; quem escaneou não tem conta
+  "GET /menu/:slug/table/:hash",
   // a cotação de frete: informa antes do pedido, para quem ainda não tem
   // carrinho montado nem conta
   "POST /menu/:slug/delivery-quote",
