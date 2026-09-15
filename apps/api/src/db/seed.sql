@@ -244,28 +244,48 @@ on conflict (id) do nothing;
 -- porque `total_in_cents` inclui o frete (ver CLAUDE.md). Os outros dois
 -- pedidos não são `delivery`, então `delivery_fee_in_cents` fica `null` neles
 -- (o `check orders_delivery_fee_check` recusaria qualquer outro valor).
+-- As mesas do salão do Tokyo, com hashes FIXOS — é o que torna possível abrir
+-- http://localhost:5173/tokyo-ramen-house?mesa=seed0000mesa0000sete01 à mão,
+-- sem ter que cadastrar mesa antes para explorar o fluxo do QR code.
+--
+-- ⚠️ Estes hashes são de EXEMPLO e ficam num arquivo versionado, então são
+-- públicos por construção. Num ambiente de verdade eles seriam sorteados pela
+-- API (16 bytes) — e é exatamente para este caso que a rotação existe: um
+-- hash que vazou se troca sem recadastrar a mesa. A Cantina não ganha mesa: ela
+-- tem `is_qrcode = false`, e mesa sem QR code seria adorno.
+insert into tables (id, restaurant_id, label, hash)
+values
+  ('9b1e4f27-3a06-4d58-8c92-1f7b5a3e0d64', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Mesa 7', 'seed0000mesa0000sete01'),
+  ('4c8a2d51-7e93-4b16-a0f5-6d2c9b8e3a07', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Mesa 8', 'seed0000mesa0000oito02'),
+  ('6f3d9a04-1b52-4e87-93ca-8b0e7d4f2c15', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
+   'Varanda 1', 'seed0000varanda0000um3')
+on conflict (id) do nothing;
+
 insert into orders
   (id, restaurant_id, customer_id, type, status, total_in_cents, delivery_fee_in_cents,
    street, number, neighborhood, city, state, zip_code,
-   payment_method, change_for_in_cents)
+   payment_method, change_for_in_cents, table_id, table_label)
 values
   -- entrega pendente: só ela leva endereço (ver orders_address_check), e é o
   -- pedido em dinheiro com troco
   ('3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'delivery', 'pending', 13170, 900,
    'Rua Augusta', '1500', 'Consolação', 'São Paulo', 'SP', '01304-001',
-   'cash', 15000),
-  -- salão, já aceito, pago no pix
+   'cash', 15000, null, null),
+  -- salão, já aceito, pago no pix, e VINDO DA MESA 7: `table_label` é cópia
+  -- congelada, então renomear ou remover a mesa não mexe neste pedido
   ('b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'dine_in', 'confirmed', 890, null,
    null, null, null, null, null, null,
-   'pix', null),
+   'pix', null, '9b1e4f27-3a06-4d58-8c92-1f7b5a3e0d64', 'Mesa 7'),
   -- retirada em preparo: o próximo passo dela é `ready_for_pickup`, pago no
   -- cartão na entrega
   ('5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'takeaway', 'preparing', 2490, null,
    null, null, null, null, null, null,
-   'card_on_delivery', null)
+   'card_on_delivery', null, null, null)
 on conflict (id) do nothing;
 
 -- name/price_in_cents são cópias congeladas do produto no momento do pedido —
