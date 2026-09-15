@@ -22,6 +22,10 @@ export default defineConfig({
       // e a suíte faz dezenas de cadastros e logins. O padrão de produção (12)
       // está em `services/auth.ts`, que prende o valor entre 4 e 15.
       BCRYPT_ROUNDS: "4",
+      // A base da URL do cardápio. Sem ela o `buildApp()` nem sobe (é guarda
+      // de boot), então a suíte precisa de um valor — e um valor FIXO, porque
+      // os testes de mesa conferem a `qrUrl` montada caractere a caractere.
+      MENU_BASE_URL: "http://localhost:5173",
     },
     globalSetup: ["./test/global-setup.ts"],
     setupFiles: ["./test/setup.ts"],
