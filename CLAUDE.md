@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, taxa de entrega por bairro ou fixa com pedido mínimo, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, taxa de entrega por bairro ou fixa com pedido mínimo, mesas do salão com QR code próprio, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -28,7 +28,7 @@ pnpm --filter @menuclick/api openapi:generate # regera o openapi.json versionado
 pnpm --filter @menuclick/api test             # suíte de integração (precisa do Postgres de pé)
 ```
 
-A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
+A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). 🚨 **`MENU_BASE_URL` é obrigatória e não tem default — sem ela a API não sobe** (é a raiz da URL do cardápio, de onde sai o endereço dentro do QR code das mesas; ver a seção de mesas). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
 
 Testes rodam no **Vitest** e o lint no **ESLint** (config mínima na raiz, `eslint.config.js`). O CI (`.github/workflows/ci.yml`) roda os três — lint, type-check e testes — contra um Postgres de serviço.
 
@@ -104,6 +104,7 @@ Público hoje, e nada além disso:
 | `GET /health` | nada a proteger |
 | `GET /menu/:slug` | o cardápio é o que o QR code abre |
 | `GET /menu/:slug/products` | idem |
+| `GET /menu/:slug/table/:hash` | traduz o QR da mesa para o rótulo; quem escaneou não tem conta |
 | `POST /menu/:slug/delivery-quote` | cota o frete antes de existir carrinho |
 | `POST /auth/register` | cria a primeira conta |
 | `POST /auth/login` | teto próprio por IP (S25) |
@@ -175,7 +176,7 @@ A troca (`POST /auth/reset-password`) revoga **todas** as sessões do usuário, 
 
 O token vale **24 horas**, e não a uma hora da recuperação de senha: o perfil de risco é outro — um token de recuperação vazado abre uma conta que já existe e tem dado dentro; um de verificação destrava uma conta vazia, cuja senha quem o pegou continua não tendo. Uma hora obrigaria a reenviar para quem só lê o e-mail depois do almoço. O banco guarda só o **hash**, como em `sessions`, no `trackingToken` e na recuperação.
 
-🚨 **O que mantém a limpeza de cadastro abandonado segura é uma condição só: loja não verificada não pode ter NADA dentro.** Isso foi medido em duas revisões e está preso por teste — não é esperança. A loja bloqueada recebe **403 em toda rota de gestão** (produtos, categorias, grupos de opções, usuários, horário, bairros, o `PATCH` e até o `DELETE` do próprio restaurante, porque a verificação é conferida antes do `ownerOnly`), **404 em toda a superfície pública** (cardápio, listagem, cotação de frete e criação de pedido), e termina com **zero linha em toda tabela que tem `restaurant_id`** — as seis de hoje (`products`, `categories`, `option_groups`, `opening_hours`, `delivery_neighborhoods` e `orders`), fora `restaurant_users`, que tem exatamente uma linha por construção: o dono. As netas (`options`, `order_items`, `order_item_options`, `product_option_groups`) são chaveadas pelo pai, então entram só transitivamente — pai vazio, neta vazia. As rotas autenticadas que escapam do gate escapam porque ele depende do parâmetro `:restaurantId` na URL — são `GET /restaurants`, `GET /auth/me`, `POST /auth/resend-verification`, `POST /auth/logout` e `POST /auth/change-password` —, e todas são leitura ou escrita na **própria** conta de quem chama (sessão, senha, token de verificação): nenhuma delas cria filho de restaurante. ⚠️ Uma delas produz uma assimetria que quem for construir o painel vai encontrar, e ela é conhecida e não é vazamento: a **mesma linha** de restaurante sai **200** por `GET /restaurants` e **403** por `GET /restaurants/:restaurantId`, porque o gate chaveia pelo parâmetro da URL e a listagem não o tem. A listagem é filtrada pela sessão (devolve só o próprio cadastro), é só leitura, e `emailVerifiedAt` não está no `restaurantResponseSchema` — nada escapa por ali; o que escapa é a coerência. ⚠️ Esse conjunto de cinco **não** está preso por teste: a varredura chama uma lista escrita à mão, então uma rota autenticada nova, sem `:restaurantId`, que escrevesse dado de restaurante deixaria a contagem em zero e a premissa cairia em silêncio. **Se isso deixar de valer, o estrago não é uma linha a mais removida — são as filhas ficando órfãs**: produto, categoria, grupo de opções (com as opções e os vínculos pendurados nele), grade e bairro vivos, apontando para um restaurante morto, fora do alcance de qualquer cascata — a cascata de verdade mora no `remove()` de `services/restaurants.ts`, e a limpeza não a usa. **O pedido não entra nessa lista**: pedido vivo sob restaurante morto é o estado normal também depois do `remove()`, porque pedido é histórico e nunca cascateia (ver a seção de pedidos). O teste da varredura tira essa lista do catálogo do Postgres, então tabela nova **com `restaurant_id`** entra sozinha — uma chaveada por `product_id` não entraria, e aí é a neta que segue coberta só pelo pai.
+🚨 **O que mantém a limpeza de cadastro abandonado segura é uma condição só: loja não verificada não pode ter NADA dentro.** Isso foi medido em duas revisões e está preso por teste — não é esperança. A loja bloqueada recebe **403 em toda rota de gestão** (produtos, categorias, grupos de opções, usuários, horário, bairros, o `PATCH` e até o `DELETE` do próprio restaurante, porque a verificação é conferida antes do `ownerOnly`), **404 em toda a superfície pública** (cardápio, listagem, cotação de frete e criação de pedido), e termina com **zero linha em toda tabela que tem `restaurant_id`** — as sete de hoje (`products`, `categories`, `option_groups`, `opening_hours`, `delivery_neighborhoods`, `tables` e `orders`), fora `restaurant_users`, que tem exatamente uma linha por construção: o dono. As netas (`options`, `order_items`, `order_item_options`, `product_option_groups`) são chaveadas pelo pai, então entram só transitivamente — pai vazio, neta vazia. As rotas autenticadas que escapam do gate escapam porque ele depende do parâmetro `:restaurantId` na URL — são `GET /restaurants`, `GET /auth/me`, `POST /auth/resend-verification`, `POST /auth/logout` e `POST /auth/change-password` —, e todas são leitura ou escrita na **própria** conta de quem chama (sessão, senha, token de verificação): nenhuma delas cria filho de restaurante. ⚠️ Uma delas produz uma assimetria que quem for construir o painel vai encontrar, e ela é conhecida e não é vazamento: a **mesma linha** de restaurante sai **200** por `GET /restaurants` e **403** por `GET /restaurants/:restaurantId`, porque o gate chaveia pelo parâmetro da URL e a listagem não o tem. A listagem é filtrada pela sessão (devolve só o próprio cadastro), é só leitura, e `emailVerifiedAt` não está no `restaurantResponseSchema` — nada escapa por ali; o que escapa é a coerência. ⚠️ Esse conjunto de cinco **não** está preso por teste: a varredura chama uma lista escrita à mão, então uma rota autenticada nova, sem `:restaurantId`, que escrevesse dado de restaurante deixaria a contagem em zero e a premissa cairia em silêncio. **Se isso deixar de valer, o estrago não é uma linha a mais removida — são as filhas ficando órfãs**: produto, categoria, grupo de opções (com as opções e os vínculos pendurados nele), grade, bairro e mesa vivos, apontando para um restaurante morto, fora do alcance de qualquer cascata — a cascata de verdade mora no `remove()` de `services/restaurants.ts`, e a limpeza não a usa. **O pedido não entra nessa lista**: pedido vivo sob restaurante morto é o estado normal também depois do `remove()`, porque pedido é histórico e nunca cascateia (ver a seção de pedidos). O teste da varredura tira essa lista do catálogo do Postgres, então tabela nova **com `restaurant_id`** entra sozinha — uma chaveada por `product_id` não entraria, e aí é a neta que segue coberta só pelo pai.
 
 **Cadastro abandonado libera slug e e-mail, passados 7 dias.** Quem se cadastra e nunca verifica segura duas coisas escassas, e a verificação tornou o abandono mais provável por criar um passo a mais onde desistir. O dano é mudo: a segunda "Pizzaria do João" ganha sufixo por causa de uma primeira que nunca existiu de fato, e — pior — quem não recebeu o e-mail e tenta de novo com o mesmo endereço batia em "e-mail já usado", sem caminho nenhum. Por isso **`POST /auth/register` agora responde 201 onde respondia 409**. Os 7 dias são folgados de propósito: o token vale 24 horas e o reenvio existe, então "demorei para confirmar" não pode virar "perdi o endereço para outra pessoa".
 
@@ -449,6 +450,106 @@ sozinha, precisa entrar no `Pick`, no `toMenuRestaurant()` e no
 `deliveryFixedFeeInCents` e `deliveryFeeToArrange` ficam de fora **de
 propósito**: a cotação já devolve o número certo para o endereço do cliente, e
 a política de "a combinar" é operação interna da loja, não informação dele.
+
+### Mesas e o QR code do salão
+
+`dine_in` existe desde a migration `add-order-type-and-status`, e até esta
+feature **não sabia de onde o pedido vinha**: o slug é um só por restaurante,
+então o QR da mesa 3 e o da mesa 12 abriam a mesma URL, e o pedido chegava com
+nome e telefone do cliente e nada mais — o garçom saía procurando pelo salão.
+`tables` é a entidade que faltava para o QR code significar alguma coisa.
+
+**A mesa só IDENTIFICA.** Não tem estado, não acumula conta, não fecha total:
+se a mesa 7 pedir três vezes, são três pedidos independentes etiquetados "Mesa
+7", cada um com a trilha de status que já existia. Conta aberta (uma
+`table_sessions`, abrir/fechar, taxa de serviço) é outro produto e outra PR —
+o que este desenho garante é não fechar a porta para ela: bastaria uma coluna
+a mais em `orders`.
+
+**O hash da mesa fica EM CLARO no banco, e isso não afrouxa o S21.** `sessions`
+e o `trackingToken` guardam só o `sha256` porque são segredos entregues **uma
+vez** a uma pessoa. O hash da mesa é o oposto em todas as dimensões que
+importam: está impresso num adesivo colado na parede, à vista de quem entrar no
+salão, e precisa ser **reimprimível** — o adesivo descola, rasga, encardece. Só
+o hash no banco tornaria reimprimir impossível, porque o valor original não
+existiria em lugar nenhum. O que o protege é entropia (16 bytes, 128 bits) mais
+a **rotação**, não sigilo. ⚠️ Por isso o gerador mora em `domain/table.ts` e
+**não** em `tokens.ts`: aquele arquivo se abre prometendo "o banco guarda só o
+hash", e enfiar a mesa lá obrigaria a afrouxar a promessa — abrindo a porta
+para alguém guardar um segredo de verdade em claro "seguindo o exemplo da
+mesa".
+
+São **16 bytes, e não os 32 de `tokens.ts`**, porque o critério é outro: lá o
+tamanho vem de "isto protege o dado de alguém"; aqui vem de "isto é impresso, e
+cada caractere adensa o QR" — QR mais denso escaneia pior de longe e com luz
+ruim, que é a condição real de um salão.
+
+**A rotação é rota própria (`POST .../tables/:id/rotate-hash`), e o `PATCH` não
+toca no hash.** Renomear "Mesa 7" para "Mesa 8" não pode, como efeito
+colateral, matar o adesivo colado nela — é o mesmo raciocínio que mantém o
+`slug` fora do PATCH do restaurante.
+
+**A URL do QR é `MENU_BASE_URL/<slug>?mesa=<hash>`, e o servidor a monta
+inteira** (`qrUrl` na resposta). O front só a entrega à biblioteca de QR:
+tanto `react-qr-code` quanto `qrcode.react` têm `value: string` como única prop
+obrigatória. O slug fica no caminho e o hash na querystring de propósito — uma
+URL auto-contida (`/m/<hash>`) economizaria treze caracteres e custaria um
+**segundo cardápio público** para manter em sincronia com o primeiro. (Para
+quem for desenhar a tela: o `level` default das bibliotecas é `L`, 7% de
+correção de erro; um adesivo que vai pegar gordura e risco quer `M` ou `Q`.)
+
+🚨 **`MENU_BASE_URL` derruba o boot se faltar** — mais duro que as URLs de
+e-mail, que só o derrubam com `EMAIL_DRIVER=smtp`. A diferença é o custo do
+erro: link de e-mail errado se conserta com um reenvio; URL de QR errada já foi
+impressa, plastificada e colada em quarenta mesas antes de alguém escanear a
+primeira, e desfazer é trabalho físico.
+
+⚠️ **`tableHash` na criação do pedido é OPCIONAL, e essa é a garantia mais
+frágil da feature.** Todo QR impresso antes dela aponta para `/slug` sem hash
+nenhum; exigir a mesa faria, no deploy, **todo adesivo já colado parar de
+funcionar** — o cliente escaneia, monta o carrinho e leva erro no fim. E aqui
+não existe backfill honesto: a grade de horário pôde ser salva com 24x7 porque
+aquilo *preservava* o comportamento anterior, mas inventar uma "Mesa 1" por
+loja não preservaria nada, já que o adesivo impresso continuaria sem o hash
+dela. Pedido de salão sem mesa continua significando o que sempre significou.
+Há teste prendendo isso, e é o primeiro a cair em quem "limpar" a
+opcionalidade. O custo assumido: enquanto houver adesivo velho, o painel terá
+pedidos de salão sem mesa, e não dá para distinguir "adesivo antigo" de "abriu
+o cardápio direto". Se incomodar, a saída é uma flag `requiresTable` que a loja
+liga **depois** de trocar os adesivos — aditiva, não quebra ninguém.
+
+**O pedido congela o rótulo** (`orders.table_label`, ao lado de `table_id`),
+como `order_items` congela nome e preço do produto: renomear a mesa não
+reescreve histórico, remover a mesa não apaga o rótulo do pedido, e nenhuma
+leitura de pedido junta `tables`. O `check` `orders_table_check` exige as duas
+colunas juntas e só em `dine_in` — espelha o `orders_address_check`.
+
+**Hash errado na criação é 400, não 404** (mesa de outro restaurante, hash
+inexistente, hash já rotacionado): é a montagem do pedido que falha, não um
+recurso ausente — a mesma categoria das violações de opção. Já na **resolução
+pública** tudo é 404, inclusive hash malformado: ali "não existe" e "não
+poderia existir" têm que ser indistinguíveis, e por isso o schema daquela rota
+**não tem `pattern`** apesar de o hash ter forma conhecida (um `pattern` faria
+formato errado sair 400, denunciando que aquele formato chegou a ser avaliado).
+
+⚠️ **A resolução pública devolve SÓ o rótulo** — nem `id`, nem `hash`. Quem
+escaneou precisa saber em que mesa está; devolver o hash entregaria a
+credencial do adesivo a qualquer um que passe pela mesa. O `hash` sai, sim, nas
+rotas de **gestão**: lá quem lê é o dono do salão, que precisa dele para
+imprimir.
+
+**Nenhuma rota de mesa é `ownerOnly`**: o papel restringe só o que é destrutivo
+(apagar o negócio, administrar usuários), e gerenciar mesa é operação de salão,
+como mexer no cardápio.
+
+**Quem está na mesa continua sem acompanhar o pedido**, e isso é do modelo, não
+um `if` removível: `dine_in` não recebe `trackingToken`
+(`acompanhaPedido()` em `domain/order.ts` é `return type !== "dine_in"`), então
+não existe credencial com que conectar. A pessoa pede e descobre quando a
+comida chega.
+
+**O painel filtra por mesa** com `?tableId=` na listagem de pedidos — é o que
+torna a etiqueta útil em vez de decorativa.
 
 ### Pedido mínimo
 
