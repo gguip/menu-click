@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, taxa de entrega por bairro ou fixa com pedido mínimo, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -439,15 +439,47 @@ sem nunca ter chamado a cotação — a mesma separação que `isOpen` (informa)
 409 da pausa manual (decide) já tinham. `deliveryFeeInCents` que venha no corpo
 da criação é ignorado, pela mesma razão de `totalInCents` nunca existir lá.
 
-Só duas colunas cruas de configuração chegam ao cardápio público —
-`deliveryFeeMode` e `freeDeliveryAboveInCents`, o suficiente para a tela
-anunciar "frete grátis acima de R$ 50" antes do carrinho. `MenuRestaurant`
-(`domain/menu.ts`) é um `Pick` explícito do `Restaurant`, não um `Omit` — coluna
-nova não chega ao cardápio sozinha, precisa entrar no `Pick`, no
-`toMenuRestaurant()` e no `schema.response` da rota, os três (S10).
+Só três colunas cruas de configuração chegam ao cardápio público —
+`deliveryFeeMode`, `freeDeliveryAboveInCents` e `minimumOrderInCents`, o
+suficiente para a tela anunciar "frete grátis acima de R$ 50" e "pedido mínimo
+de R$ 30" antes do carrinho. `MenuRestaurant` (`domain/menu.ts`) é um `Pick`
+explícito do `Restaurant`, não um `Omit` — coluna nova não chega ao cardápio
+sozinha, precisa entrar no `Pick`, no `toMenuRestaurant()` e no
+`schema.response` da rota, os três (S10).
 `deliveryFixedFeeInCents` e `deliveryFeeToArrange` ficam de fora **de
 propósito**: a cotação já devolve o número certo para o endereço do cliente, e
 a política de "a combinar" é operação interna da loja, não informação dele.
+
+### Pedido mínimo
+
+`restaurants.minimum_order_in_cents` é o piso de valor para a loja sair para
+entregar, e **vale só em `delivery`**: entrega tem custo de piso — sai
+entregador, sai veículo —, enquanto retirada e salão não custam nada a mais à
+loja. Recusar um café de R$ 5 no balcão só perderia venda. É outro conceito que
+não se mistura com o frete: o mínimo **recusa** o pedido, não cobra por ele.
+
+⚠️ **Compara com o SUBTOTAL dos itens, nunca com o total.** É o mesmo critério
+do "grátis acima de X", e aqui a razão é ainda mais direta: o total inclui o
+frete, e deixá-lo contar para atingir o mínimo faria o cliente pagar mais para
+contornar exatamente o que a loja quis evitar — sair para entregar pouca
+mercadoria.
+
+O limite é **inclusivo**: pedido de exatamente R$ 30 com mínimo de R$ 30 passa.
+Exclusivo recusaria o de R$ 30,00 e aceitaria o de R$ 30,01, o que ninguém
+explica ao cliente — o mesmo raciocínio do frete grátis.
+
+⚠️ **Zero é "sem mínimo", e por isso a coluna NÃO é nulável.** É o contraste
+deliberado com `free_delivery_above_in_cents`, que é nulável e precisou de
+`nullable: true` no schema do PATCH (F12) para a loja conseguir DESLIGAR a
+promoção — lacuna que só a revisão daquela branch pegou. Aqui desligar é pôr
+zero, e o caminho de volta existe sem tratamento especial.
+
+**A recusa é 409 na criação do pedido, e a mensagem traz o valor em reais**
+(`R$ 30,00`, não `3000`): quem a lê é o cliente. E o mínimo **não fica gravado
+no pedido** — ao contrário do frete, ele não é cobrado, é só condição de
+aceite, e não há o que congelar. `minimumOrderInCents` sai no cardápio público
+para a tela avisar antes do carrinho: informar continua sendo do cardápio,
+decidir continua sendo da criação.
 
 ### Documentação: OpenAPI derivado das rotas
 
