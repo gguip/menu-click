@@ -45,6 +45,9 @@ type OrderRow = {
   zip_code: string | null;
   payment_method: PaymentMethod;
   change_for_in_cents: number | null;
+  /** `null` fora de `dine_in` e no pedido de salão sem mesa informada. */
+  table_id: string | null;
+  table_label: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -139,6 +142,12 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
     ...(row.change_for_in_cents === null
       ? {}
       : { changeForInCents: row.change_for_in_cents }),
+    // presente e `null` quando não há mesa, como `deliveryFeeInCents` — o
+    // `check` do banco garante que as duas colunas andam juntas
+    table:
+      row.table_id === null
+        ? null
+        : { id: row.table_id, label: row.table_label as string },
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -179,6 +188,8 @@ export type InsertOrderData = {
   trackingTokenHash: string | null;
   paymentMethod: PaymentMethod;
   changeForInCents?: number;
+  /** A mesa já resolvida pelo serviço, com o rótulo a congelar. */
+  table?: { id: string; label: string };
 };
 
 /** Uma linha de `order_items` pronta para gravar, com os valores congelados. */
@@ -217,8 +228,8 @@ export async function insertOrder(
     `insert into orders
        (restaurant_id, customer_id, type, total_in_cents, delivery_fee_in_cents,
         tracking_token_hash, street, number, neighborhood, city, state, zip_code,
-        payment_method, change_for_in_cents)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        payment_method, change_for_in_cents, table_id, table_label)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      returning id`,
     [
       restaurantId,
@@ -239,6 +250,10 @@ export async function insertOrder(
       address?.zipCode ?? null,
       data.paymentMethod,
       data.changeForInCents ?? null,
+      // o check `orders_table_check` garante a coerência: as duas colunas vêm
+      // juntas, e só em `dine_in`
+      data.table?.id ?? null,
+      data.table?.label ?? null,
     ],
   );
   return rows[0].id;
@@ -527,6 +542,12 @@ function periodConditions(
 export type OrderFilters = {
   status?: OrderStatus;
   period?: PeriodFilter;
+  /**
+   * Só os pedidos de uma mesa. É o que torna a etiqueta útil em vez de
+   * decorativa: sem ele, o painel mostra "Mesa 7" no pedido e não consegue
+   * responder "o que a mesa 7 pediu hoje?".
+   */
+  tableId?: string;
 };
 
 /**
@@ -587,6 +608,10 @@ export async function findByRestaurant(
     if (filters.status !== undefined) {
       values.push(filters.status);
       lista.push(`${prefixo}status = $${values.length}`);
+    }
+    if (filters.tableId !== undefined) {
+      values.push(filters.tableId);
+      lista.push(`${prefixo}table_id = $${values.length}`);
     }
     lista.push(
       ...periodConditions(filters.period, timezone, `${prefixo}created_at`, values),
