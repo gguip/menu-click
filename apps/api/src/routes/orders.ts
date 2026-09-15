@@ -89,6 +89,12 @@ const createOrderBodySchema = {
     // opcional: ausente significa "tenho o valor certo". Comparado com o
     // total calculado no SERVIDOR, nunca com um valor do cliente.
     changeForInCents: { type: "integer", minimum: 0 },
+    // o hash que veio no QR code da mesa. Só em `dine_in`, e OPCIONAL: todo
+    // adesivo impresso antes desta feature aponta para o cardápio sem hash
+    // nenhum, e exigi-lo quebraria todos eles de uma vez. Sem `pattern` pelo
+    // mesmo motivo da rota pública de resolução: formato errado é recusado
+    // pelo serviço junto com hash inexistente, sem dizer qual dos dois foi.
+    tableHash: { type: "string" },
   },
   // `totalInCents` não está aqui de propósito: o total é calculado no servidor.
   // Aceitá-lo do cliente seria deixar quem paga escolher o preço.
@@ -153,6 +159,19 @@ const orderSummaryProperties = {
   // ausente = "tenho o valor certo"; por isso não é `nullable` (F12) — a
   // ausência é a informação, um `null` explícito não diria nada a mais
   changeForInCents: { type: "integer" },
+  // a mesa, com o rótulo congelado na criação. `nullable` (F12) porque `null`
+  // É a informação: fora de `dine_in`, e no pedido de salão vindo de um QR
+  // code antigo, que não carrega hash. O `hash` NÃO sai aqui — a listagem e o
+  // detalhe são rotas do painel, e o hash é o conteúdo do adesivo, não do
+  // pedido (S10).
+  table: {
+    type: "object",
+    nullable: true,
+    properties: {
+      id: { type: "string" },
+      label: { type: "string" },
+    },
+  },
   createdAt: { type: "string" },
   updatedAt: { type: "string" },
 };
@@ -201,6 +220,10 @@ const orderListQuerystringSchema = {
     // enum fechado: o valor chega ao SQL como `$n` comparado a uma coluna,
     // nunca como identificador — e mesmo assim só passa o que está na lista
     status: { type: "string", enum: [...ORDER_STATUSES] },
+    // só os pedidos de uma mesa — é o que torna a etiqueta útil em vez de
+    // decorativa. Vai como `$n` comparado a uma coluna, nunca como
+    // identificador (S3).
+    tableId: { type: "string" },
     // os atalhos do painel; o recorte é resolvido no fuso do restaurante
     period: { type: "string", enum: [...ORDER_PERIODS] },
     // datas locais do seletor, não instantes: `format: "date"` é YYYY-MM-DD.
@@ -265,6 +288,7 @@ const orderParamsSchema = {
 
 type OrderListQuery = Pagination & {
   status?: OrderStatus;
+  tableId?: string;
   period?: OrderPeriod;
   from?: string;
   to?: string;
@@ -333,7 +357,7 @@ export async function orderRoutes(app: FastifyInstance) {
       return ordersService.listByRestaurant(
         request.params.restaurantId,
         { limit, offset },
-        { status, period, from, to, sort, order },
+        { status, period, from, to, sort, order, tableId: request.query.tableId },
       );
     },
   );

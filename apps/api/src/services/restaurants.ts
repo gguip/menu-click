@@ -14,6 +14,7 @@ import { isValidTimezone } from "../domain/timezone.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
 import * as deliveryNeighborhoodsRepository from "../repositories/delivery-neighborhoods.ts";
+import * as tablesRepository from "../repositories/tables.ts";
 import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as productsRepository from "../repositories/products.ts";
@@ -311,5 +312,10 @@ export async function remove(id: string): Promise<void> {
     await optionGroupsRepository.softDeleteByRestaurant(id, client);
     await openingHoursRepository.softDeleteByRestaurant(id, client);
     await deliveryNeighborhoodsRepository.softDeleteByRestaurant(id, client);
+    // As mesas entram aqui como qualquer filha com `restaurant_id` próprio.
+    // Os PEDIDOS daquelas mesas não são tocados — pedido é histórico e nunca
+    // cascateia —, e continuam legíveis porque o rótulo foi COPIADO para o
+    // pedido na criação: nenhuma leitura de pedido junta `tables`.
+    await tablesRepository.softDeleteByRestaurant(id, client);
   });
 }

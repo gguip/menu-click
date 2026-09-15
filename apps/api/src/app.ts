@@ -31,6 +31,7 @@ import { optionGroupRoutes } from "./routes/option-groups.ts";
 import { openingHoursRoutes } from "./routes/opening-hours.ts";
 import { deliveryNeighborhoodsRoutes } from "./routes/delivery-neighborhoods.ts";
 import { restaurantUserRoutes } from "./routes/restaurant-users.ts";
+import { tableRoutes } from "./routes/tables.ts";
 import { orderRoutes } from "./routes/orders.ts";
 import { menuRoutes } from "./routes/menu.ts";
 import { trackingRoutes } from "./routes/tracking.ts";
@@ -38,6 +39,7 @@ import { authRoutes } from "./routes/auth.ts";
 import { installAuth } from "./routes/authenticate.ts";
 import { openapiOptions } from "./openapi.ts";
 import { assertEmailDriverIsSafe, configureEmail } from "./email.ts";
+import { assertMenuBaseUrl } from "./menu-url.ts";
 
 /**
  * Monta a instância do Fastify sem escutar (F1): registra plugins, rotas e o
@@ -57,6 +59,14 @@ export async function buildApp() {
    */
   const emailDriver = process.env.EMAIL_DRIVER ?? "console";
   assertEmailDriverIsSafe(emailDriver, process.env.NODE_ENV);
+
+  /**
+   * Segunda pré-condição de subida: a base da URL do cardápio. Sem ela não há
+   * como montar o endereço que vai dentro do QR code das mesas, e uma base
+   * errada só daria sintoma depois de o adesivo estar impresso e colado — ver
+   * `assertMenuBaseUrl` em `menu-url.ts`.
+   */
+  assertMenuBaseUrl();
 
   const app = Fastify({
     bodyLimit: BODY_LIMIT_BYTES,
@@ -323,6 +333,7 @@ export async function buildApp() {
   await app.register(openingHoursRoutes);
   await app.register(deliveryNeighborhoodsRoutes);
   await app.register(restaurantUserRoutes);
+  await app.register(tableRoutes);
   await app.register(orderRoutes);
   await app.register(menuRoutes);
   await app.register(trackingRoutes);

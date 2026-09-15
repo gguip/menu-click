@@ -196,6 +196,20 @@ export type CreateOrderInput = {
    * inventar um número.
    */
   changeForInCents?: number;
+  /**
+   * O hash que veio no QR code da mesa. Só em `dine_in`, e **opcional**.
+   *
+   * ⚠️ Opcional não é indecisão. Todo QR code impresso antes desta feature
+   * aponta para `/slug` sem hash nenhum, porque mesa não existia quando ele
+   * foi colado; exigi-lo faria, no deploy, todo adesivo já colado parar de
+   * funcionar — o mesmo dano que mantém o `slug` fora do PATCH. Pedido de
+   * salão sem mesa continua significando o que sempre significou: alguém no
+   * salão pediu, sem dizer de onde.
+   *
+   * Vem o HASH, nunca o `tableId`: quem escaneou tem o hash na mão e não tem
+   * por que conhecer UUID nenhum do sistema.
+   */
+  tableHash?: string;
 };
 
 /**
@@ -261,6 +275,16 @@ export type OrderSummary = {
   paymentMethod: PaymentMethod;
   /** Ausente = "tenho o valor certo". Só faz sentido junto de `paymentMethod: "cash"`. */
   changeForInCents?: number;
+  /**
+   * A mesa de onde o pedido veio, com o rótulo **congelado** na criação —
+   * nunca lido de `tables`. Renomear a mesa não reescreve pedido antigo, e
+   * removê-la não apaga o rótulo do histórico: é a mesma disciplina de
+   * `order_items` copiar nome e preço do produto.
+   *
+   * Sempre presente, e `null` — não ausente — quando não há mesa: fora de
+   * `dine_in`, e no pedido de salão feito por um QR code antigo, sem hash.
+   */
+  table: { id: string; label: string } | null;
   createdAt: string;
   updatedAt: string;
 };
