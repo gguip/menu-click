@@ -36,6 +36,14 @@ export const OPENAPI_TAGS = [
   },
   { name: "Produtos", description: "O cardápio, do lado de quem o edita." },
   {
+    name: "Mesas",
+    description:
+      "O salão, e o QR code colado em cada mesa. A resposta já traz a " +
+      "`qrUrl` pronta — o front só a entrega à biblioteca de QR. O hash é " +
+      "reimprimível de propósito (o adesivo descola), e o que o protege é " +
+      "entropia mais a rotação, não sigilo.",
+  },
+  {
     name: "Usuários",
     description:
       "Quem tem acesso ao painel. Restrito ao dono: administrar usuários é " +

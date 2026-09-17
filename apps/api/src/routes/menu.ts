@@ -5,6 +5,7 @@ import { SLUG_MAX_LENGTH } from "../domain/slug.ts";
 import { DELIVERY_QUOTE_RATE_LIMIT_MAX, RATE_LIMIT_WINDOW } from "../limits.ts";
 import * as deliveryService from "../services/delivery.ts";
 import * as menuService from "../services/menu.ts";
+import * as tablesService from "../services/tables.ts";
 import {
   addressProperties,
   addressSchema,
@@ -30,6 +31,42 @@ const slugParamsSchema = {
   type: "object",
   required: ["slug"],
   properties: { slug: { type: "string", maxLength: SLUG_MAX_LENGTH } },
+};
+
+/**
+ * O hash da mesa como ele chega na URL.
+ *
+ * ⚠️ Sem `pattern` de propósito, embora o hash tenha forma conhecida (16 bytes
+ * em `base64url`, 22 caracteres). Um `pattern` aqui faria hash malformado sair
+ * **400**, e o projeto já decidiu o contrário: o D14 manda validar o formato do
+ * id e responder **404**, para "não existe" e "não poderia existir" serem
+ * indistinguíveis de fora. Um 400 diria a quem varre que aquele formato chegou
+ * a ser avaliado.
+ *
+ * Não custa consulta perdida: `hash` é coluna `text` com índice único, então
+ * lixo simplesmente não casa — ao contrário do `uuid`, que faz o Postgres
+ * estourar e por isso precisa do `isUuid()` antes.
+ */
+const tableHashParamsSchema = {
+  type: "object",
+  required: ["slug", "hash"],
+  properties: {
+    slug: { type: "string", maxLength: SLUG_MAX_LENGTH },
+    hash: { type: "string" },
+  },
+};
+
+/**
+ * A mesa como o PÚBLICO a vê: o rótulo, e nada mais.
+ *
+ * Nem `id` nem `hash` saem aqui, e não é descuido — é a mesma disciplina que
+ * mantém `stock` fora do cardápio (S10). Quem escaneou precisa saber em que
+ * mesa está; devolver o hash entregaria a credencial do adesivo a quem passou
+ * pela mesa, e o id não serve para nada do lado de fora.
+ */
+const publicTableResponseSchema = {
+  type: "object",
+  properties: { label: { type: "string" } },
 };
 
 const menuRestaurantResponseSchema = {
@@ -233,6 +270,34 @@ export async function menuRoutes(app: FastifyInstance) {
     },
     async (request) => {
       return menuService.listProducts(request.params.slug, request.query);
+    },
+  );
+
+  app.get<{ Params: { slug: string; hash: string } }>(
+    "/menu/:slug/table/:hash",
+    {
+      // pública como o resto do cardápio: quem acabou de escanear o QR code
+      // não tem conta nenhuma, e é justamente para ele que esta rota existe
+      config: { public: true },
+      schema: {
+        tags: ["Cardápio público"],
+        operationId: "resolvePublicTable",
+        summary: "Resolve o QR code de uma mesa",
+        description:
+          'Traduz o hash que veio no QR code para o rótulo da mesa, para a tela poder dizer "você está na Mesa 7" — sem isso, quem escaneou o adesivo errado só descobre quando a comida for para outra mesa. Devolve **só o rótulo**: nem o id nem o hash saem por aqui. Hash de outro restaurante, hash já rotacionado e mesa removida respondem 404, indistinguíveis de um hash que nunca existiu.',
+        params: tableHashParamsSchema,
+        response: {
+          200: publicTableResponseSchema,
+          404: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const table = await tablesService.resolveBySlugAndHash(
+        request.params.slug,
+        request.params.hash,
+      );
+      return { label: table.label };
     },
   );
 

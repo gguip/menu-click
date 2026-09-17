@@ -29,6 +29,7 @@ import { acceptedPaymentMethods } from "../domain/payment.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import * as customersRepository from "../repositories/customers.ts";
+import * as tablesRepository from "../repositories/tables.ts";
 import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as ordersRepository from "../repositories/orders.ts";
 import * as productsRepository from "../repositories/products.ts";
@@ -241,6 +242,44 @@ function assertEnderecoCoerente(input: CreateOrderInput): void {
 }
 
 /**
+ * Resolve o hash que veio do QR code para a mesa — e recusa o que não faz
+ * sentido. **400**, nunca 404: é a montagem do pedido que falha, não um
+ * recurso ausente, a mesma categoria das violações de opção.
+ *
+ * ⚠️ Ausência de `tableHash` é VÁLIDA em `dine_in`, e isso é a garantia mais
+ * frágil desta feature. Todo QR code impresso antes dela aponta para `/slug`
+ * sem hash nenhum; exigir a mesa faria, no deploy, todo adesivo já colado
+ * parar de funcionar. Quem "limpar" esta opcionalidade um dia quebra o salão
+ * inteiro de quem ainda não trocou os adesivos — há teste prendendo isto.
+ *
+ * A mesa é buscada **escopada pelo restaurante da rota** (S23): sem isso um
+ * hash legítimo etiquetaria pedido em loja alheia.
+ */
+async function resolverMesa(
+  restaurantId: string,
+  input: CreateOrderInput,
+): Promise<{ id: string; label: string } | undefined> {
+  if (input.tableHash === undefined) return undefined;
+
+  if (input.type !== "dine_in") {
+    throw new ValidationError(
+      `Pedido de ${NOME_DA_MODALIDADE[input.type]} não leva \`tableHash\`: mesa é do salão`,
+    );
+  }
+
+  const table = await tablesRepository.findByHash(
+    restaurantId,
+    input.tableHash,
+  );
+  if (table === null) {
+    throw new ValidationError("Mesa não encontrada neste restaurante");
+  }
+  // só o que vai ser CONGELADO no pedido — o hash não entra, ele muda na
+  // rotação e o pedido não pode mudar junto
+  return { id: table.id, label: table.label };
+}
+
+/**
  * A chave de fusão de linhas.
  *
  * Era só o `productId`. Com opções isso passou a estar errado: "um hambúrguer
@@ -360,6 +399,7 @@ export async function create(
   assertRestauranteAceita(restaurant, input.type);
   assertFormaAceita(restaurant, input.paymentMethod);
   assertEnderecoCoerente(input);
+  const table = await resolverMesa(restaurantId, input);
 
   // Duas linhas iguais (mesmo produto, mesmas opções) viram uma com a
   // quantidade somada. É o que um carrinho faz, e apaga de vez o caso em que a
@@ -487,6 +527,7 @@ export async function create(
           trackingToken === null ? null : hashToken(trackingToken),
         paymentMethod: input.paymentMethod,
         changeForInCents: input.changeForInCents,
+        table,
       },
       client,
     );
@@ -539,6 +580,8 @@ export type OrderListFilters = {
   to?: string;
   sort?: OrderSortField;
   order?: SortDirection;
+  /** Só os pedidos de uma mesa — "o que a mesa 7 pediu hoje?". */
+  tableId?: string;
 };
 
 /**
@@ -603,7 +646,7 @@ export async function listByRestaurant(
   const { rows, total } = await ordersRepository.findByRestaurant(
     restaurantId,
     pagination,
-    { status: filters.status, period },
+    { status: filters.status, period, tableId: filters.tableId },
     {
       field: filters.sort ?? DEFAULT_SORT.field,
       direction: filters.order ?? DEFAULT_SORT.direction,
