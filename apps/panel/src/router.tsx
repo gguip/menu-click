@@ -1,7 +1,10 @@
 import { Navigate, type RouteObject } from "react-router";
 import { RedirectIfSession, RequireSession, RequireVerified } from "./auth/guards.tsx";
+import { ForgotPasswordPage } from "./features/access/ForgotPasswordPage.tsx";
 import { LoginPage } from "./features/access/LoginPage.tsx";
 import { RegisterPage } from "./features/access/RegisterPage.tsx";
+import { ResetPasswordPage } from "./features/access/ResetPasswordPage.tsx";
+import { VerifyEmailLinkPage } from "./features/access/VerifyEmailLinkPage.tsx";
 
 // Provisório: cada tela entra no lugar do seu Placeholder na task dela.
 function Placeholder({ title }: { title: string }) {
@@ -14,13 +17,13 @@ export const routes: RouteObject[] = [
     children: [
       { path: "/login", element: <LoginPage /> },
       { path: "/cadastro", element: <RegisterPage /> },
-      { path: "/esqueci-senha", element: <Placeholder title="Esqueci a senha" /> },
+      { path: "/esqueci-senha", element: <ForgotPasswordPage /> },
     ],
   },
   // Os dois links que a API manda por e-mail (PASSWORD_RESET_URL e
   // EMAIL_VERIFICATION_URL) — funcionam com ou sem sessão.
-  { path: "/recuperar-senha", element: <Placeholder title="Definir nova senha" /> },
-  { path: "/verificar-email", element: <Placeholder title="Confirmando o e-mail" /> },
+  { path: "/recuperar-senha", element: <ResetPasswordPage /> },
+  { path: "/verificar-email", element: <VerifyEmailLinkPage /> },
   {
     element: <RequireSession />,
     children: [
