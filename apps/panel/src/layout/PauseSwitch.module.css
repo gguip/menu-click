@@ -1,0 +1,68 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 7px 14px 7px 11px;
+  border: 1px solid var(--mc-line);
+  border-radius: 999px;
+  background: var(--mc-surface);
+  color: var(--mc-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pill:hover {
+  border-color: var(--mc-line-hi);
+}
+
+.pill:disabled {
+  cursor: default;
+}
+
+.track {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--mc-accent);
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--mc-on-accent);
+}
+
+.paused {
+  background: var(--mc-warn-soft);
+  border-color: var(--mc-warn-line);
+  color: var(--mc-warn);
+}
+
+.paused .track {
+  background: var(--mc-warn-line);
+}
+
+.paused .knob {
+  right: auto;
+  left: 3px;
+  background: var(--mc-warn);
+}
+
+.error {
+  font-size: 12.5px;
+  color: var(--mc-danger);
+}

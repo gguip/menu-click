@@ -1,3 +1,4 @@
+import type { MockHandler } from "./api-mock.ts";
 import { saveSession } from "../src/api/session.ts";
 import type {
   Category,
@@ -168,4 +169,19 @@ export function makeOptionGroup(overrides: Partial<OptionGroup> = {}): OptionGro
     options: [],
     ...overrides,
   };
+}
+
+/** O mínimo que toda tela de dentro do painel pede. Específicos antes. */
+export function panelHandlers(
+  options: { me?: Partial<Me>; restaurant?: Partial<Restaurant>; summary?: Partial<OrdersSummary> } = {},
+): MockHandler[] {
+  return [
+    { method: "GET", path: "/auth/me", body: makeMe(options.me) },
+    { method: "GET", path: `/restaurants/${RESTAURANT_ID}`, body: makeRestaurant(options.restaurant) },
+    {
+      method: "GET",
+      path: `/restaurants/${RESTAURANT_ID}/orders/summary`,
+      body: makeSummary(options.summary),
+    },
+  ];
 }
