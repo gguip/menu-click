@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { createMemoryRouter, type RouteObject, useLocation } from "react-router";
 import { RouterProvider } from "react-router/dom";
+import { RequireVerified } from "../src/auth/guards.tsx";
 import { cssVariablesResolver, theme } from "../src/theme/theme.ts";
 
 type TestRouter = ReturnType<typeof createMemoryRouter>;
@@ -34,4 +35,9 @@ export function renderRoutes(routes: RouteObject[], initialPath: string, options
 export function LocationProbe() {
   const location = useLocation();
   return <p data-testid="location">{location.pathname + location.search}</p>;
+}
+
+/** Rotas de dentro do painel: exigem /auth/me mockado e sessão (`signIn`). */
+export function renderInPanel(routes: RouteObject[], initialPath: string, options: RenderOptions = {}) {
+  return renderRoutes([{ element: <RequireVerified />, children: routes }], initialPath, options);
 }
