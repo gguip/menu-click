@@ -1,0 +1,36 @@
+.notice {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 13.5px;
+}
+
+.title {
+  font-weight: 700;
+}
+
+.body {
+  color: var(--mc-ink2);
+  max-width: 78ch;
+}
+
+.warn {
+  background: var(--mc-warn-soft);
+  border-color: var(--mc-warn-line);
+  border-left: 3px solid var(--mc-warn-strong);
+  color: var(--mc-warn);
+}
+
+.accent {
+  background: var(--mc-accent-soft);
+  border-color: var(--mc-accent-line);
+  color: var(--mc-accent-hi);
+}
+
+.danger {
+  background: var(--mc-danger-soft);
+  border-color: var(--mc-danger-line);
+  color: var(--mc-danger);
+}

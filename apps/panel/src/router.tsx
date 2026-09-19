@@ -1,5 +1,7 @@
 import { Navigate, type RouteObject } from "react-router";
 import { RedirectIfSession, RequireSession, RequireVerified } from "./auth/guards.tsx";
+import { LoginPage } from "./features/access/LoginPage.tsx";
+import { RegisterPage } from "./features/access/RegisterPage.tsx";
 
 // Provisório: cada tela entra no lugar do seu Placeholder na task dela.
 function Placeholder({ title }: { title: string }) {
@@ -10,8 +12,8 @@ export const routes: RouteObject[] = [
   {
     element: <RedirectIfSession />,
     children: [
-      { path: "/login", element: <Placeholder title="Entrar" /> },
-      { path: "/cadastro", element: <Placeholder title="Criar a conta da loja" /> },
+      { path: "/login", element: <LoginPage /> },
+      { path: "/cadastro", element: <RegisterPage /> },
       { path: "/esqueci-senha", element: <Placeholder title="Esqueci a senha" /> },
     ],
   },
