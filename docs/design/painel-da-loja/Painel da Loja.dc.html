@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { margin: 0; font-family: Figtree, ui-sans-serif, system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: var(--bg); color: var(--ink); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hi); text-decoration: underline; }
+  :root {
+    --bg:#F5F4F1; --surface:#FFFFFF; --surface2:#FAF9F7; --surface3:#EFEDE9;
+    --line:#E4E1DB; --line-hi:#CFCAC2;
+    --ink:#1B1A17; --ink2:#5F5A52; --ink3:#6E6960;
+    --accent:#4A6B3A; --accent-hi:#3C5A2D; --accent-soft:#EDF1E7; --accent-line:#CBD8BD; --on-accent:#FFFFFF;
+    --warn:#8A5A12; --warn-strong:#C4841F; --warn-soft:#FBF2E2; --warn-line:#E8D3A8;
+    --danger:#98362A; --danger-soft:#FAEDEB; --danger-line:#E7C6C0;
+    --pad:14px; --row:44px; --gap:12px; --r:6px; --r-lg:10px;
+  }
+  [data-theme="dark"] {
+    --bg:#15140F; --surface:#1E1D19; --surface2:#242320; --surface3:#2B2A25;
+    --line:#332F29; --line-hi:#443F37;
+    --ink:#EFEDE7; --ink2:#A8A29A; --ink3:#98928A;
+    --accent:#93B375; --accent-hi:#A6C489; --accent-soft:#232A1C; --accent-line:#39452C; --on-accent:#14170F;
+    --warn:#DFAE5E; --warn-strong:#E8BE74; --warn-soft:#2B2417; --warn-line:#4A3D22;
+    --danger:#E08878; --danger-soft:#2C1D19; --danger-line:#4E2F27;
+  }
+  [data-density="compacta"] { --pad:10px; --row:38px; --gap:8px; }
+  .n { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+</style>
+</helmet>
+
+<div data-theme="{{ theme }}" data-density="{{ density }}" style="min-height:100vh; background:var(--bg); color:var(--ink); font-size:15px; line-height:1.45">
+
+  <sc-if value="{{ isApp }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex; min-height:100vh">
+
+    <!-- ===== RAIL ===== -->
+    <nav style="width:212px; flex:0 0 212px; border-right:1px solid var(--line); background:var(--surface); display:flex; flex-direction:column; position:sticky; top:0; height:100vh">
+      <div style="padding:16px 16px 12px; border-bottom:1px solid var(--line)">
+        <div style="font-size:15px; font-weight:700; letter-spacing:-0.01em">Trattoria Bella</div>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:4px">
+          <span style="width:7px; height:7px; border-radius:50%; background:var(--accent); flex:0 0 7px"></span>
+          <span style="font-size:12.5px; color:var(--ink2)">{{ storeStatus }}</span>
+        </div>
+      </div>
+      <div style="padding:10px 8px; display:flex; flex-direction:column; gap:1px; overflow-y:auto; flex:1">
+        <sc-for list="{{ navGroups }}" as="g" hint-placeholder-count="3">
+          <div style="padding:12px 8px 5px; font-size:10.5px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink3)">{{ g.title }}</div>
+          <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="4">
+            <button type="button" onClick="{{ it.onSelect }}" style="display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; text-align:left; border:0; border-radius:var(--r); padding:8px 10px; font:inherit; font-size:13.5px; font-weight:500; cursor:pointer; background:{{ it.bg }}; color:{{ it.fg }}" style-hover="background:var(--surface3)">
+              <span>{{ it.label }}</span>
+              <span class="n" style="font-size:11.5px; font-weight:700; color:{{ it.badgeFg }}">{{ it.badge }}</span>
+            </button>
+          </sc-for>
+        </sc-for>
+      </div>
+      <div style="padding:10px; border-top:1px solid var(--line); display:flex; align-items:center; gap:9px">
+        <div style="width:28px; height:28px; border-radius:50%; background:var(--surface3); display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:var(--ink2)">{{ userInitials }}</div>
+        <div style="min-width:0">
+          <div style="font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ userName }}</div>
+          <div style="font-size:11px; color:var(--ink3)">{{ roleLabel }}</div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ===== MAIN ===== -->
+    <main style="flex:1; min-width:0; display:flex; flex-direction:column">
+
+      <!-- top bar: pausa manual sempre visível -->
+      <header style="position:sticky; top:0; z-index:20; background:var(--surface); border-bottom:1px solid var(--line); padding:0 20px; height:60px; display:flex; align-items:center; gap:20px">
+        <div style="flex:1; min-width:0">
+          <div style="font-size:17px; font-weight:600; letter-spacing:-0.01em">{{ screenTitle }}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:22px">
+          <sc-for list="{{ dayStats }}" as="s" hint-placeholder-count="3">
+            <div>
+              <div style="font-size:10.5px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink3)">{{ s.label }}</div>
+              <div class="n" style="font-size:16px; font-weight:600; letter-spacing:-0.01em">{{ s.value }}</div>
+            </div>
+          </sc-for>
+          <div style="width:1px; height:32px; background:var(--line)"></div>
+          <button type="button" onClick="{{ togglePause }}" style="display:flex; align-items:center; gap:10px; border:1px solid {{ pauseLine }}; background:{{ pauseBg }}; color:{{ pauseFg }}; border-radius:999px; padding:7px 14px 7px 11px; font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; min-height:38px">
+            <span style="width:34px; height:20px; border-radius:999px; background:{{ knobTrack }}; padding:2px; display:flex; justify-content:{{ knobSide }}; flex:0 0 34px">
+              <span style="width:16px; height:16px; border-radius:50%; background:{{ knobFill }}; display:block"></span>
+            </span>
+            <span>{{ pauseLabel }}</span>
+          </button>
+        </div>
+      </header>
+
+      <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}">
+        <div style="background:var(--warn-soft); border-bottom:1px solid var(--warn-line); padding:10px 20px; display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--warn)">
+          <span style="font-weight:700">Pausada</span>
+          <span>A loja não está recebendo pedidos novos. O horário cadastrado não foi alterado.</span>
+        </div>
+      </sc-if>
+
+      <!-- ============ PEDIDOS ============ -->
+      <sc-if value="{{ isPedidos }}" hint-placeholder-val="{{ true }}">
+      <div style="flex:1; display:flex; flex-direction:column; min-height:0">
+
+        <sc-if value="{{ showDeliveryAlert }}" hint-placeholder-val="{{ true }}">
+          <div style="margin:16px 20px 0; border:1px solid var(--warn-line); border-left:3px solid var(--warn-strong); background:var(--warn-soft); border-radius:var(--r); padding:12px 14px; display:flex; align-items:flex-start; gap:12px">
+            <div style="flex:1">
+              <div style="font-size:13.5px; font-weight:700; color:var(--warn)">Entrega por bairro sem nenhum bairro cadastrado</div>
+              <div style="font-size:13px; color:var(--ink2); margin-top:3px; max-width:78ch">Não é frete grátis: a loja não consegue calcular o frete e vai recusar pedidos de entrega. Cadastre os bairros ou mude para taxa fixa.</div>
+            </div>
+            <button type="button" onClick="{{ goEntrega }}" style="border:1px solid var(--warn-line); background:var(--surface); color:var(--warn); border-radius:var(--r); padding:8px 12px; font:inherit; font-size:13px; font-weight:600; white-space:nowrap; cursor:pointer; min-height:36px">Configurar entrega</button>
+          </div>
+        </sc-if>
+
+        <!-- filtros -->
+        <div style="padding:16px 20px 14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+          <div style="display:flex; border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--surface)">
+            <sc-for list="{{ periods }}" as="p" hint-placeholder-count="4">
+              <button type="button" onClick="{{ p.onSelect }}" style="border:0; border-right:1px solid var(--line); padding:0 14px; height:36px; font:inherit; font-size:13.5px; font-weight:500; cursor:pointer; background:{{ p.bg }}; color:{{ p.fg }}">{{ p.label }}</button>
+            </sc-for>
+          </div>
+          <button type="button" onClick="{{ useRange }}" style="border:1px dashed var(--line-hi); background:transparent; color:{{ rangeFg }}; border-radius:var(--r); height:36px; padding:0 13px; font:inherit; font-size:13.5px; cursor:pointer">{{ rangeLabel }}</button>
+          <select value="{{ mesaFiltro }}" onChange="{{ onMesaFiltro }}" style="border:1px solid {{ mesaFiltroLine }}; background:{{ mesaFiltroBg }}; color:{{ mesaFiltroFg }}; border-radius:var(--r); height:36px; padding:0 10px; font:inherit; font-size:13.5px; font-weight:500">
+            <sc-for list="{{ mesaOpcoes }}" as="m" hint-placeholder-count="4">
+              <option value="{{ m.value }}">{{ m.label }}</option>
+            </sc-for>
+          </select>
+          <div style="flex:1"></div>
+          <div style="font-size:12.5px; color:var(--ink3)">{{ syncLabel }}</div>
+          <select style="border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); height:36px; padding:0 10px; font:inherit; font-size:13.5px">
+            <option>Mais recentes</option>
+            <option>Maior valor</option>
+          </select>
+        </div>
+
+        <sc-if value="{{ rangeOn }}" hint-placeholder-val="{{ false }}">
+          <div style="margin:0 20px 14px; font-size:12.5px; color:var(--ink2); background:var(--surface2); border:1px solid var(--line); border-radius:var(--r); padding:8px 12px">Intervalo de datas ativo — o filtro por período fica desligado. Os dois não se combinam.</div>
+        </sc-if>
+
+        <!-- kanban -->
+        <div style="flex:1; min-height:0; padding:0 20px 20px; display:grid; grid-template-columns:repeat(4, minmax(268px, 1fr)); gap:var(--gap); overflow-x:auto; align-items:start">
+          <sc-for list="{{ columns }}" as="col" hint-placeholder-count="4">
+            <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface2); display:flex; flex-direction:column; max-height:calc(100vh - 210px)">
+              <div style="padding:11px 13px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line)">
+                <span style="width:8px; height:8px; border-radius:50%; background:{{ col.dot }}; flex:0 0 8px"></span>
+                <span style="font-size:13.5px; font-weight:700; letter-spacing:-0.005em">{{ col.title }}</span>
+                <span class="n" style="margin-left:auto; font-size:12.5px; font-weight:700; color:{{ col.countFg }}; background:{{ col.countBg }}; border-radius:999px; min-width:22px; text-align:center; padding:1px 7px">{{ col.count }}</span>
+              </div>
+              <div style="padding:10px; display:flex; flex-direction:column; gap:10px; overflow-y:auto">
+
+                <sc-if value="{{ col.loading }}" hint-placeholder-val="{{ false }}">
+                  <sc-for list="{{ col.skeletons }}" as="k" hint-placeholder-count="2">
+                    <div style="border:1px solid var(--line); background:var(--surface); border-radius:var(--r); padding:var(--pad); display:flex; flex-direction:column; gap:9px">
+                      <div style="height:11px; width:45%; border-radius:3px; background:var(--surface3)"></div>
+                      <div style="height:15px; width:75%; border-radius:3px; background:var(--surface3)"></div>
+                      <div style="height:11px; width:60%; border-radius:3px; background:var(--surface3)"></div>
+                    </div>
+                  </sc-for>
+                </sc-if>
+
+                <sc-for list="{{ col.orders }}" as="o" hint-placeholder-count="2">
+                  <article onClick="{{ o.onOpen }}" style="border:1px solid {{ o.cardLine }}; border-left:3px solid {{ o.edge }}; background:var(--surface); border-radius:var(--r); padding:var(--pad); cursor:pointer; display:flex; flex-direction:column; gap:8px" style-hover="border-color:var(--line-hi)">
+                    <div style="display:flex; align-items:baseline; gap:8px">
+                      <span class="n" style="font-size:12.5px; font-weight:700; color:var(--ink3)">{{ o.code }}</span>
+                      <span class="n" style="margin-left:auto; font-size:12.5px; font-weight:600; color:{{ o.agoFg }}">{{ o.ago }}</span>
+                    </div>
+                    <div style="font-size:16px; font-weight:600; letter-spacing:-0.01em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ o.name }}</div>
+                    <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap">
+                      <span style="display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:999px; padding:2px 9px 2px 7px; font-size:12px; font-weight:600; color:var(--ink2)">
+                        <span style="width:6px; height:6px; border-radius:50%; background:{{ o.dot }}; flex:0 0 6px"></span>{{ o.typeLabel }}
+                      </span>
+                      <sc-if value="{{ o.stageLabel }}" hint-placeholder-val="{{ false }}">
+                        <span style="font-size:12px; font-weight:600; color:var(--ink3)">{{ o.stageLabel }}</span>
+                      </sc-if>
+                    </div>
+                    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:8px; margin-top:1px">
+                      <div style="font-size:12.5px; color:var(--ink2); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ o.pay }}</div>
+                      <div class="n" style="font-size:18px; font-weight:700; letter-spacing:-0.02em; white-space:nowrap">{{ o.total }}</div>
+                    </div>
+                    <sc-if value="{{ o.showActions }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex; gap:8px; margin-top:3px">
+                        <button type="button" onClick="{{ o.onPrimary }}" style="flex:1; min-height:38px; border:1px solid {{ o.primaryLine }}; background:{{ o.primaryBg }}; color:{{ o.primaryFg }}; border-radius:var(--r); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer">{{ o.primaryLabel }}</button>
+                        <sc-if value="{{ o.secondaryLabel }}" hint-placeholder-val="{{ false }}">
+                          <button type="button" onClick="{{ o.onSecondary }}" style="min-height:38px; border:1px solid var(--line); background:transparent; color:var(--ink2); border-radius:var(--r); padding:0 12px; font:inherit; font-size:13.5px; font-weight:500; cursor:pointer">{{ o.secondaryLabel }}</button>
+                        </sc-if>
+                      </div>
+                    </sc-if>
+                  </article>
+                </sc-for>
+
+                <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:26px 14px; text-align:center; color:var(--ink3); font-size:13px">{{ col.emptyText }}</div>
+                </sc-if>
+
+              </div>
+            </section>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ PRODUTOS ============ -->
+      <sc-if value="{{ isProdutos }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 26px">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px">
+          <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="Buscar por nome" style="height:36px; width:100%; max-width:260px; min-width:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 12px; font:inherit; font-size:14px" />
+          <div style="display:flex; gap:6px; flex-wrap:wrap">
+            <sc-for list="{{ sections }}" as="s" hint-placeholder-count="4">
+              <button type="button" onClick="{{ s.onSelect }}" style="height:36px; border:1px solid {{ s.line }}; background:{{ s.bg }}; color:{{ s.fg }}; border-radius:999px; padding:0 14px; font:inherit; font-size:13.5px; font-weight:500; cursor:pointer">{{ s.label }}</button>
+            </sc-for>
+          </div>
+          <div style="flex:1"></div>
+          <button type="button" onClick="{{ onNewProduct }}" style="height:38px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">Novo produto</button>
+        </div>
+
+        <div style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); overflow:hidden">
+          <div style="display:grid; grid-template-columns:minmax(150px,3fr) minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr); gap:12px; padding:9px 16px; background:var(--surface2); border-bottom:1px solid var(--line); font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--ink3)">
+            <div>Produto</div><div>Seção</div><div style="text-align:right">Preço</div><div style="text-align:right">Estoque</div><div>Status</div>
+          </div>
+          <sc-for list="{{ products }}" as="p" hint-placeholder-count="6">
+            <div onClick="{{ p.onOpen }}" style="display:grid; grid-template-columns:minmax(150px,3fr) minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr); gap:12px; align-items:center; padding:0 16px; min-height:var(--row); border-bottom:1px solid var(--line); cursor:pointer; font-size:14px" style-hover="background:var(--surface2)">
+              <div style="display:flex; align-items:center; gap:11px; min-width:0; padding:7px 0">
+                <div style="width:34px; height:34px; flex:0 0 34px; border-radius:var(--r); background:var(--surface3); border:1px solid var(--line)"></div>
+                <div style="min-width:0">
+                  <div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ p.name }}</div>
+                  <div style="font-size:12.5px; color:var(--ink3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ p.desc }}</div>
+                </div>
+              </div>
+              <div style="color:var(--ink2); font-size:13.5px">{{ p.section }}</div>
+              <div class="n" style="text-align:right; font-weight:600">{{ p.price }}</div>
+              <div class="n" style="text-align:right; font-weight:600; color:{{ p.stockFg }}">{{ p.stock }}</div>
+              <div><span style="font-size:12.5px; font-weight:600; color:{{ p.statusFg }}; background:{{ p.statusBg }}; border:1px solid {{ p.statusLine }}; border-radius:999px; padding:2px 10px">{{ p.status }}</span></div>
+            </div>
+          </sc-for>
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 16px; font-size:13px; color:var(--ink2)">
+            <span>{{ productsCount }}</span>
+            <span style="display:flex; gap:6px">
+              <button type="button" style="height:32px; border:1px solid var(--line); background:var(--surface); color:var(--ink2); border-radius:var(--r); padding:0 11px; font:inherit; font-size:13px; cursor:pointer">Anterior</button>
+              <button type="button" style="height:32px; border:1px solid var(--line); background:var(--surface); color:var(--ink2); border-radius:var(--r); padding:0 11px; font:inherit; font-size:13px; cursor:pointer">Próxima</button>
+            </span>
+          </div>
+        </div>
+        <div style="margin-top:10px; font-size:12.5px; color:var(--ink3)">O estoque aparece só aqui. No cardápio público o cliente vê apenas disponível ou esgotado.</div>
+      </div>
+      </sc-if>
+
+      <!-- ============ PRODUTO (editar) ============ -->
+      <sc-if value="{{ isProduto }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 26px; max-width:1180px">
+        <button type="button" onClick="{{ backToProdutos }}" style="border:0; background:transparent; color:var(--ink2); font:inherit; font-size:13.5px; cursor:pointer; padding:0 0 12px">← Produtos</button>
+        <div style="display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; align-items:start">
+
+          <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:15px">
+            <div style="font-size:15px; font-weight:700">Dados do produto</div>
+            <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Nome
+              <input value="Pizza Grande" style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px; font-weight:400; width:100%; min-width:0" />
+            </label>
+            <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Descrição
+              <textarea rows="3" style="border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:9px 11px; font:inherit; font-size:14px; font-weight:400; resize:vertical; width:100%; min-width:0">Massa fina, 8 fatias. Escolha até 2 sabores.</textarea>
+            </label>
+            <div style="display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.2fr); gap:12px">
+              <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Preço
+                <input value="R$ 72,00" class="n" style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px; font-weight:400; width:100%; min-width:0" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Estoque
+                <input value="18" class="n" style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px; font-weight:400; width:100%; min-width:0" />
+              </label>
+              <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Seção
+                <select style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 9px; font:inherit; font-size:14px; font-weight:400; width:100%; min-width:0">
+                  <option>Pizzas</option><option>Entradas</option><option>Bebidas</option>
+                </select>
+              </label>
+            </div>
+            <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">URL da foto
+              <input value="https://cdn.loja.com/pizza-grande.jpg" style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px; font-weight:400; width:100%; min-width:0" />
+              <span style="font-size:12px; font-weight:400; color:var(--ink3)">Ainda não há upload de imagem: cole o endereço de uma foto já publicada.</span>
+            </label>
+          </section>
+
+          <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:13px">
+            <div>
+              <div style="font-size:15px; font-weight:700">Grupos de opções</div>
+              <div style="font-size:12.5px; color:var(--ink2); margin-top:3px">A ordem aqui é a ordem que o cliente vê. Os grupos pertencem à loja — crie e edite em Grupos de opções.</div>
+            </div>
+            <sc-for list="{{ groups }}" as="g" hint-placeholder-count="3">
+              <div style="border:1px solid var(--line); border-radius:var(--r); background:var(--surface2); padding:11px 12px; display:flex; align-items:flex-start; gap:11px">
+                <div style="display:flex; flex-direction:column; gap:3px">
+                  <button type="button" onClick="{{ g.onUp }}" style="width:26px; height:22px; border:1px solid var(--line); background:var(--surface); color:var(--ink2); border-radius:4px; font:inherit; font-size:11px; cursor:pointer; line-height:1">↑</button>
+                  <button type="button" onClick="{{ g.onDown }}" style="width:26px; height:22px; border:1px solid var(--line); background:var(--surface); color:var(--ink2); border-radius:4px; font:inherit; font-size:11px; cursor:pointer; line-height:1">↓</button>
+                </div>
+                <div style="flex:1; min-width:0">
+                  <div style="display:flex; align-items:baseline; gap:8px">
+                    <span style="font-size:14px; font-weight:600">{{ g.name }}</span>
+                    <span style="font-size:12px; color:var(--ink3)">{{ g.range }}</span>
+                  </div>
+                  <div style="font-size:12.5px; color:var(--ink2); margin-top:4px"><span style="font-weight:600; color:var(--ink)">{{ g.rule }}</span> — {{ g.ruleHelp }}</div>
+                  <div class="n" style="font-size:12.5px; color:var(--ink2); margin-top:3px; background:var(--surface3); border-radius:4px; padding:5px 8px; display:inline-block">{{ g.example }}</div>
+                </div>
+                <button type="button" style="border:0; background:transparent; color:var(--ink3); font:inherit; font-size:12.5px; cursor:pointer; padding:2px 0">Remover</button>
+              </div>
+            </sc-for>
+            <button type="button" style="height:38px; border:1px dashed var(--line-hi); background:transparent; color:var(--ink2); border-radius:var(--r); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer">Adicionar grupo já cadastrado</button>
+          </section>
+        </div>
+
+        <div style="position:sticky; bottom:0; margin-top:16px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:12px 16px; display:flex; align-items:center; gap:12px">
+          <span style="font-size:13px; color:var(--ink3)">Alterações não salvas</span>
+          <div style="flex:1"></div>
+          <button type="button" onClick="{{ backToProdutos }}" style="height:38px; border:1px solid var(--line); background:transparent; color:var(--ink2); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:500; cursor:pointer">Cancelar</button>
+          <button type="button" style="height:38px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); padding:0 18px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">Salvar produto</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ ESTADOS ============ -->
+      <sc-if value="{{ isEstados }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 26px">
+        <div style="font-size:13.5px; color:var(--ink2); max-width:80ch; margin-bottom:16px">Os estados que o documento aponta como esquecidos, desenhados. Cada um com o texto que evita a leitura errada.</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(330px, 1fr)); gap:14px">
+          <sc-for list="{{ states }}" as="s" hint-placeholder-count="6">
+            <section style="border:1px solid {{ s.line }}; border-radius:var(--r-lg); background:var(--surface); overflow:hidden; display:flex; flex-direction:column">
+              <div style="padding:9px 14px; border-bottom:1px solid var(--line); background:var(--surface2); display:flex; align-items:center; gap:8px">
+                <span style="width:7px; height:7px; border-radius:50%; background:{{ s.dot }}; flex:0 0 7px"></span>
+                <span style="font-size:12px; font-weight:700; letter-spacing:0.04em; text-transform:uppercase; color:var(--ink2)">{{ s.kind }}</span>
+              </div>
+              <div style="padding:16px 14px; display:flex; flex-direction:column; gap:7px; flex:1">
+                <div style="font-size:15.5px; font-weight:700; letter-spacing:-0.01em">{{ s.title }}</div>
+                <div style="font-size:13.5px; color:var(--ink2)">{{ s.body }}</div>
+                <div style="margin-top:auto; padding-top:12px; display:flex; gap:8px; flex-wrap:wrap">
+                  <span style="min-height:36px; display:inline-flex; align-items:center; border:1px solid {{ s.ctaLine }}; background:{{ s.ctaBg }}; color:{{ s.ctaFg }}; border-radius:var(--r); padding:0 14px; font-size:13.5px; font-weight:600">{{ s.cta }}</span>
+                  <sc-if value="{{ s.cta2 }}" hint-placeholder-val="{{ false }}">
+                    <span style="min-height:36px; display:inline-flex; align-items:center; border:1px solid var(--line); color:var(--ink2); border-radius:var(--r); padding:0 14px; font-size:13.5px; font-weight:500">{{ s.cta2 }}</span>
+                  </sc-if>
+                </div>
+              </div>
+            </section>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ DIREÇÃO VISUAL ============ -->
+      <sc-if value="{{ isSistema }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 40px; max-width:1100px; display:flex; flex-direction:column; gap:24px">
+        <p style="margin:0; font-size:14px; color:var(--ink2); max-width:72ch">Um acento só, âmbar reservado para o que exige ação e vermelho para o que é destrutivo. Nenhuma sombra: a separação vem de borda de 1px e de dois tons de superfície. Nada anima, exceto a chegada de pedido novo.</p>
+
+        <section style="display:flex; flex-direction:column; gap:10px">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink3)">Cor</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:10px">
+            <sc-for list="{{ swatches }}" as="w" hint-placeholder-count="8">
+              <div style="border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--surface)">
+                <div style="height:52px; background:{{ w.color }}; border-bottom:1px solid var(--line)"></div>
+                <div style="padding:8px 10px">
+                  <div style="font-size:13px; font-weight:600">{{ w.name }}</div>
+                  <div style="font-size:12px; color:var(--ink3)">{{ w.use }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section style="display:flex; flex-direction:column; gap:10px">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink3)">Tipografia — Figtree</div>
+          <div style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:14px">
+            <sc-for list="{{ typeScale }}" as="t" hint-placeholder-count="5">
+              <div style="display:flex; align-items:baseline; gap:18px; border-bottom:1px solid var(--line); padding-bottom:12px">
+                <div style="width:170px; flex:0 0 170px; font-size:12px; color:var(--ink3)">{{ t.spec }}</div>
+                <div class="n" style="font-size:{{ t.size }}; font-weight:{{ t.weight }}; letter-spacing:-0.015em">{{ t.sample }}</div>
+              </div>
+            </sc-for>
+            <div style="font-size:13px; color:var(--ink2)">Todo número usa tabular-nums: totais e contadores alinham em coluna e podem ser comparados sem ler.</div>
+          </div>
+        </section>
+
+        <section style="display:flex; flex-direction:column; gap:10px">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink3)">Componentes base</div>
+          <div style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:16px">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+              <button type="button" style="height:38px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">Ação principal</button>
+              <button type="button" style="height:38px; border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:500; cursor:pointer">Secundária</button>
+              <button type="button" style="height:38px; border:1px solid var(--danger-line); background:var(--danger-soft); color:var(--danger); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">Destrutiva</button>
+              <button type="button" style="height:38px; border:1px solid var(--line); background:var(--surface2); color:var(--ink3); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:500">Desabilitada</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+              <span style="border:1px solid var(--warn-line); background:var(--warn-soft); color:var(--warn); border-radius:999px; padding:3px 11px; font-size:12.5px; font-weight:700">Novo</span>
+              <span style="border:1px solid var(--line); color:var(--ink2); border-radius:999px; padding:3px 11px; font-size:12.5px; font-weight:600">Em preparo</span>
+              <span style="border:1px solid var(--accent-line); background:var(--accent-soft); color:var(--accent-hi); border-radius:999px; padding:3px 11px; font-size:12.5px; font-weight:600">Concluído</span>
+              <span style="border:1px solid var(--danger-line); background:var(--danger-soft); color:var(--danger); border-radius:999px; padding:3px 11px; font-size:12.5px; font-weight:600">Cancelado</span>
+            </div>
+            <div style="display:flex; gap:12px; flex-wrap:wrap">
+              <input placeholder="Input 36px" style="height:36px; width:200px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px" />
+              <select style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 10px; font:inherit; font-size:14px"><option>Select 36px</option></select>
+            </div>
+            <div style="font-size:13px; color:var(--ink2)">Escala de espaço 4 · 8 · 12 · 16 · 20 · 24. Raio 6px em controles, 10px em painéis. Alvo de toque mínimo 38px de altura.</div>
+          </div>
+        </section>
+      </div>
+      </sc-if>
+
+      <!-- ============ MODALIDADES E PAGAMENTO ============ -->
+      <sc-if value="{{ isModalidades }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:720px; display:flex; flex-direction:column; gap:14px">
+        <p style="margin:0; font-size:13.5px; color:var(--ink2); max-width:70ch">O que a loja aceita. Desligar uma modalidade tira a opção do cardápio público na hora — pedidos já abertos não são afetados.</p>
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:15px">
+          <sc-for list="{{ toggles }}" as="t" hint-placeholder-count="6">
+            <div style="display:flex; align-items:center; gap:13px">
+              <button type="button" onClick="{{ t.onToggle }}" style="width:42px; height:24px; flex:0 0 42px; border-radius:999px; border:0; background:{{ t.track }}; padding:3px; display:flex; justify-content:{{ t.side }}; cursor:pointer">
+                <span style="width:18px; height:18px; border-radius:50%; background:{{ t.knob }}; display:block"></span>
+              </button>
+              <div style="flex:1; min-width:0">
+                <div style="font-size:14.5px; font-weight:600">{{ t.label }}</div>
+                <div style="font-size:12.5px; color:var(--ink2)">{{ t.help }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </section>
+        <div style="border:1px solid var(--line); border-radius:var(--r); background:var(--surface2); padding:13px 15px; font-size:13.5px; color:var(--ink2); max-width:72ch">Sem nenhuma modalidade ligada a loja não recebe pedido nenhum, mesmo dentro do horário. Ao menos uma precisa ficar ativa.</div>
+      </div>
+      </sc-if>
+
+      <!-- ============ MODO COZINHA ============ -->
+      <sc-if value="{{ isCozinha }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:16px 20px 26px; display:flex; flex-direction:column; gap:14px">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+          <div style="font-size:13.5px; color:var(--ink2); flex:1; max-width:62ch">Tela para o tablet da bancada: só o que a cozinha precisa fazer. Sem preço, sem forma de pagamento, sem telefone — tipografia grande para leitura a um metro.</div>
+          <div class="n" style="font-size:13px; color:var(--ink3)">{{ syncLabel }}</div>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(330px,1fr)); gap:14px; align-items:start">
+          <sc-for list="{{ cozinhaCols }}" as="col" hint-placeholder-count="2">
+            <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface2); overflow:hidden">
+              <div style="padding:13px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px">
+                <span style="width:9px; height:9px; border-radius:50%; background:{{ col.dot }}; flex:0 0 9px"></span>
+                <span style="font-size:16px; font-weight:700">{{ col.title }}</span>
+                <span class="n" style="margin-left:auto; font-size:15px; font-weight:700; color:var(--ink2)">{{ col.count }}</span>
+              </div>
+              <div style="padding:12px; display:flex; flex-direction:column; gap:12px">
+                <sc-for list="{{ col.orders }}" as="o" hint-placeholder-count="2">
+                  <article style="border:1px solid {{ o.cardLine }}; border-left:4px solid {{ o.edge }}; background:var(--surface); border-radius:var(--r); padding:16px">
+                    <div style="display:flex; align-items:baseline; gap:12px">
+                      <span class="n" style="font-size:22px; font-weight:700; letter-spacing:-0.02em">{{ o.code }}</span>
+                      <span style="font-size:15px; font-weight:600; color:var(--ink2)">{{ o.typeLabel }}</span>
+                      <span class="n" style="margin-left:auto; font-size:17px; font-weight:700; color:{{ o.agoFg }}">{{ o.ago }}</span>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:9px; margin:14px 0 4px">
+                      <sc-for list="{{ o.lines }}" as="l" hint-placeholder-count="2">
+                        <div>
+                          <div style="display:flex; gap:12px; align-items:baseline">
+                            <span class="n" style="font-size:21px; font-weight:700; flex:0 0 46px">{{ l.qty }}</span>
+                            <span style="font-size:21px; font-weight:600; letter-spacing:-0.015em">{{ l.name }}</span>
+                          </div>
+                          <sc-for list="{{ l.opts }}" as="op" hint-placeholder-count="1">
+                            <div style="font-size:17px; color:var(--ink2); padding-left:58px">{{ op.label }}</div>
+                          </sc-for>
+                        </div>
+                      </sc-for>
+                    </div>
+                    <button type="button" onClick="{{ o.onPrimary }}" style="width:100%; min-height:54px; margin-top:12px; border:1px solid {{ o.primaryLine }}; background:{{ o.primaryBg }}; color:{{ o.primaryFg }}; border-radius:var(--r); font:inherit; font-size:17px; font-weight:700; cursor:pointer">{{ o.primaryLabel }}</button>
+                  </article>
+                </sc-for>
+                <sc-if value="{{ col.empty }}" hint-placeholder-val="{{ false }}">
+                  <div style="padding:30px 16px; text-align:center; color:var(--ink3); font-size:15px">{{ col.emptyText }}</div>
+                </sc-if>
+              </div>
+            </section>
+          </sc-for>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ MESAS + QR ============ -->
+      <sc-if value="{{ isMesas }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:1040px; display:flex; flex-direction:column; gap:14px">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+          <p style="margin:0; font-size:13.5px; color:var(--ink2); max-width:58ch; flex:1">Renomear a mesa não invalida o adesivo: o QR continua funcionando. O que invalida é gerar um código novo.</p>
+          <button type="button" onClick="{{ toggleAllMesas }}" style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink2); border-radius:var(--r); padding:0 14px; font:inherit; font-size:13.5px; font-weight:500; cursor:pointer">{{ mesasSelLabel }}</button>
+          <button type="button" style="height:38px; border:1px solid var(--accent); background:{{ printBg }}; color:{{ printFg }}; border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">{{ printLabel }}</button>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(215px,1fr)); gap:12px">
+          <sc-for list="{{ mesas }}" as="m" hint-placeholder-count="6">
+            <section style="border:1px solid {{ m.line }}; border-radius:var(--r-lg); background:var(--surface); overflow:hidden">
+              <div style="padding:10px 13px; display:flex; align-items:center; gap:9px; border-bottom:1px solid var(--line)">
+                <button type="button" onClick="{{ m.onToggle }}" style="width:18px; height:18px; flex:0 0 18px; border-radius:4px; border:1px solid {{ m.boxLine }}; background:{{ m.boxBg }}; color:var(--on-accent); font:inherit; font-size:11px; font-weight:700; cursor:pointer; line-height:1; padding:0">{{ m.check }}</button>
+                <div style="font-size:15px; font-weight:700; flex:1">{{ m.label }}</div>
+              </div>
+              <div style="padding:14px; display:flex; flex-direction:column; align-items:center; gap:10px">
+                <div style="width:104px; height:104px; border:1px solid var(--line); border-radius:6px; background:var(--surface2); display:grid; grid-template-columns:repeat(7,1fr); grid-template-rows:repeat(7,1fr); gap:2px; padding:8px">
+                  <sc-for list="{{ m.cells }}" as="c" hint-placeholder-count="20">
+                    <span style="background:{{ c.on }}; border-radius:1px"></span>
+                  </sc-for>
+                </div>
+                <div style="font-size:11.5px; color:var(--ink3); text-align:center; word-break:break-all">{{ m.url }}</div>
+              </div>
+              <div style="border-top:1px solid var(--line); display:flex">
+                <button type="button" style="flex:1; min-height:38px; border:0; border-right:1px solid var(--line); background:transparent; color:var(--ink2); font:inherit; font-size:13px; font-weight:500; cursor:pointer">Renomear</button>
+                <button type="button" onClick="{{ m.onRegen }}" style="flex:1; min-height:38px; border:0; background:transparent; color:var(--danger); font:inherit; font-size:13px; font-weight:600; cursor:pointer">Novo código</button>
+              </div>
+            </section>
+          </sc-for>
+          <section style="border:1px dashed var(--line-hi); border-radius:var(--r-lg); display:flex; flex-direction:column; justify-content:center; gap:9px; padding:16px; min-height:180px">
+            <label style="font-size:12.5px; font-weight:600; color:var(--ink2)">Rótulo da nova mesa</label>
+            <input value="{{ novaMesa }}" onChange="{{ onNovaMesa }}" placeholder="Mesa 9, Varanda 2…" style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px; width:100%; min-width:0" />
+            <button type="button" onClick="{{ addMesa }}" style="min-height:38px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); font:inherit; font-size:14px; font-weight:600; cursor:pointer">Cadastrar mesa</button>
+          </section>
+        </div>
+
+        <div style="border:1px solid var(--line); border-radius:var(--r); background:var(--surface2); padding:13px 15px; font-size:13.5px; color:var(--ink2); max-width:76ch">Para o adesivo impresso, use correção de erro média ou alta — o QR vai pegar gordura, risco e luz ruim no salão.</div>
+      </div>
+      </sc-if>
+
+      <!-- ============ USUÁRIOS ============ -->
+      <sc-if value="{{ isUsuarios }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:820px; display:flex; flex-direction:column; gap:14px">
+        <p style="margin:0; font-size:13.5px; color:var(--ink2); max-width:70ch">Dono e equipe operam o painel do mesmo jeito. A diferença é só esta tela e a remoção do restaurante.</p>
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); overflow:hidden">
+          <sc-for list="{{ usuarios }}" as="u" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:13px; padding:0 16px; min-height:58px; border-bottom:1px solid var(--line)">
+              <div style="width:32px; height:32px; flex:0 0 32px; border-radius:50%; background:var(--surface3); display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; color:var(--ink2)">{{ u.initials }}</div>
+              <div style="flex:1; min-width:0">
+                <div style="font-size:14.5px; font-weight:600">{{ u.name }}</div>
+                <div style="font-size:12.5px; color:var(--ink2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">{{ u.email }}</div>
+              </div>
+              <span style="border:1px solid {{ u.tagLine }}; background:{{ u.tagBg }}; color:{{ u.tagFg }}; border-radius:999px; padding:2px 10px; font-size:12.5px; font-weight:600">{{ u.role }}</span>
+              <div style="width:96px; text-align:right">
+                <sc-if value="{{ u.removable }}" hint-placeholder-val="{{ true }}">
+                  <button type="button" style="min-height:34px; border:1px solid var(--line); background:transparent; color:var(--danger); border-radius:var(--r); padding:0 12px; font:inherit; font-size:13px; font-weight:600; cursor:pointer">Remover</button>
+                </sc-if>
+                <sc-if value="{{ u.selfNote }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size:12.5px; color:var(--ink3)">{{ u.selfNote }}</span>
+                </sc-if>
+              </div>
+            </div>
+          </sc-for>
+          <div style="padding:13px 16px; background:var(--surface2); display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+            <input placeholder="Nome" style="height:36px; flex:1; min-width:120px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px" />
+            <input placeholder="e-mail" style="height:36px; flex:1.4; min-width:150px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px" />
+            <select style="height:36px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 10px; font:inherit; font-size:14px"><option>Equipe</option><option>Dono</option></select>
+            <button type="button" style="height:36px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">Convidar</button>
+          </div>
+        </section>
+        <div style="font-size:12.5px; color:var(--ink3)">Sem papel informado, o usuário nasce como equipe. Ninguém remove a própria conta.</div>
+      </div>
+      </sc-if>
+
+      <!-- ============ DADOS DA LOJA ============ -->
+      <sc-if value="{{ isLoja }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:1000px; display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:16px; align-items:start">
+
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:14px">
+          <div style="font-size:15px; font-weight:700">Identificação</div>
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Nome da loja
+            <input value="Trattoria Bella" style="height:38px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px,1fr)); gap:12px">
+            <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Tipo de cozinha
+              <select style="height:38px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 9px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0"><option>Italiana</option><option>Pizzaria</option><option>Brasileira</option></select>
+            </label>
+            <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Fuso horário
+              <select style="height:38px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 9px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0"><option>America/Sao_Paulo</option></select>
+            </label>
+          </div>
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">URL do logo
+            <input value="https://cdn.loja.com/logo-trattoria.png" style="height:38px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+            <span style="font-size:12px; font-weight:400; color:var(--ink2)">Cole o endereço de uma imagem já publicada — não há upload nesta versão.</span>
+          </label>
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Endereço
+            <input value="R. dos Pinheiros, 1204 — Pinheiros, São Paulo" style="height:38px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+        </section>
+
+        <div style="display:flex; flex-direction:column; gap:16px">
+          <sc-if value="{{ isOwner }}" hint-placeholder-val="{{ true }}">
+          <section style="border:1px solid var(--danger-line); border-radius:var(--r-lg); background:var(--surface); padding:18px">
+            <div style="font-size:15px; font-weight:700; color:var(--danger)">Remover o restaurante</div>
+            <div style="font-size:13.5px; color:var(--ink2); margin-top:5px; max-width:60ch">Apaga cardápio, mesas, usuários e o histórico de pedidos. Não há como desfazer, e o cardápio público sai do ar na hora.</div>
+            <button type="button" style="min-height:38px; margin-top:13px; border:1px solid var(--danger-line); background:var(--danger-soft); color:var(--danger); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:700; cursor:pointer">Remover restaurante</button>
+          </section>
+          </sc-if>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ ENTREGA ============ -->
+      <sc-if value="{{ isEntrega }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:1020px; display:flex; flex-direction:column; gap:16px">
+
+        <sc-if value="{{ entregaAlert }}" hint-placeholder-val="{{ true }}">
+          <div style="border:1px solid var(--warn-line); border-left:3px solid var(--warn-strong); background:var(--warn-soft); border-radius:var(--r); padding:13px 15px">
+            <div style="font-size:14px; font-weight:700; color:var(--warn)">{{ entregaAlert }}</div>
+            <div style="font-size:13.5px; color:var(--ink2); margin-top:4px; max-width:76ch">{{ entregaAlertBody }}</div>
+          </div>
+        </sc-if>
+
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:14px">
+          <div style="font-size:15px; font-weight:700">Como o frete é calculado</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); gap:10px">
+            <sc-for list="{{ freteModes }}" as="m" hint-placeholder-count="3">
+              <button type="button" onClick="{{ m.onSelect }}" style="text-align:left; border:1px solid {{ m.line }}; background:{{ m.bg }}; color:{{ m.fg }}; border-radius:var(--r); padding:13px 14px; font:inherit; cursor:{{ m.cursor }}; display:flex; flex-direction:column; gap:4px; min-height:78px">
+                <span style="display:flex; align-items:center; gap:8px; font-size:14.5px; font-weight:700">
+                  <span style="width:14px; height:14px; border-radius:50%; border:1px solid {{ m.radio }}; background:{{ m.radioFill }}; flex:0 0 14px"></span>{{ m.label }}
+                </span>
+                <span style="font-size:13px; color:var(--ink2); font-weight:400">{{ m.help }}</span>
+              </button>
+            </sc-for>
+          </div>
+        </section>
+
+        <sc-if value="{{ isBairro }}" hint-placeholder-val="{{ true }}">
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); overflow:hidden">
+          <div style="padding:14px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px">
+            <div style="font-size:15px; font-weight:700; flex:1">Bairros atendidos</div>
+            <div class="n" style="font-size:13px; color:var(--ink3)">{{ bairrosCount }}</div>
+          </div>
+          <sc-for list="{{ bairros }}" as="b" hint-placeholder-count="4">
+            <div style="display:grid; grid-template-columns:minmax(0,2fr) 130px 90px; gap:14px; align-items:center; padding:0 18px; min-height:var(--row); border-bottom:1px solid var(--line)">
+              <div style="font-size:14px; font-weight:500">{{ b.name }}</div>
+              <div class="n" style="font-size:14px; font-weight:600; text-align:right">{{ b.fee }}</div>
+              <button type="button" onClick="{{ b.onRemove }}" style="border:0; background:transparent; color:var(--ink2); font:inherit; font-size:13px; font-weight:500; cursor:pointer; text-align:right; padding:0">Remover</button>
+            </div>
+          </sc-for>
+          <sc-if value="{{ bairrosEmpty }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:26px 18px; text-align:center">
+              <div style="font-size:14.5px; font-weight:700; color:var(--warn)">Nenhum bairro cadastrado</div>
+              <div style="font-size:13.5px; color:var(--ink2); margin-top:5px; max-width:60ch; margin-left:auto; margin-right:auto">Neste estado a loja não consegue calcular frete nenhum e recusa os pedidos de entrega. Isto não é entrega grátis.</div>
+            </div>
+          </sc-if>
+          <div style="padding:12px 18px; background:var(--surface2); display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+            <input value="{{ novoBairro }}" onChange="{{ onNovoBairro }}" placeholder="Bairro" style="height:36px; flex:1; min-width:140px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px" />
+            <input value="{{ novoFrete }}" onChange="{{ onNovoFrete }}" placeholder="R$ 0,00" class="n" style="height:36px; width:110px; min-width:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px" />
+            <button type="button" onClick="{{ addBairro }}" style="height:36px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">Adicionar bairro</button>
+          </div>
+        </section>
+        </sc-if>
+
+        <sc-if value="{{ isFixa }}" hint-placeholder-val="{{ false }}">
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:6px; max-width:320px">
+          <label style="font-size:12.5px; font-weight:600; color:var(--ink2)">Taxa fixa para toda a área atendida</label>
+          <input value="R$ 9,00" class="n" style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 12px; font:inherit; font-size:16px; font-weight:600; width:100%; min-width:0" />
+        </section>
+        </sc-if>
+
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:18px; display:flex; flex-direction:column; gap:16px">
+          <div style="font-size:15px; font-weight:700">Regras de valor</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px,1fr)); gap:16px">
+            <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Entrega grátis acima de
+              <input value="R$ 120,00" class="n" style="height:38px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:600; width:100%; min-width:0" />
+              <span style="font-size:12.5px; font-weight:400; color:var(--ink2)">Compara com o valor dos itens, sem o frete. Uma sacola de R$ 115 + R$ 9 de frete não ganha a isenção.</span>
+            </label>
+            <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Pedido mínimo
+              <input value="R$ 35,00" class="n" style="height:38px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:600; width:100%; min-width:0" />
+              <span style="font-size:12.5px; font-weight:400; color:var(--ink2)">Vale só para entrega. Zero significa sem mínimo — retirada e salão nunca são afetados.</span>
+            </label>
+          </div>
+          <div style="border-top:1px solid var(--line); padding-top:14px; display:flex; align-items:flex-start; gap:13px">
+            <button type="button" onClick="{{ toggleCombinar }}" style="width:42px; height:24px; flex:0 0 42px; border-radius:999px; border:0; background:{{ combinarTrack }}; padding:3px; display:flex; justify-content:{{ combinarSide }}; cursor:pointer">
+              <span style="width:18px; height:18px; border-radius:50%; background:{{ combinarKnob }}; display:block"></span>
+            </button>
+            <div>
+              <div style="font-size:14.5px; font-weight:700">Aceitar pedido com frete a combinar</div>
+              <div style="font-size:13.5px; color:var(--ink2); margin-top:3px; max-width:72ch">{{ combinarHelp }}</div>
+            </div>
+          </div>
+        </section>
+      </div>
+      </sc-if>
+
+      <!-- ============ HORÁRIO ============ -->
+      <sc-if value="{{ isHorario }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:880px; display:flex; flex-direction:column; gap:14px">
+        <p style="margin:0; font-size:13.5px; color:var(--ink2); max-width:74ch">Um dia pode ter mais de uma faixa — é assim que se declara o fechamento entre o almoço e o jantar. Dia sem faixa nenhuma é dia fechado.</p>
+
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); overflow:hidden">
+          <sc-for list="{{ dias }}" as="d" hint-placeholder-count="7">
+            <div style="display:flex; align-items:flex-start; gap:16px; padding:13px 18px; border-bottom:1px solid var(--line)">
+              <div style="width:104px; flex:0 0 104px; padding-top:7px">
+                <div style="font-size:14.5px; font-weight:600">{{ d.name }}</div>
+                <div style="font-size:12.5px; color:{{ d.stateFg }}; font-weight:600">{{ d.stateLabel }}</div>
+              </div>
+              <div style="flex:1; display:flex; flex-direction:column; gap:8px">
+                <sc-for list="{{ d.faixas }}" as="f" hint-placeholder-count="1">
+                  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+                    <input value="{{ f.from }}" class="n" style="height:36px; width:82px; min-width:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 10px; font:inherit; font-size:14.5px; font-weight:600; text-align:center" />
+                    <span style="color:var(--ink3); font-size:13px">até</span>
+                    <input value="{{ f.to }}" class="n" style="height:36px; width:82px; min-width:0; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 10px; font:inherit; font-size:14.5px; font-weight:600; text-align:center" />
+                    <sc-if value="{{ f.note }}" hint-placeholder-val="{{ false }}">
+                      <span style="font-size:12.5px; color:var(--ink2); background:var(--surface3); border-radius:999px; padding:3px 10px; font-weight:600">{{ f.note }}</span>
+                    </sc-if>
+                    <button type="button" onClick="{{ f.onRemove }}" style="border:0; background:transparent; color:var(--ink2); font:inherit; font-size:13px; cursor:pointer; padding:0 4px">Remover faixa</button>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ d.closed }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size:13.5px; color:var(--ink3); padding:7px 0">Sem faixa cadastrada — a loja não abre neste dia.</div>
+                </sc-if>
+                <button type="button" onClick="{{ d.onAdd }}" style="align-self:flex-start; min-height:34px; border:1px dashed var(--line-hi); background:transparent; color:var(--ink2); border-radius:var(--r); padding:0 12px; font:inherit; font-size:13px; font-weight:600; cursor:pointer">+ Adicionar faixa</button>
+              </div>
+            </div>
+          </sc-for>
+        </section>
+
+        <div style="border:1px solid var(--line); border-radius:var(--r); background:var(--surface2); padding:13px 15px; font-size:13.5px; color:var(--ink2); max-width:74ch">Faixa que termina antes de começar é normal, não erro: <span class="n" style="color:var(--ink); font-weight:600">18:00 até 02:00</span> é a pizzaria que atende até as duas da manhã.</div>
+
+        <div style="border:1px solid var(--warn-line); border-radius:var(--r); background:var(--warn-soft); padding:14px 16px; display:flex; align-items:flex-start; gap:13px">
+          <div style="flex:1">
+            <div style="font-size:14.5px; font-weight:700; color:var(--warn)">Parar de aceitar pedidos agora</div>
+            <div style="font-size:13.5px; color:var(--ink2); margin-top:3px; max-width:70ch">É o botão de cozinha afogada, e não mexe no horário cadastrado. Ele está sempre na barra do topo — daqui é só o mesmo interruptor.</div>
+          </div>
+          <button type="button" onClick="{{ togglePause }}" style="min-height:40px; border:1px solid {{ pauseLine }}; background:{{ pauseBg }}; color:{{ pauseFg }}; border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap">{{ pauseLabel }}</button>
+        </div>
+      </div>
+      </sc-if>
+
+      <!-- ============ GRUPOS DE OPÇÕES ============ -->
+      <sc-if value="{{ isGrupos }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:1040px; display:flex; flex-direction:column; gap:14px">
+        <div style="display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap">
+          <p style="margin:0; font-size:13.5px; color:var(--ink2); max-width:66ch; flex:1">Um grupo pertence à loja, não ao produto: "Sabores" serve todas as pizzas. Quem escolhe quais grupos cada produto usa é a tela do produto.</p>
+          <button type="button" style="height:38px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">Novo grupo</button>
+        </div>
+
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface2); padding:16px 18px">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink3)">Regra de preço — a escolha que muda o valor final</div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:10px; margin-top:12px">
+            <sc-for list="{{ regras }}" as="r" hint-placeholder-count="3">
+              <div style="border:1px solid var(--line); border-radius:var(--r); background:var(--surface); padding:13px 14px">
+                <div style="font-size:14.5px; font-weight:700">{{ r.name }}</div>
+                <div style="font-size:13px; color:var(--ink2); margin-top:3px">{{ r.help }}</div>
+                <div class="n" style="font-size:13px; margin-top:9px; background:var(--surface2); border:1px solid var(--line); border-radius:4px; padding:7px 9px">{{ r.example }}</div>
+                <div style="font-size:12.5px; color:var(--ink3); margin-top:7px">{{ r.when }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <sc-for list="{{ gruposLoja }}" as="g" hint-placeholder-count="3">
+          <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); overflow:hidden">
+            <div style="padding:13px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+              <div style="font-size:15.5px; font-weight:700">{{ g.name }}</div>
+              <span style="border:1px solid var(--line); border-radius:999px; padding:2px 10px; font-size:12.5px; font-weight:600; color:var(--ink2)">{{ g.range }}</span>
+              <span style="border:1px solid var(--accent-line); background:var(--accent-soft); border-radius:999px; padding:2px 10px; font-size:12.5px; font-weight:700; color:var(--accent-hi)">{{ g.rule }}</span>
+              <div style="flex:1"></div>
+              <div style="font-size:12.5px; color:var(--ink3)">{{ g.usedBy }}</div>
+            </div>
+            <div style="display:grid; grid-template-columns:minmax(0,2fr) 120px 120px 90px; gap:14px; padding:8px 18px; background:var(--surface2); border-bottom:1px solid var(--line); font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--ink3)">
+              <div>Opção</div><div style="text-align:right">Preço</div><div style="text-align:right">Qtd. máx.</div><div></div>
+            </div>
+            <sc-for list="{{ g.opts }}" as="o" hint-placeholder-count="3">
+              <div style="display:grid; grid-template-columns:minmax(0,2fr) 120px 120px 90px; gap:14px; align-items:center; padding:0 18px; min-height:var(--row); border-bottom:1px solid var(--line)">
+                <div style="font-size:14px; font-weight:500">{{ o.name }}</div>
+                <div class="n" style="font-size:14px; font-weight:600; text-align:right; color:{{ o.priceFg }}">{{ o.price }}</div>
+                <div class="n" style="font-size:14px; text-align:right; color:var(--ink2)">{{ o.max }}</div>
+                <button type="button" style="border:0; background:transparent; color:var(--ink2); font:inherit; font-size:13px; cursor:pointer; text-align:right; padding:0">Editar</button>
+              </div>
+            </sc-for>
+            <div style="padding:11px 18px">
+              <button type="button" style="min-height:34px; border:1px dashed var(--line-hi); background:transparent; color:var(--ink2); border-radius:var(--r); padding:0 12px; font:inherit; font-size:13px; font-weight:600; cursor:pointer">+ Adicionar opção</button>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+      </sc-if>
+
+      <!-- ============ RESUMO DO DIA ============ -->
+      <sc-if value="{{ isResumo }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:1140px; display:flex; flex-direction:column; gap:18px">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+          <div style="display:flex; border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--surface)">
+            <sc-for list="{{ periods }}" as="p" hint-placeholder-count="4">
+              <button type="button" onClick="{{ p.onSelect }}" style="border:0; border-right:1px solid var(--line); padding:0 14px; height:36px; font:inherit; font-size:13.5px; font-weight:500; cursor:pointer; background:{{ p.bg }}; color:{{ p.fg }}">{{ p.label }}</button>
+            </sc-for>
+          </div>
+          <div style="font-size:13px; color:var(--ink3)">{{ resumoPeriodLabel }}</div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); gap:12px">
+          <sc-for list="{{ resumoBig }}" as="b" hint-placeholder-count="3">
+            <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:16px 18px">
+              <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink3)">{{ b.label }}</div>
+              <div class="n" style="font-size:32px; font-weight:700; letter-spacing:-0.03em; margin-top:6px">{{ b.value }}</div>
+              <div style="font-size:13px; color:var(--ink2); margin-top:4px">{{ b.sub }}</div>
+            </section>
+          </sc-for>
+        </div>
+
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); overflow:hidden">
+          <div style="padding:12px 18px; border-bottom:1px solid var(--line); font-size:14px; font-weight:700">Pedidos por status</div>
+          <sc-for list="{{ resumoStatus }}" as="r" hint-placeholder-count="6">
+            <div style="display:grid; grid-template-columns:minmax(0,1.1fr) 64px minmax(0,3fr) 130px; gap:14px; align-items:center; padding:0 18px; min-height:var(--row); border-bottom:1px solid var(--line)">
+              <div style="display:flex; align-items:center; gap:9px; font-size:14px; font-weight:500"><span style="width:8px; height:8px; border-radius:50%; background:{{ r.dot }}; flex:0 0 8px"></span>{{ r.label }}</div>
+              <div class="n" style="font-size:16px; font-weight:700; text-align:right">{{ r.count }}</div>
+              <div style="height:8px; border-radius:999px; background:var(--surface3); overflow:hidden"><div style="height:8px; width:{{ r.pct }}; background:{{ r.bar }}"></div></div>
+              <div class="n" style="font-size:14px; font-weight:600; text-align:right; color:{{ r.valueFg }}">{{ r.value }}</div>
+            </div>
+          </sc-for>
+        </section>
+
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface2); padding:16px 18px; display:flex; flex-direction:column; gap:10px">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink3)">Como ler estes números</div>
+          <sc-for list="{{ resumoNotes }}" as="n" hint-placeholder-count="3">
+            <div style="display:flex; gap:10px; font-size:13.5px; color:var(--ink2)">
+              <span style="color:var(--ink); font-weight:700; flex:0 0 auto">{{ n.head }}</span>
+              <span>{{ n.body }}</span>
+            </div>
+          </sc-for>
+        </section>
+      </div>
+      </sc-if>
+
+      <!-- ============ SEÇÕES ============ -->
+      <sc-if value="{{ isSecoes }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 20px 30px; max-width:760px; display:flex; flex-direction:column; gap:14px">
+        <p style="margin:0; font-size:13.5px; color:var(--ink2); max-width:70ch">A ordem é a ordem da refeição, não alfabética — e é exatamente o que o cliente vê no cardápio. Arraste com as setas.</p>
+
+        <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); overflow:hidden">
+          <sc-for list="{{ secoes }}" as="s" hint-placeholder-count="5">
+            <div style="display:flex; align-items:center; gap:12px; padding:9px 14px; border-bottom:1px solid var(--line); min-height:52px">
+              <div style="display:flex; flex-direction:column; gap:3px">
+                <button type="button" onClick="{{ s.onUp }}" style="width:26px; height:20px; border:1px solid var(--line); background:var(--surface2); color:var(--ink2); border-radius:4px; font:inherit; font-size:11px; cursor:pointer; line-height:1">↑</button>
+                <button type="button" onClick="{{ s.onDown }}" style="width:26px; height:20px; border:1px solid var(--line); background:var(--surface2); color:var(--ink2); border-radius:4px; font:inherit; font-size:11px; cursor:pointer; line-height:1">↓</button>
+              </div>
+              <div class="n" style="font-size:12.5px; font-weight:700; color:var(--ink3); width:20px">{{ s.pos }}</div>
+              <div style="flex:1; min-width:0">
+                <div style="font-size:15px; font-weight:600">{{ s.name }}</div>
+                <div style="font-size:12.5px; color:var(--ink2)">{{ s.count }}</div>
+              </div>
+              <button type="button" style="min-height:34px; border:1px solid var(--line); background:transparent; color:var(--ink2); border-radius:var(--r); padding:0 12px; font:inherit; font-size:13px; font-weight:500; cursor:pointer">Renomear</button>
+              <button type="button" onClick="{{ s.onRemove }}" style="min-height:34px; border:1px solid var(--line); background:transparent; color:var(--danger); border-radius:var(--r); padding:0 12px; font:inherit; font-size:13px; font-weight:600; cursor:pointer">Remover</button>
+            </div>
+          </sc-for>
+          <div style="padding:12px 14px; display:flex; gap:10px; align-items:center; background:var(--surface2)">
+            <input value="{{ newSection }}" onChange="{{ onNewSection }}" placeholder="Nome da nova seção" style="height:36px; flex:1; min-width:0; border:1px solid {{ secErrorLine }}; background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:14px" />
+            <button type="button" onClick="{{ addSection }}" style="height:36px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer">Adicionar</button>
+          </div>
+          <sc-if value="{{ secError }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:10px 14px; background:var(--danger-soft); border-top:1px solid var(--danger-line); color:var(--danger); font-size:13.5px; font-weight:600">{{ secError }}</div>
+          </sc-if>
+        </section>
+      </div>
+      </sc-if>
+
+    </main>
+
+    <!-- ===== DETALHE DO PEDIDO (painel) ===== -->
+    <sc-if value="{{ detail }}" hint-placeholder-val="{{ false }}">
+      <aside style="position:fixed; top:0; right:0; bottom:0; width:472px; max-width:92vw; background:var(--surface); border-left:1px solid var(--line); z-index:40; display:flex; flex-direction:column">
+        <div style="padding:16px 18px; border-bottom:1px solid var(--line); display:flex; align-items:flex-start; gap:12px">
+          <div style="flex:1; min-width:0">
+            <div style="display:flex; align-items:center; gap:9px">
+              <span class="n" style="font-size:13px; font-weight:700; color:var(--ink3)">{{ detail.code }}</span>
+              <span style="border:1px solid var(--line); border-radius:999px; padding:2px 9px; font-size:12px; font-weight:600; color:var(--ink2)">{{ detail.typeLabel }}</span>
+              <span class="n" style="font-size:12.5px; color:var(--ink3)">{{ detail.ago }}</span>
+            </div>
+            <div style="font-size:20px; font-weight:700; letter-spacing:-0.02em; margin-top:5px">{{ detail.name }}</div>
+            <div class="n" style="font-size:13.5px; color:var(--ink2)">{{ detail.phone }}</div>
+            <div style="font-size:13.5px; color:var(--ink2); margin-top:2px">{{ detail.where }}</div>
+          </div>
+          <button type="button" onClick="{{ closeDetail }}" style="width:34px; height:34px; border:1px solid var(--line); background:transparent; color:var(--ink2); border-radius:var(--r); font:inherit; font-size:15px; cursor:pointer; line-height:1">✕</button>
+        </div>
+
+        <div style="flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:14px">
+          <div style="display:flex; flex-direction:column; gap:12px">
+            <sc-for list="{{ detail.items }}" as="i" hint-placeholder-count="2">
+              <div style="display:flex; flex-direction:column; gap:4px; border-bottom:1px solid var(--line); padding-bottom:12px">
+                <div style="display:flex; align-items:baseline; gap:10px">
+                  <span class="n" style="font-size:15px; font-weight:700; color:var(--ink2); flex:0 0 32px">{{ i.qty }}</span>
+                  <span style="font-size:15px; font-weight:600; flex:1">{{ i.name }}</span>
+                  <span class="n" style="font-size:15px; font-weight:600">{{ i.price }}</span>
+                </div>
+                <sc-for list="{{ i.opts }}" as="o" hint-placeholder-count="2">
+                  <div style="display:flex; gap:10px; padding-left:42px">
+                    <span style="font-size:13px; color:var(--ink2); flex:1">{{ o.label }}</span>
+                    <span class="n" style="font-size:13px; color:var(--ink2)">{{ o.price }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:7px">
+            <div style="display:flex; justify-content:space-between; font-size:14px; color:var(--ink2)"><span>Itens</span><span class="n">{{ detail.subtotal }}</span></div>
+            <div style="display:flex; justify-content:space-between; font-size:14px; color:var(--ink2)"><span>{{ detail.feeLabel }}</span><span class="n">{{ detail.fee }}</span></div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline; border-top:1px solid var(--line-hi); padding-top:9px; margin-top:2px">
+              <span style="font-size:15px; font-weight:700">Total</span>
+              <span class="n" style="font-size:24px; font-weight:700; letter-spacing:-0.025em">{{ detail.total }}</span>
+            </div>
+            <div style="font-size:13.5px; color:var(--ink2)">{{ detail.payLine }}</div>
+          </div>
+
+          <div style="border:1px solid var(--line); border-radius:var(--r); background:var(--surface2); padding:12px">
+            <div style="font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:var(--ink3); margin-bottom:9px">Andamento</div>
+            <div style="display:flex; flex-direction:column; gap:7px">
+              <sc-for list="{{ detail.steps }}" as="s" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:9px">
+                  <span style="width:9px; height:9px; border-radius:50%; background:{{ s.dot }}; flex:0 0 9px"></span>
+                  <span style="font-size:13.5px; font-weight:{{ s.weight }}; color:{{ s.fg }}">{{ s.label }}</span>
+                  <span class="n" style="margin-left:auto; font-size:12.5px; color:var(--ink3)">{{ s.time }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--line); padding:14px 18px; display:flex; flex-direction:column; gap:9px">
+          <sc-if value="{{ detail.open }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; gap:10px">
+              <button type="button" onClick="{{ detail.onPrimary }}" style="flex:1; min-height:46px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); font:inherit; font-size:15.5px; font-weight:700; cursor:pointer">{{ detail.primaryLabel }}</button>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px">
+              <div style="font-size:12.5px; color:var(--ink3); flex:1">{{ detail.hint }}</div>
+              <button type="button" onClick="{{ detail.onCancel }}" style="min-height:36px; border:1px solid var(--line); background:transparent; color:var(--danger); border-radius:var(--r); padding:0 14px; font:inherit; font-size:13.5px; font-weight:600; cursor:pointer">{{ detail.cancelLabel }}</button>
+            </div>
+          </sc-if>
+          <sc-if value="{{ detail.closedNote }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:10px; min-height:46px; border:1px solid var(--line); background:var(--surface2); border-radius:var(--r); padding:0 14px; font-size:13.5px; color:var(--ink2)">{{ detail.closedNote }}</div>
+          </sc-if>
+        </div>
+      </aside>
+    </sc-if>
+
+    <!-- ===== CONFIRMAÇÃO ===== -->
+    <sc-if value="{{ confirm }}" hint-placeholder-val="{{ false }}">
+      <div style="position:fixed; inset:0; background:rgba(20,18,14,0.42); z-index:60; display:flex; align-items:center; justify-content:center; padding:24px">
+        <div style="width:460px; max-width:100%; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:22px">
+          <div style="font-size:18px; font-weight:700; letter-spacing:-0.015em">{{ confirm.title }}</div>
+          <div style="font-size:14px; color:var(--ink2); margin-top:8px">{{ confirm.body }}</div>
+          <sc-if value="{{ confirm.warn }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:12px; border:1px solid var(--warn-line); background:var(--warn-soft); color:var(--warn); border-radius:var(--r); padding:10px 12px; font-size:13.5px; font-weight:600">{{ confirm.warn }}</div>
+          </sc-if>
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px">
+            <button type="button" onClick="{{ closeConfirm }}" style="min-height:40px; border:1px solid var(--line); background:transparent; color:var(--ink2); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:500; cursor:pointer">Voltar</button>
+            <button type="button" onClick="{{ runConfirm }}" style="min-height:40px; border:1px solid {{ confirm.line }}; background:{{ confirm.bg }}; color:{{ confirm.fg }}; border-radius:var(--r); padding:0 18px; font:inherit; font-size:14px; font-weight:700; cursor:pointer">{{ confirm.cta }}</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+  </sc-if>
+
+  <!-- ============ CADASTRO ============ -->
+  <sc-if value="{{ isCadastro }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 24px">
+    <div style="width:620px; max-width:100%">
+      <div style="font-size:15px; font-weight:700; margin-bottom:22px">Painel da loja</div>
+      <h1 style="margin:0; font-size:27px; font-weight:700; letter-spacing:-0.025em">Criar a conta da loja</h1>
+      <p style="font-size:14.5px; color:var(--ink2); margin:8px 0 22px; max-width:62ch">O restaurante e o primeiro acesso são criados juntos. Quem criar a conta fica como dono.</p>
+      <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:16px">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink3)">O restaurante</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:13px">
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Nome da loja
+            <input placeholder="Trattoria Bella" style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Tipo de cozinha
+            <select style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 9px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0"><option>Escolha</option><option>Pizzaria</option><option>Italiana</option><option>Hamburgueria</option></select>
+          </label>
+        </div>
+        <div style="height:1px; background:var(--line)"></div>
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink3)">Seu acesso</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px,1fr)); gap:13px">
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Seu nome
+            <input placeholder="Cláudia Mendes" style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">E-mail
+            <input placeholder="gerencia@sualoja.com.br" style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+            <span style="font-size:12px; font-weight:400; color:var(--ink2)">É para cá que vai o link de confirmação, e não há como trocar depois pelo painel. Confira antes de criar.</span>
+          </label>
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Senha
+            <input type="password" placeholder="mínimo 8 caracteres" style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+        </div>
+        <button type="button" onClick="{{ goVerificar }}" style="min-height:46px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); font:inherit; font-size:15.5px; font-weight:700; cursor:pointer">Criar loja e continuar</button>
+      </section>
+      <div style="margin-top:14px; font-size:13.5px; color:var(--ink2)">Já tem conta? <button type="button" onClick="{{ goLogin }}" style="border:0; background:transparent; color:var(--accent); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; padding:0; text-decoration:underline">Entrar</button></div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ ESQUECI / NOVA SENHA ============ -->
+  <sc-if value="{{ isSenha }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 24px">
+    <div style="width:820px; max-width:100%; display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:16px; align-items:start">
+      <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:20px">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink3)">Etapa 1</div>
+        <h2 style="margin:8px 0 0; font-size:20px; font-weight:700; letter-spacing:-0.02em">Esqueci a senha</h2>
+        <p style="font-size:13.5px; color:var(--ink2); margin:7px 0 16px">Informe o e-mail da conta. A resposta é sempre a mesma, exista a conta ou não — é assim de propósito, para não revelar quem tem cadastro.</p>
+        <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">E-mail
+          <input placeholder="gerencia@sualoja.com.br" style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+        </label>
+        <button type="button" onClick="{{ sendReset }}" style="width:100%; min-height:44px; margin-top:14px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); font:inherit; font-size:15px; font-weight:700; cursor:pointer">Enviar link</button>
+        <sc-if value="{{ resetMsg }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:12px; border:1px solid var(--line); background:var(--surface2); border-radius:var(--r); padding:11px 13px; font-size:13.5px; color:var(--ink2)">{{ resetMsg }}</div>
+        </sc-if>
+        <div style="margin-top:14px; font-size:13px"><button type="button" onClick="{{ goLogin }}" style="border:0; background:transparent; color:var(--accent); font:inherit; font-size:13px; font-weight:600; cursor:pointer; padding:0; text-decoration:underline">Voltar para o login</button></div>
+      </section>
+
+      <section style="border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:20px">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink3)">Etapa 2 — pelo link do e-mail</div>
+        <h2 style="margin:8px 0 0; font-size:20px; font-weight:700; letter-spacing:-0.02em">Definir nova senha</h2>
+        <p style="font-size:13.5px; color:var(--ink2); margin:7px 0 16px">O link carrega o código de uso único. Abrindo daqui, a tela já sabe de quem é a conta.</p>
+        <div style="display:flex; flex-direction:column; gap:13px">
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Nova senha
+            <input type="password" placeholder="mínimo 8 caracteres" style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Repita a nova senha
+            <input type="password" style="height:40px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 11px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+        </div>
+        <button type="button" onClick="{{ goLogin }}" style="width:100%; min-height:44px; margin-top:14px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); font:inherit; font-size:15px; font-weight:700; cursor:pointer">Salvar e entrar</button>
+        <div style="margin-top:12px; border:1px solid var(--warn-line); background:var(--warn-soft); border-radius:var(--r); padding:11px 13px; font-size:13px; color:var(--warn); font-weight:600">Link expirado ou já usado: peça outro na etapa 1. Cada link vale uma vez.</div>
+      </section>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ CONFIRME SEU E-MAIL (bloqueio) ============ -->
+  <sc-if value="{{ isVerificar }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 24px">
+    <div style="width:560px; max-width:100%">
+      <div style="display:flex; align-items:center; gap:9px; margin-bottom:22px">
+        <span style="width:8px; height:8px; border-radius:50%; background:var(--warn-strong); flex:0 0 8px"></span>
+        <span style="font-size:11.5px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--warn)">Painel bloqueado</span>
+      </div>
+      <h1 style="margin:0; font-size:27px; font-weight:700; letter-spacing:-0.025em">Confirme o e-mail da loja</h1>
+      <p style="font-size:15px; color:var(--ink2); margin:10px 0 0; max-width:60ch">Enviamos um link de confirmação para o endereço abaixo. Até ele ser aberto, nenhuma tela do painel carrega — nem os pedidos.</p>
+
+      <div style="margin-top:20px; border:1px solid var(--line); border-radius:var(--r-lg); background:var(--surface); padding:16px 18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap">
+        <div style="flex:1; min-width:200px">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--ink3)">Endereço cadastrado</div>
+          <div style="font-size:16px; font-weight:600; margin-top:4px; word-break:break-all">gerencia@trattoriabella.com.br</div>
+        </div>
+        <button type="button" onClick="{{ resend }}" style="min-height:44px; border:1px solid {{ resendLine }}; background:{{ resendBg }}; color:{{ resendFg }}; border-radius:var(--r); padding:0 18px; font:inherit; font-size:14.5px; font-weight:600; cursor:pointer">{{ resendLabel }}</button>
+      </div>
+
+      <sc-if value="{{ resendMsg }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px; border:1px solid var(--warn-line); background:var(--warn-soft); color:var(--warn); border-radius:var(--r); padding:11px 14px; font-size:13.5px; font-weight:600">{{ resendMsg }}</div>
+      </sc-if>
+
+      <div style="margin-top:16px; border:1px solid var(--line); border-left:3px solid var(--line-hi); border-radius:var(--r); background:var(--surface2); padding:14px 16px">
+        <div style="font-size:14px; font-weight:700">O endereço está errado?</div>
+        <div style="font-size:13.5px; color:var(--ink2); margin-top:5px; max-width:64ch">Não é possível trocar o e-mail pelo painel. Duas saídas: falar com o suporte, ou aguardar 7 dias — nesse prazo o cadastro é liberado automaticamente e você entra sem confirmar.</div>
+        <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+          <a href="#suporte" style="min-height:38px; display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 15px; font-size:13.5px; font-weight:600; text-decoration:none">Falar com o suporte<span style="font-size:12px; color:var(--ink3)">↗</span></a>
+          <button type="button" onClick="{{ goLogin }}" style="min-height:38px; border:0; background:transparent; color:var(--ink2); font:inherit; font-size:13.5px; font-weight:500; cursor:pointer; padding:0 4px">Sair da conta</button>
+        </div>
+      </div>
+
+      <div style="margin-top:14px; font-size:12.5px; color:var(--ink3)">Já confirmou em outra aba? <button type="button" onClick="{{ doLogin }}" style="border:0; background:transparent; color:var(--accent); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; padding:0; text-decoration:underline">Verificar de novo</button></div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ LOGIN ============ -->
+  <sc-if value="{{ isLogin }}" hint-placeholder-val="{{ false }}">
+  <div style="min-height:100vh; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+    <div style="display:flex; align-items:center; justify-content:center; padding:40px">
+      <div style="width:352px; max-width:100%">
+        <div style="font-size:15px; font-weight:700; margin-bottom:28px">Painel da loja</div>
+        <div style="font-size:26px; font-weight:700; letter-spacing:-0.025em">Entrar</div>
+        <div style="font-size:14px; color:var(--ink2); margin-top:6px; margin-bottom:22px">Acesso do dono e da equipe do restaurante.</div>
+        <div style="display:flex; flex-direction:column; gap:14px">
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">E-mail
+            <input value="gerencia@trattoriabella.com.br" style="height:42px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 12px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+          <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; font-weight:600; color:var(--ink2)">Senha
+            <input type="password" value="senhasenha" style="height:42px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 12px; font:inherit; font-size:15px; font-weight:400; width:100%; min-width:0" />
+          </label>
+          <button type="button" onClick="{{ doLogin }}" style="min-height:46px; border:1px solid var(--accent); background:var(--accent); color:var(--on-accent); border-radius:var(--r); font:inherit; font-size:15.5px; font-weight:700; cursor:pointer; margin-top:4px">Entrar</button>
+          <div style="display:flex; justify-content:space-between; font-size:13.5px">
+            <button type="button" onClick="{{ goSenha }}" style="border:0; background:transparent; color:var(--accent); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; padding:0">Esqueci a senha</button>
+            <button type="button" onClick="{{ goCadastro }}" style="border:0; background:transparent; color:var(--accent); font:inherit; font-size:13.5px; font-weight:600; cursor:pointer; padding:0">Criar conta da loja</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="background:var(--surface2); border-left:1px solid var(--line); padding:40px; display:flex; align-items:center">
+      <div style="max-width:420px">
+        <div style="font-size:11px; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink3)">Antes de abrir</div>
+        <div style="font-size:19px; font-weight:600; letter-spacing:-0.015em; margin-top:10px">Se o e-mail da loja ainda não foi confirmado, o painel inteiro fica bloqueado.</div>
+        <div style="font-size:14px; color:var(--ink2); margin-top:10px">Depois de entrar, o app checa a verificação antes de tentar carregar pedidos — e leva direto para a tela de confirmação, sem erro genérico.</div>
+        <button type="button" onClick="{{ goEstados }}" style="min-height:38px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:var(--r); padding:0 16px; font:inherit; font-size:14px; font-weight:600; cursor:pointer; margin-top:18px">Ver estados de bloqueio</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;claro&quot;,&quot;escuro&quot;],&quot;default&quot;:&quot;claro&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aparência&quot;},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;confortável&quot;,&quot;compacta&quot;],&quot;default&quot;:&quot;confortável&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Aparência&quot;},&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;owner&quot;,&quot;staff&quot;],&quot;default&quot;:&quot;owner&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Contexto&quot;},&quot;paused&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Contexto&quot;},&quot;alertaEntrega&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Contexto&quot;},&quot;carregando&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Contexto&quot;}}">
+const money = (c) => 'R$ ' + (c / 100).toFixed(2).replace('.', ',');
+
+const TYPES = {
+  entrega: { label: 'Entrega', dot: 'var(--accent)' },
+  retirada: { label: 'Retirada', dot: '#6B7B8C' },
+  salao: { label: 'Salão', dot: 'var(--warn-strong)' }
+};
+
+const ORDERS = [
+  { id: 1042, st: 'novo', type: 'entrega', name: 'Marcela Andrade', phone: '(11) 98844-2011', where: 'R. Aurora, 142 — Vila Madalena', total: 10100, sub: 9200, fee: 900, pay: 'Pix · pago', ago: '2 min', mins: 2,
+    items: [ { qty: '2×', name: 'Pizza Grande', price: 'R$ 80,00', opts: [ { label: 'Sabores: Calabresa, Portuguesa', price: '' }, { label: 'Borda: Catupiry', price: '+R$ 8,00' } ] }, { qty: '1×', name: 'Coca 2L', price: 'R$ 12,00', opts: [] } ] },
+  { id: 1041, st: 'novo', type: 'retirada', name: 'Rodrigo Lima', phone: '(11) 97712-5540', where: 'Retirada no balcão', total: 4650, sub: 4650, fee: null, pay: 'Dinheiro · troco para R$ 50,00', ago: '5 min', mins: 5,
+    items: [ { qty: '1×', name: 'Hambúrguer da casa', price: 'R$ 34,50', opts: [ { label: 'Adicionais: Bacon, Ovo', price: '+R$ 9,00' } ] }, { qty: '1×', name: 'Suco de laranja', price: 'R$ 12,00', opts: [] } ] },
+  { id: 1039, st: 'preparo', type: 'salao', name: 'Mesa 7', phone: '—', where: 'Salão · Mesa 7', total: 12800, sub: 12800, fee: null, pay: 'Cartão no caixa', ago: '11 min', mins: 11,
+    items: [ { qty: '1×', name: 'Pizza Grande', price: 'R$ 72,00', opts: [ { label: 'Sabores: Margherita', price: '' } ] }, { qty: '2×', name: 'Chopp 500ml', price: 'R$ 28,00', opts: [] }, { qty: '1×', name: 'Tiramisù', price: 'R$ 28,00', opts: [] } ] },
+  { id: 1038, st: 'preparo', type: 'entrega', name: 'Caio Bastos', phone: '(11) 99120-7733', where: 'Al. Jaú, 88 — ap. 71', total: 6300, sub: 6300, fee: 0, pay: 'Cartão na entrega', ago: '16 min', mins: 16,
+    items: [ { qty: '1×', name: 'Lasanha bolonhesa', price: 'R$ 48,00', opts: [] }, { qty: '1×', name: 'Pão de alho', price: 'R$ 15,00', opts: [] } ] },
+  { id: 1036, st: 'pronto', type: 'retirada', name: 'Luana Prado', phone: '(11) 98410-2299', where: 'Retirada no balcão', total: 3800, sub: 3800, fee: null, pay: 'Pix · pago', ago: '23 min', mins: 23,
+    items: [ { qty: '1×', name: 'Focaccia', price: 'R$ 26,00', opts: [] }, { qty: '1×', name: 'Água com gás', price: 'R$ 12,00', opts: [] } ] },
+  { id: 1035, st: 'pronto', type: 'entrega', name: 'Fernanda Reis', phone: '(11) 97355-8120', where: 'R. Harmonia, 501 — fora da área de bairros', total: 8750, sub: 8750, fee: null, pay: 'Pix · pago', ago: '31 min', mins: 31,
+    items: [ { qty: '1×', name: 'Pizza Grande', price: 'R$ 72,00', opts: [ { label: 'Sabores: Quatro queijos, Pepperoni', price: '' } ] }, { qty: '1×', name: 'Petit gateau', price: 'R$ 15,50', opts: [] } ] },
+  { id: 1031, st: 'fim', type: 'entrega', name: 'Bruno Sato', phone: '(11) 96622-1180', where: 'R. Girassol, 23', total: 8400, sub: 7500, fee: 900, pay: 'Pix · pago', ago: '1 h', mins: 62, items: [ { qty: '1×', name: 'Pizza Grande', price: 'R$ 75,00', opts: [] } ] },
+  { id: 1030, st: 'fim', type: 'salao', name: 'Mesa 3', phone: '—', where: 'Salão · Mesa 3', total: 15600, sub: 15600, fee: null, pay: 'Cartão no caixa', ago: '1 h', mins: 70, items: [ { qty: '2×', name: 'Pizza Grande', price: 'R$ 144,00', opts: [] } ] },
+  { id: 1028, st: 'cancelado', type: 'retirada', name: 'Igor Menezes', phone: '(11) 95511-3001', where: 'Retirada no balcão', total: 4200, sub: 4200, fee: null, pay: 'Dinheiro', ago: '2 h', mins: 122, items: [ { qty: '1×', name: 'Calzone', price: 'R$ 42,00', opts: [] } ] }
+];
+
+const PRODUCTS = [
+  { name: 'Pizza Grande', desc: 'Massa fina, 8 fatias. Escolha até 2 sabores.', section: 'Pizzas', price: 7200, stock: 18 },
+  { name: 'Pizza Broto', desc: '4 fatias, um sabor', section: 'Pizzas', price: 3900, stock: 24 },
+  { name: 'Calzone', desc: 'Recheio à escolha, massa fechada', section: 'Pizzas', price: 4200, stock: 3 },
+  { name: 'Hambúrguer da casa', desc: '180 g, queijo, alface, tomate', section: 'Pratos', price: 3450, stock: 31 },
+  { name: 'Lasanha bolonhesa', desc: 'Porção individual', section: 'Pratos', price: 4800, stock: 0 },
+  { name: 'Focaccia', desc: 'Alecrim e azeite', section: 'Entradas', price: 2600, stock: 12 },
+  { name: 'Pão de alho', desc: '4 unidades', section: 'Entradas', price: 1500, stock: 40 },
+  { name: 'Tiramisù', desc: 'Receita da casa', section: 'Sobremesas', price: 2800, stock: 6 },
+  { name: 'Coca 2L', desc: 'Garrafa', section: 'Bebidas', price: 1200, stock: 48 },
+  { name: 'Chopp 500ml', desc: 'Pilsen', section: 'Bebidas', price: 1400, stock: 2 }
+];
+
+const STATES = [
+  { kind: 'Bloqueio', tone: 'warn', title: 'Confirme o e-mail da loja', body: 'Enviamos o link para gerencia@trattoriabella.com.br. Sem essa confirmação o painel não carrega nada — nem pedidos. Se o endereço estiver errado, não há como trocar pelo painel: fale com o suporte ou aguarde 7 dias, quando o cadastro é liberado.', cta: 'Reenviar link', cta2: 'Falar com o suporte' },
+  { kind: 'Limite', tone: 'warn', title: 'Aguarde um instante para reenviar', body: 'São no máximo 3 reenvios por minuto. O botão volta em 38 segundos — o link anterior continua valendo.', cta: 'Reenviar em 0:38' },
+  { kind: 'Vazio', tone: 'calm', title: 'Nenhum pedido ainda hoje', body: 'A tela se atualiza sozinha e avisa com som quando o primeiro chegar. Não é preciso recarregar.', cta: 'Ver cardápio público', cta2: 'Conferir horário' },
+  { kind: 'Vazio', tone: 'calm', title: 'Seu cardápio está vazio', body: 'Comece pelas seções — elas definem a ordem da refeição que o cliente vê. Depois cadastre os produtos dentro delas.', cta: 'Criar primeira seção' },
+  { kind: 'Sessão', tone: 'calm', title: 'Sua sessão expirou', body: 'Entre de novo para continuar. Nada do que estava na tela foi enviado; os pedidos seguem registrados no servidor.', cta: 'Entrar de novo' },
+  { kind: 'Conexão', tone: 'danger', title: 'Sem internet', body: 'A lista abaixo é de 40 segundos atrás e pode estar desatualizada. Aceitar e despachar ficam bloqueados até a conexão voltar — assim nada é aceito duas vezes.', cta: 'Tentar de novo', cta2: 'Ver a última lista' },
+  { kind: 'Erro de ação', tone: 'danger', title: 'Estoque acabou ao aceitar', body: 'Pizza Grande ficou sem unidades entre a chegada do pedido e o aceite. O pedido não foi aceito e o estoque não mudou. Reponha o estoque ou recuse explicando ao cliente.', cta: 'Repor estoque', cta2: 'Recusar pedido' },
+  { kind: 'Validação', tone: 'calm', title: 'Já existe uma seção com esse nome', body: '"Bebidas" já está cadastrada. O nome não diferencia maiúsculas: "bebidas" conta como repetido.', cta: 'Editar a seção existente' },
+  { kind: 'Permissão', tone: 'calm', title: 'Só o dono administra usuários', body: 'Seu acesso é de equipe. Todo o resto do painel — pedidos, cardápio, configuração — funciona igual.', cta: 'Voltar aos pedidos' }
+];
+
+class Component extends DCLogic {
+  state = { screen: 'pedidos', detailId: null, confirm: null, period: 'Hoje', rangeOn: false, query: '', section: 'Todas', paused: null, groups: ['sabores', 'borda', 'adicionais'] };
+
+  go = (screen) => () => this.setState({ screen, detailId: null });
+
+  advance(id) {
+    const o = ORDERS.find((x) => x.id === id);
+    if (!o) return;
+    if (o.st === 'novo') o.st = 'preparo';
+    else if (o.st === 'preparo') o.st = 'pronto';
+    else if (o.st === 'pronto') o.st = 'fim';
+    this.forceUpdate();
+  }
+
+  askAccept = (o) => (e) => {
+    e.stopPropagation();
+    this.setState({ confirm: { kind: 'accept', id: o.id, title: 'Aceitar o pedido ' + o.id + '?', body: o.name + ' · ' + money(o.total) + '. Aceitar manda o pedido para a cozinha e baixa o estoque dos itens.', warn: 'Não existe desconfirmar. Depois de aceito, só cabe cancelar.', cta: 'Aceitar pedido', bg: 'var(--accent)', line: 'var(--accent)', fg: 'var(--on-accent)' } });
+  };
+
+  askCancel = (o) => (e) => {
+    e.stopPropagation();
+    const late = o.st === 'pronto';
+    this.setState({ confirm: { kind: 'cancel', id: o.id, title: late ? 'Cancelar sem devolver o estoque?' : 'Cancelar o pedido ' + o.id + '?', body: late ? 'A comida do pedido ' + o.id + ' já ficou pronta. As unidades usadas não voltam para o estoque — só o pedido sai da lista.' : 'O pedido ' + o.id + ' sai da lista e as unidades voltam para o estoque.', warn: late ? 'O estoque NÃO será devolvido.' : '', cta: late ? 'Cancelar sem devolver' : 'Cancelar e devolver estoque', bg: 'var(--danger-soft)', line: 'var(--danger-line)', fg: 'var(--danger)' } });
+  };
+
+  runConfirm = () => {
+    const c = this.state.confirm;
+    if (!c) return;
+    if (c.kind === 'accept') this.advance(c.id);
+    if (c.kind === 'cancel') { const o = ORDERS.find((x) => x.id === c.id); if (o) o.st = 'cancelado'; }
+    if (c.kind === 'secao') { const secs = (this.state.secs || ['Entradas', 'Pratos', 'Pizzas', 'Sobremesas', 'Bebidas']).filter((x) => x !== c.name); this.setState({ secs }); }
+    if (c.kind === 'qr') this.setState({ qrDone: c.name });
+    this.setState({ confirm: null, detailId: null });
+  };
+
+  step(o, key) {
+    const order = ['novo', 'preparo', 'pronto', 'fim'];
+    const st = o.st === 'cancelado' ? 'novo' : o.st;
+    const done = order.indexOf(st) > order.indexOf(key);
+    const now = st === key;
+    return { dot: done ? 'var(--accent)' : now ? 'var(--warn-strong)' : 'var(--line-hi)', fg: now ? 'var(--ink)' : done ? 'var(--ink2)' : 'var(--ink3)', weight: now ? 700 : 500 };
+  }
+
+  detailFor(o) {
+    const nextByType = { entrega: { preparo: 'Saiu para entrega', pronto: 'Concluir pedido' }, retirada: { preparo: 'Pronto para retirada', pronto: 'Concluir pedido' }, salao: { preparo: 'Concluir pedido', pronto: 'Concluir pedido' } };
+    const primaryLabel = o.st === 'novo' ? 'Aceitar pedido' : o.st === 'preparo' ? nextByType[o.type].preparo : o.st === 'pronto' ? nextByType[o.type].pronto : 'Pedido encerrado';
+    const feeLabel = o.type !== 'entrega' ? 'Frete' : o.fee === 0 ? 'Entrega grátis' : o.fee === null ? 'Frete a combinar' : 'Frete';
+    const fee = o.type !== 'entrega' ? '—' : o.fee === 0 ? 'R$ 0,00' : o.fee === null ? 'a combinar' : money(o.fee);
+    const labels = { entrega: ['Novo', 'Em preparo', 'Saiu para entrega', 'Concluído'], retirada: ['Novo', 'Em preparo', 'Pronto para retirada', 'Concluído'], salao: ['Novo', 'Em preparo', 'Concluído'] };
+    const keys = o.type === 'salao' ? ['novo', 'preparo', 'fim'] : ['novo', 'preparo', 'pronto', 'fim'];
+    const NOW = 20 * 60 + 10;
+    const clock = (min) => { const m = ((min % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+    const arrival = NOW - o.mins;
+    const offsets = { novo: 0, preparo: Math.min(3, o.mins), pronto: Math.min(18, o.mins), fim: o.mins };
+    const order = ['novo', 'preparo', 'pronto', 'fim'];
+    const st = o.st === 'cancelado' ? 'novo' : o.st;
+    const times = keys.map((k) => (order.indexOf(st) >= order.indexOf(k) ? clock(arrival + offsets[k]) : '—'));
+    return {
+      code: '#' + o.id, name: o.name, phone: o.phone, where: o.where, ago: 'há ' + o.ago,
+      typeLabel: TYPES[o.type].label + (o.type === 'salao' ? ' · ' + o.where.split('· ')[1] : ''),
+      items: o.items, subtotal: money(o.sub), feeLabel, fee, total: money(o.total), payLine: o.pay,
+      steps: labels[o.type].map((label, i) => Object.assign({ label, time: times[i] || '—' }, this.step(o, keys[i]))),
+      primaryLabel, onPrimary: o.st === 'novo' ? this.askAccept(o) : (e) => { e.stopPropagation(); this.advance(o.id); },
+      cancelLabel: o.st === 'pronto' ? 'Cancelar (sem devolver estoque)' : 'Cancelar pedido',
+      hint: o.st === 'novo' ? 'Aceitar baixa o estoque e não pode ser desfeito.' : o.st === 'pronto' ? 'A partir daqui o cancelamento não devolve estoque.' : 'O cancelamento ainda devolve o estoque.',
+      onCancel: this.askCancel(o),
+      open: o.st !== 'fim' && o.st !== 'cancelado',
+      closedNote: o.st === 'fim' ? 'Pedido concluído às ' + times[times.length - 1] + '. Não há mais ação possível.' : o.st === 'cancelado' ? 'Pedido cancelado. Não há mais ação possível.' : ''
+    };
+  }
+
+  card(o) {
+    const t = TYPES[o.type];
+    const isNew = o.st === 'novo';
+    const stageByType = { entrega: 'Saiu para entrega', retirada: 'Pronto para retirada', salao: '' };
+    const nextLabel = o.st === 'novo' ? 'Aceitar' : o.st === 'preparo' ? (o.type === 'entrega' ? 'Despachar' : o.type === 'retirada' ? 'Pronto' : 'Concluir') : 'Concluir';
+    return {
+      code: '#' + o.id, name: o.name, typeLabel: t.label + (o.type === 'salao' ? ' · ' + o.where.split('· ')[1] : ''), dot: t.dot,
+      total: money(o.total), pay: o.pay, ago: o.ago,
+      agoFg: isNew ? 'var(--warn)' : o.mins > 25 && o.st !== 'fim' && o.st !== 'cancelado' ? 'var(--warn)' : 'var(--ink3)',
+      edge: isNew ? 'var(--warn-strong)' : o.st === 'preparo' ? 'var(--line-hi)' : o.st === 'pronto' ? 'var(--accent)' : o.st === 'cancelado' ? 'var(--danger-line)' : 'var(--line)',
+      cardLine: isNew ? 'var(--warn-line)' : 'var(--line)',
+      stageLabel: o.st === 'pronto' ? stageByType[o.type] : o.st === 'cancelado' ? 'Cancelado' : '',
+      showActions: o.st !== 'fim' && o.st !== 'cancelado',
+      primaryLabel: nextLabel,
+      primaryBg: isNew ? 'var(--accent)' : 'transparent', primaryFg: isNew ? 'var(--on-accent)' : 'var(--ink)', primaryLine: isNew ? 'var(--accent)' : 'var(--line-hi)',
+      secondaryLabel: isNew ? 'Recusar' : '',
+      onPrimary: o.st === 'novo' ? this.askAccept(o) : (e) => { e.stopPropagation(); this.advance(o.id); },
+      onSecondary: this.askCancel(o),
+      onOpen: () => this.setState({ detailId: o.id })
+    };
+  }
+
+  syncTheme() {
+    const dark = this.props.theme === 'escuro';
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-density', this.props.density || 'confortável');
+  }
+
+  componentDidMount() { this.syncTheme(); }
+  componentDidUpdate() { this.syncTheme(); }
+
+  stats() {
+    const g = (st) => ORDERS.filter((o) => o.st === st);
+    const sum = (a) => a.reduce((t, o) => t + o.total, 0);
+    const novos = g('novo'), prep = g('preparo'), pron = g('pronto'), fim = g('fim'), canc = g('cancelado');
+    const aceitos = prep.concat(pron, fim);
+    const fat = sum(aceitos);
+    const total = ORDERS.length;
+    const pct = (n) => Math.round((n / total) * 100) + '%';
+    return {
+      chegaram: total, aceitosN: aceitos.length, fat, ticket: aceitos.length ? Math.round(fat / aceitos.length) : 0,
+      linhas: [
+        { label: 'Novos', count: novos.length, value: '—', dot: 'var(--warn-strong)', bar: 'var(--warn-strong)', pct: pct(novos.length), valueFg: 'var(--ink3)' },
+        { label: 'Em preparo', count: prep.length, value: money(sum(prep)), dot: 'var(--ink3)', bar: 'var(--ink3)', pct: pct(prep.length), valueFg: 'var(--ink)' },
+        { label: 'Prontos / em rota', count: pron.length, value: money(sum(pron)), dot: 'var(--accent)', bar: 'var(--accent)', pct: pct(pron.length), valueFg: 'var(--ink)' },
+        { label: 'Concluídos', count: fim.length, value: money(sum(fim)), dot: 'var(--accent)', bar: 'var(--accent)', pct: pct(fim.length), valueFg: 'var(--ink)' },
+        { label: 'Cancelados', count: canc.length, value: '— ' + money(sum(canc)), dot: 'var(--danger)', bar: 'var(--danger)', pct: pct(canc.length), valueFg: 'var(--danger)' }
+      ]
+    };
+  }
+
+  clean(o) {
+    const out = {};
+    Object.keys(o).forEach((k) => { if (o[k] !== undefined) out[k] = o[k]; });
+    return out;
+  }
+
+  b1(s) {
+    const screen = s.screen;
+    const secs = s.secs || ['Entradas', 'Pratos', 'Pizzas', 'Sobremesas', 'Bebidas'];
+    const counts = { Entradas: '2 produtos', Pratos: '2 produtos', Pizzas: '3 produtos', Sobremesas: '1 produto', Bebidas: '2 produtos' };
+    const moveSec = (i, d) => () => {
+      const a = secs.slice(); const j = i + d;
+      if (j < 0 || j >= a.length) return;
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+      this.setState({ secs: a });
+    };
+    const st = this.stats();
+    return {
+      isApp: screen !== 'login' && screen !== 'verificar',
+      isVerificar: screen === 'verificar',
+      isResumo: screen === 'resumo',
+      isSecoes: screen === 'secoes',
+      screenTitle: { pedidos: 'Pedidos', produtos: 'Produtos', produto: 'Editar produto', estados: 'Estados', sistema: 'Direção visual', resumo: 'Resumo do dia', secoes: 'Seções do cardápio' }[screen] || 'Painel da loja',
+      resumoPeriodLabel: 'Fechamento parcial · atualizado há 6 s',
+      resumoBig: [
+        { label: 'Faturamento', value: money(st.fat), sub: 'de ' + st.aceitosN + ' pedidos aceitos — inclui o frete cobrado' },
+        { label: 'Pedidos aceitos', value: String(st.aceitosN), sub: st.chegaram + ' chegaram no período' },
+        { label: 'Ticket médio', value: money(st.ticket), sub: 'faturamento ÷ pedidos aceitos' }
+      ],
+      resumoStatus: st.linhas,
+      resumoNotes: [
+        { head: 'Faturamento conta de aceito em diante.', body: 'Pedido novo ainda não é venda e cancelado deixou de ser. São as vendas do período, não tudo que chegou.' },
+        { head: 'O frete entra no faturamento.', body: 'R$ 30 de comida + R$ 15 de entrega aparecem como R$ 45. Está certo para faturamento bruto.' },
+        { head: 'O ticket médio mistura comida e frete.', body: 'Por isso ele não serve para decidir preço de cardápio — para isso, olhe o preço dos produtos.' }
+      ],
+      secoes: secs.map((name, i) => ({ name, pos: String(i + 1), count: counts[name] || 'sem produtos', onUp: moveSec(i, -1), onDown: moveSec(i, 1), onRemove: () => this.setState({ confirm: { kind: 'secao', name, title: 'Remover a seção "' + name + '"?', body: 'Os produtos dela não são apagados: passam para um grupo "Sem categoria" no fim do cardápio, e continuam à venda.', warn: '', cta: 'Remover seção', bg: 'var(--danger-soft)', line: 'var(--danger-line)', fg: 'var(--danger)' } }) })),
+      newSection: s.newSection || '',
+      onNewSection: (e) => this.setState({ newSection: e.target.value, secError: '' }),
+      secError: s.secError || '',
+      secErrorLine: s.secError ? 'var(--danger-line)' : 'var(--line)',
+      addSection: () => {
+        const v = (s.newSection || '').trim();
+        if (!v) return;
+        if (secs.some((x) => x.toLowerCase() === v.toLowerCase())) { this.setState({ secError: 'Já existe uma seção "' + secs.find((x) => x.toLowerCase() === v.toLowerCase()) + '". O nome não diferencia maiúsculas.' }); return; }
+        this.setState({ secs: secs.concat([v]), newSection: '', secError: '' });
+      },
+      resendLabel: s.resendLeft ? 'Reenviar em 0:' + String(s.resendLeft).padStart(2, '0') : 'Não recebi, reenviar',
+      resendBg: s.resendLeft ? 'var(--surface2)' : 'var(--accent)',
+      resendFg: s.resendLeft ? 'var(--ink3)' : 'var(--on-accent)',
+      resendLine: s.resendLeft ? 'var(--line)' : 'var(--accent)',
+      resendMsg: s.resendMsg || '',
+      resend: () => {
+        if (s.resendLeft) return;
+        const n = (s.resends || 0) + 1;
+        if (n > 3) { this.setState({ resendLeft: 38, resendMsg: 'Aguarde um instante: são no máximo 3 reenvios por minuto. O último link continua valendo.' }); return; }
+        this.setState({ resends: n, resendMsg: 'Link reenviado. Confira também a caixa de spam.' });
+      },
+      goLogin: () => this.setState({ screen: 'login' })
+    };
+  }
+
+  b2(s) {
+    const screen = s.screen;
+    const mode = s.freteMode || 'bairro';
+    const bairros = s.bairros === undefined ? [ { name: 'Vila Madalena', fee: 'R$ 9,00' }, { name: 'Pinheiros', fee: 'R$ 9,00' }, { name: 'Perdizes', fee: 'R$ 13,00' }, { name: 'Sumaré', fee: 'R$ 13,00' } ] : s.bairros;
+    const combinar = s.combinar === undefined ? true : s.combinar;
+    const vazio = mode === 'bairro' && bairros.length === 0;
+    const mk = (key, label, help, disabled) => ({
+      label, help, onSelect: disabled ? () => {} : () => this.setState({ freteMode: key }),
+      bg: mode === key ? 'var(--accent-soft)' : 'var(--surface)',
+      line: mode === key ? 'var(--accent-line)' : 'var(--line)',
+      fg: disabled ? 'var(--ink3)' : 'var(--ink)',
+      radio: mode === key ? 'var(--accent)' : 'var(--line-hi)',
+      radioFill: mode === key ? 'var(--accent)' : 'transparent',
+      cursor: disabled ? 'not-allowed' : 'pointer'
+    });
+    const dias = s.dias || [
+      { name: 'Segunda', faixas: [] },
+      { name: 'Terça', faixas: [['18:00', '23:30']] },
+      { name: 'Quarta', faixas: [['18:00', '23:30']] },
+      { name: 'Quinta', faixas: [['11:30', '15:00'], ['18:00', '23:30']] },
+      { name: 'Sexta', faixas: [['11:30', '15:00'], ['18:00', '02:00']] },
+      { name: 'Sábado', faixas: [['11:30', '02:00']] },
+      { name: 'Domingo', faixas: [['11:30', '22:00']] }
+    ];
+    const setDias = (d) => this.setState({ dias: d });
+    const crosses = (f, t) => Number(t.split(':')[0]) < Number(f.split(':')[0]);
+    return {
+      isEntrega: screen === 'entrega', isHorario: screen === 'horario', isGrupos: screen === 'grupos',
+      screenTitle: { entrega: 'Entrega', horario: 'Horário de funcionamento', grupos: 'Grupos de opções' }[screen] || undefined,
+      freteModes: [
+        mk('bairro', 'Por bairro', 'Uma lista de bairros, cada um com o seu preço'),
+        mk('fixa', 'Taxa fixa', 'Um valor só para toda a área atendida'),
+        Object.assign(mk('distancia', 'Por distância', 'Ainda não disponível nesta versão', true), { bg: 'var(--surface2)', line: 'var(--line)' })
+      ],
+      isBairro: mode === 'bairro', isFixa: mode === 'fixa',
+      bairros: bairros.map((b, i) => ({ name: b.name, fee: b.fee, onRemove: () => this.setState({ bairros: bairros.filter((_, j) => j !== i) }) })),
+      bairrosEmpty: bairros.length === 0,
+      bairrosCount: bairros.length + (bairros.length === 1 ? ' bairro' : ' bairros'),
+      novoBairro: s.novoBairro || '', onNovoBairro: (e) => this.setState({ novoBairro: e.target.value }),
+      novoFrete: s.novoFrete || '', onNovoFrete: (e) => this.setState({ novoFrete: e.target.value }),
+      addBairro: () => {
+        const n = (s.novoBairro || '').trim();
+        if (!n) return;
+        this.setState({ bairros: bairros.concat([{ name: n, fee: (s.novoFrete || 'a combinar').trim() }]), novoBairro: '', novoFrete: '' });
+      },
+      entregaAlert: vazio ? 'Modo por bairro sem nenhum bairro cadastrado' : (combinar ? '' : ''),
+      entregaAlertBody: vazio ? 'A loja não consegue calcular o frete e vai recusar todo pedido de entrega — ou aceitar com frete a combinar, se a chave abaixo estiver ligada. Não configurar não é frete grátis.' : '',
+      combinar, toggleCombinar: () => this.setState({ combinar: !combinar }),
+      combinarTrack: combinar ? 'var(--accent)' : 'var(--line-hi)',
+      combinarKnob: combinar ? 'var(--on-accent)' : 'var(--surface)',
+      combinarSide: combinar ? 'flex-end' : 'flex-start',
+      combinarHelp: combinar ? 'Quando o frete não pode ser calculado, o pedido entra com "frete a combinar" e o valor é acertado por telefone. O total do pedido chega sem o frete.' : 'Quando o frete não pode ser calculado, o pedido de entrega é recusado na hora. Nenhum pedido entra com valor em aberto.',
+      dias: dias.map((d, di) => ({
+        name: d.name, closed: d.faixas.length === 0,
+        stateLabel: d.faixas.length === 0 ? 'Fechado' : d.faixas.length > 1 ? d.faixas.length + ' faixas' : 'Aberto',
+        stateFg: d.faixas.length === 0 ? 'var(--ink3)' : 'var(--accent-hi)',
+        faixas: d.faixas.map((f, fi) => ({
+          from: f[0], to: f[1], note: crosses(f[0], f[1]) ? 'vira a madrugada' : '',
+          onRemove: () => { const c = dias.map((x) => ({ name: x.name, faixas: x.faixas.slice() })); c[di].faixas.splice(fi, 1); setDias(c); }
+        })),
+        onAdd: () => { const c = dias.map((x) => ({ name: x.name, faixas: x.faixas.slice() })); c[di].faixas.push(['18:00', '23:30']); setDias(c); }
+      })),
+      regras: [
+        { name: 'Somar', help: 'Soma o preço de tudo que foi escolhido.', example: 'Bacon R$ 6,00 + Ovo R$ 3,00 = R$ 9,00', when: 'Adicionais, borda, bebida extra' },
+        { name: 'Mais caro', help: 'Cobra só a opção mais cara entre as escolhidas.', example: 'Margherita R$ 62 + Calabresa R$ 72 = R$ 72,00', when: 'Pizza meio a meio pelo sabor mais caro' },
+        { name: 'Média', help: 'Cobra a média das opções escolhidas.', example: 'Margherita R$ 62 + Calabresa R$ 72 = R$ 67,00', when: 'A outra convenção de meio a meio' }
+      ],
+      gruposLoja: [
+        { name: 'Sabores', range: 'escolhe 1 a 2', rule: 'Mais caro', usedBy: 'usado em 3 produtos', opts: [
+          { name: 'Margherita', price: 'R$ 62,00', max: '1', priceFg: 'var(--ink)' },
+          { name: 'Calabresa', price: 'R$ 72,00', max: '1', priceFg: 'var(--ink)' },
+          { name: 'Portuguesa', price: 'R$ 74,00', max: '1', priceFg: 'var(--ink)' },
+          { name: 'Quatro queijos', price: 'R$ 78,00', max: '1', priceFg: 'var(--ink)' }
+        ] },
+        { name: 'Borda', range: 'escolhe 0 a 1', rule: 'Somar', usedBy: 'usado em 2 produtos', opts: [
+          { name: 'Catupiry', price: '+R$ 8,00', max: '1', priceFg: 'var(--ink)' },
+          { name: 'Cheddar', price: '+R$ 8,00', max: '1', priceFg: 'var(--ink)' },
+          { name: 'Sem borda', price: 'R$ 0,00', max: '1', priceFg: 'var(--ink3)' }
+        ] },
+        { name: 'Adicionais', range: 'escolhe 0 a 5', rule: 'Somar', usedBy: 'usado em 4 produtos', opts: [
+          { name: 'Bacon', price: '+R$ 6,00', max: '2', priceFg: 'var(--ink)' },
+          { name: 'Ovo', price: '+R$ 3,00', max: '2', priceFg: 'var(--ink)' },
+          { name: 'Cebola caramelizada', price: '+R$ 4,00', max: '1', priceFg: 'var(--ink)' }
+        ] }
+      ]
+    };
+  }
+
+  b3(s) {
+    const screen = s.screen;
+    const role = this.props.role || 'owner';
+    const mesas = s.mesas || ['Mesa 1', 'Mesa 2', 'Mesa 3', 'Mesa 7', 'Varanda 1', 'Varanda 2'];
+    const sel = s.mesaSel || [];
+    const cells = (seed) => {
+      const out = [];
+      let x = seed * 9301 + 49297;
+      for (let i = 0; i < 49; i++) {
+        x = (x * 9301 + 49297) % 233280;
+        const corner = (i % 7 < 2 && i < 16) || (i % 7 > 4 && i < 16) || (i % 7 < 2 && i > 32);
+        out.push({ on: corner ? 'var(--ink)' : (x / 233280 > 0.52 ? 'var(--ink)' : 'transparent') });
+      }
+      return out;
+    };
+    const toggles = s.toggles || { entrega: true, retirada: true, salao: true, pix: true, cartao: true, dinheiro: false };
+    const tg = (key, label, help) => ({
+      label, help, onToggle: () => this.setState({ toggles: Object.assign({}, toggles, { [key]: !toggles[key] }) }),
+      track: toggles[key] ? 'var(--accent)' : 'var(--line-hi)',
+      knob: toggles[key] ? 'var(--on-accent)' : 'var(--surface)',
+      side: toggles[key] ? 'flex-end' : 'flex-start'
+    });
+    return {
+      isMesas: screen === 'mesas', isUsuarios: screen === 'usuarios', isLoja: screen === 'loja',
+      isModalidades: screen === 'modalidades', isOwner: role === 'owner',
+      screenTitle: { mesas: 'Mesas e QR code', usuarios: 'Usuários', loja: 'Dados da loja', modalidades: 'Modalidades e pagamento' }[screen] || undefined,
+      mesas: mesas.map((label, i) => ({
+        label, url: 'loja.com/t/' + (1000 + i * 37),
+        cells: cells(i + 3),
+        onToggle: () => this.setState({ mesaSel: sel.includes(label) ? sel.filter((x) => x !== label) : sel.concat([label]) }),
+        check: sel.includes(label) ? '✓' : '',
+        boxBg: sel.includes(label) ? 'var(--accent)' : 'transparent',
+        boxLine: sel.includes(label) ? 'var(--accent)' : 'var(--line-hi)',
+        line: sel.includes(label) ? 'var(--accent-line)' : 'var(--line)',
+        onRegen: () => this.setState({ confirm: { kind: 'qr', name: label, title: 'Gerar um código novo para ' + label + '?', body: 'O adesivo que está na mesa para de funcionar imediatamente. Quem apontar a câmera para o QR antigo não abre o cardápio.', warn: 'Só faça isso se você vai reimprimir e trocar o adesivo agora.', cta: 'Gerar e invalidar o atual', bg: 'var(--danger-soft)', line: 'var(--danger-line)', fg: 'var(--danger)' } })
+      })),
+      mesasSelLabel: sel.length === mesas.length ? 'Limpar seleção' : 'Selecionar todas',
+      toggleAllMesas: () => this.setState({ mesaSel: sel.length === mesas.length ? [] : mesas.slice() }),
+      printLabel: sel.length ? 'Imprimir ' + sel.length + (sel.length === 1 ? ' adesivo' : ' adesivos') : 'Selecione para imprimir',
+      printBg: sel.length ? 'var(--accent)' : 'var(--surface2)',
+      printFg: sel.length ? 'var(--on-accent)' : 'var(--ink3)',
+      novaMesa: s.novaMesa || '', onNovaMesa: (e) => this.setState({ novaMesa: e.target.value }),
+      addMesa: () => { const v = (s.novaMesa || '').trim(); if (!v) return; this.setState({ mesas: mesas.concat([v]), novaMesa: '' }); },
+      usuarios: [
+        { name: 'Cláudia Mendes', email: 'gerencia@trattoriabella.com.br', role: 'Dono', initials: 'CM', removable: role === 'owner' ? false : false, selfNote: 'você' },
+        { name: 'André Lopes', email: 'andre@trattoriabella.com.br', role: 'Equipe', initials: 'AL', removable: true, selfNote: '' },
+        { name: 'Bianca Ferraz', email: 'bianca@trattoriabella.com.br', role: 'Equipe', initials: 'BF', removable: true, selfNote: '' }
+      ].map((u) => Object.assign(u, {
+        tagBg: u.role === 'Dono' ? 'var(--accent-soft)' : 'transparent',
+        tagLine: u.role === 'Dono' ? 'var(--accent-line)' : 'var(--line)',
+        tagFg: u.role === 'Dono' ? 'var(--accent-hi)' : 'var(--ink2)'
+      })),
+      toggles: [
+        tg('entrega', 'Entrega', 'Frete e área atendida ficam na tela de Entrega'),
+        tg('retirada', 'Retirada no balcão', 'O cliente busca no endereço da loja'),
+        tg('salao', 'Salão', 'Pedido pela mesa, com QR code'),
+        tg('pix', 'Pix', 'Pago antes da confirmação'),
+        tg('cartao', 'Cartão', 'Na entrega ou no caixa'),
+        tg('dinheiro', 'Dinheiro', 'Habilita o campo de troco no pedido')
+      ]
+    };
+  }
+
+  b4(s) {
+    const screen = s.screen;
+    const kcard = (o) => {
+      const c = this.card(o);
+      return Object.assign({}, c, {
+        lines: o.items.map((i) => ({ qty: i.qty, name: i.name, opts: i.opts })),
+        primaryLabel: o.st === 'preparo' ? (o.type === 'entrega' ? 'Pronto — despachar' : o.type === 'retirada' ? 'Pronto para retirada' : 'Pronto — servir') : 'Aceitar e começar'
+      });
+    };
+    const novos = ORDERS.filter((o) => o.st === 'novo').map(kcard);
+    const preparo = ORDERS.filter((o) => o.st === 'preparo').map(kcard);
+    return {
+      isApp: screen !== 'login' && screen !== 'verificar' && screen !== 'cadastro' && screen !== 'senha',
+      isCozinha: screen === 'cozinha', isCadastro: screen === 'cadastro', isSenha: screen === 'senha',
+      screenTitle: { cozinha: 'Modo cozinha' }[screen] || undefined,
+      cozinhaCols: [
+        { title: 'Entraram agora', dot: 'var(--warn-strong)', count: novos.length, orders: novos, empty: novos.length === 0, emptyText: 'Nada novo.' },
+        { title: 'Fazendo', dot: 'var(--ink3)', count: preparo.length, orders: preparo, empty: preparo.length === 0, emptyText: 'Bancada limpa.' }
+      ],
+      goVerificar: () => this.setState({ screen: 'verificar' }),
+      goSenha: () => this.setState({ screen: 'senha' }),
+      goEntrega: () => this.setState({ screen: 'entrega' }),
+      goCadastro: () => this.setState({ screen: 'cadastro' }),
+      sendReset: () => this.setState({ resetMsg: 'Se existir uma conta com esse e-mail, o link de redefinição chega em alguns minutos. Confira o spam.' }),
+      resetMsg: s.resetMsg || ''
+    };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const role = this.props.role || 'owner';
+    const paused = s.paused === null ? !!this.props.paused : s.paused;
+    const screen = s.screen;
+    const isApp = screen !== 'login';
+
+    const loading = !!this.props.carregando;
+    const mesaF = s.mesaFiltro || 'todas';
+    const mesaOf = (o) => (o.type === 'salao' ? o.where.split('· ')[1] : null);
+    const pass = (o) => mesaF === 'todas' || mesaOf(o) === mesaF;
+    const byStatus = (st) => ORDERS.filter((o) => o.st === st && pass(o)).map((o) => this.card(o));
+    const fin = ORDERS.filter((o) => (o.st === 'fim' || o.st === 'cancelado') && pass(o)).map((o) => this.card(o));
+    const mkCol = (title, dot, orders, emptyText, hot) => ({
+      title, dot, orders: loading ? [] : orders, count: loading ? '—' : orders.length, loading, skeletons: loading ? [1, 2] : [],
+      countBg: !loading && hot && orders.length ? 'var(--warn-soft)' : 'var(--surface3)',
+      countFg: !loading && hot && orders.length ? 'var(--warn)' : 'var(--ink2)',
+      empty: !loading && orders.length === 0, emptyText
+    });
+    const columns = [
+      mkCol('Novos', 'var(--warn-strong)', byStatus('novo'), 'Nada esperando aceite.', true),
+      mkCol('Em preparo', 'var(--ink3)', byStatus('preparo'), 'A cozinha está livre.', false),
+      mkCol('Prontos', 'var(--accent)', byStatus('pronto'), 'Nada aguardando saída.', false),
+      mkCol('Finalizados', 'var(--line-hi)', fin, 'Nenhum pedido encerrado hoje.', false)
+    ];
+    columns[3].skeletons = [];
+
+    const navItem = (key, label, badge) => ({
+      key, label, badge: badge || '', onSelect: this.go(key),
+      bg: screen === key ? 'var(--accent-soft)' : 'transparent',
+      fg: screen === key ? 'var(--accent-hi)' : 'var(--ink)',
+      badgeFg: key === 'pedidos' && badge ? 'var(--warn)' : 'var(--ink3)'
+    });
+    const navGroups = [
+      { title: 'Operação', items: [navItem('pedidos', 'Pedidos', String(columns[0].count)), navItem('resumo', 'Resumo do dia'), navItem('produtos', 'Produtos'), navItem('secoes', 'Seções'), navItem('grupos', 'Grupos de opções')] },
+      { title: 'Configuração', items: [navItem('modalidades', 'Modalidades'), navItem('entrega', 'Entrega'), navItem('horario', 'Horário'), navItem('mesas', 'Mesas e QR'), navItem('loja', 'Dados da loja')].concat(role === 'owner' ? [navItem('usuarios', 'Usuários')] : []) },
+      { title: 'Protótipo', items: [navItem('estados', 'Estados'), navItem('sistema', 'Direção visual'), navItem('cozinha', 'Modo cozinha'), navItem('verificar', 'Bloqueio de e-mail'), navItem('login', 'Login'), navItem('cadastro', 'Cadastro'), navItem('senha', 'Recuperar senha')] }
+    ];
+
+    const titles = { pedidos: 'Pedidos', produtos: 'Produtos', produto: 'Editar produto', estados: 'Estados', sistema: 'Direção visual', resumo: 'Resumo do dia' };
+
+    const q = s.query.trim().toLowerCase();
+    const products = PRODUCTS.filter((p) => (s.section === 'Todas' || p.section === s.section) && (!q || p.name.toLowerCase().includes(q))).map((p) => ({
+      name: p.name, desc: p.desc, section: p.section, price: money(p.price),
+      stock: p.stock === 0 ? 'esgotado' : String(p.stock),
+      stockFg: p.stock === 0 ? 'var(--danger)' : p.stock <= 5 ? 'var(--warn)' : 'var(--ink)',
+      status: p.stock === 0 ? 'Esgotado' : 'Disponível',
+      statusFg: p.stock === 0 ? 'var(--danger)' : 'var(--accent-hi)',
+      statusBg: p.stock === 0 ? 'var(--danger-soft)' : 'var(--accent-soft)',
+      statusLine: p.stock === 0 ? 'var(--danger-line)' : 'var(--accent-line)',
+      onOpen: () => this.setState({ screen: 'produto' })
+    }));
+    const sectionNames = ['Todas', 'Entradas', 'Pratos', 'Pizzas', 'Sobremesas', 'Bebidas'];
+
+    const GROUPS = {
+      sabores: { name: 'Sabores', range: 'escolhe 1 a 2', rule: 'Mais caro', ruleHelp: 'cobra só a opção mais cara das escolhidas', example: 'Margherita R$ 62 + Calabresa R$ 72 → R$ 72,00' },
+      borda: { name: 'Borda', range: 'escolhe 0 a 1', rule: 'Somar', ruleHelp: 'soma o preço de tudo que foi escolhido', example: 'Catupiry +R$ 8,00 → R$ 8,00' },
+      adicionais: { name: 'Adicionais', range: 'escolhe 0 a 5', rule: 'Somar', ruleHelp: 'soma o preço de tudo que foi escolhido', example: 'Bacon +R$ 6,00 e Ovo +R$ 3,00 → R$ 9,00' }
+    };
+    const move = (i, d) => () => {
+      const g = s.groups.slice();
+      const j = i + d;
+      if (j < 0 || j >= g.length) return;
+      const tmp = g[i]; g[i] = g[j]; g[j] = tmp;
+      this.setState({ groups: g });
+    };
+    const groups = s.groups.map((k, i) => Object.assign({}, GROUPS[k], { onUp: move(i, -1), onDown: move(i, 1) }));
+
+    const toneMap = { warn: { line: 'var(--warn-line)', dot: 'var(--warn-strong)', ctaBg: 'var(--warn-soft)', ctaFg: 'var(--warn)', ctaLine: 'var(--warn-line)' }, danger: { line: 'var(--danger-line)', dot: 'var(--danger)', ctaBg: 'var(--danger-soft)', ctaFg: 'var(--danger)', ctaLine: 'var(--danger-line)' }, calm: { line: 'var(--line)', dot: 'var(--line-hi)', ctaBg: 'var(--accent)', ctaFg: 'var(--on-accent)', ctaLine: 'var(--accent)' } };
+    const states = STATES.map((st) => Object.assign({}, st, toneMap[st.tone]));
+
+    const detailOrder = s.detailId ? ORDERS.find((o) => o.id === s.detailId) : null;
+    const day = this.stats();
+
+    return {
+      theme: this.props.theme === 'escuro' ? 'dark' : 'light',
+      density: this.props.density || 'confortável',
+      isApp, isLogin: screen === 'login', isPedidos: screen === 'pedidos', isProdutos: screen === 'produtos',
+      isProduto: screen === 'produto', isEstados: screen === 'estados', isSistema: screen === 'sistema',
+      screenTitle: titles[screen] || 'Painel da loja',
+      storeStatus: paused ? 'Pausada agora' : 'Aberta · fecha 23:30',
+      navGroups, userInitials: role === 'owner' ? 'CM' : 'AL', userName: role === 'owner' ? 'Cláudia Mendes' : 'André Lopes',
+      roleLabel: role === 'owner' ? 'Dono' : 'Equipe',
+      dayStats: [ { label: 'Aceitos hoje', value: String(day.aceitosN) }, { label: 'Faturamento', value: money(day.fat) }, { label: 'Ticket médio', value: money(day.ticket) } ],
+      paused, togglePause: () => this.setState({ paused: !paused }),
+      pauseLabel: paused ? 'Pausada' : 'Aceitando pedidos',
+      pauseBg: paused ? 'var(--warn-soft)' : 'var(--surface)', pauseFg: paused ? 'var(--warn)' : 'var(--ink)',
+      pauseLine: paused ? 'var(--warn-line)' : 'var(--line)',
+      knobTrack: paused ? 'var(--warn-line)' : 'var(--accent)', knobFill: paused ? 'var(--warn)' : 'var(--on-accent)',
+      knobSide: paused ? 'flex-start' : 'flex-end',
+      showDeliveryAlert: this.props.alertaEntrega !== false,
+      periods: ['Hoje', 'Ontem', 'Últimos 7 dias', 'Este mês'].map((label) => ({
+        label, onSelect: () => this.setState({ period: label, rangeOn: false }),
+        bg: !s.rangeOn && s.period === label ? 'var(--accent-soft)' : 'var(--surface)',
+        fg: !s.rangeOn && s.period === label ? 'var(--accent-hi)' : 'var(--ink2)'
+      })),
+      rangeOn: s.rangeOn, useRange: () => this.setState({ rangeOn: !s.rangeOn }),
+      rangeLabel: s.rangeOn ? '12/09 – 17/09 · limpar' : 'Intervalo de datas',
+      rangeFg: s.rangeOn ? 'var(--accent-hi)' : 'var(--ink2)',
+      syncLabel: loading ? 'Carregando pedidos…' : 'Atualiza sozinho · há 6 s',
+      mesaFiltro: mesaF,
+      onMesaFiltro: (e) => this.setState({ mesaFiltro: e.target.value }),
+      mesaFiltroBg: mesaF === 'todas' ? 'var(--surface)' : 'var(--accent-soft)',
+      mesaFiltroFg: mesaF === 'todas' ? 'var(--ink2)' : 'var(--accent-hi)',
+      mesaFiltroLine: mesaF === 'todas' ? 'var(--line)' : 'var(--accent-line)',
+      mesaOpcoes: [{ value: 'todas', label: 'Todas as mesas' }].concat((s.mesas || ['Mesa 1', 'Mesa 2', 'Mesa 3', 'Mesa 7', 'Varanda 1', 'Varanda 2']).map((m) => ({ value: m, label: m }))),
+      columns,
+      query: s.query, onQuery: (e) => this.setState({ query: e.target.value }),
+      sections: sectionNames.map((label) => ({ label, onSelect: () => this.setState({ section: label }), bg: s.section === label ? 'var(--accent-soft)' : 'var(--surface)', fg: s.section === label ? 'var(--accent-hi)' : 'var(--ink2)', line: s.section === label ? 'var(--accent-line)' : 'var(--line)' })),
+      products, productsCount: products.length + ' de ' + PRODUCTS.length + ' produtos',
+      onNewProduct: () => this.setState({ screen: 'produto' }),
+      backToProdutos: () => this.setState({ screen: 'produtos' }),
+      groups, states,
+      detail: detailOrder ? this.detailFor(detailOrder) : null,
+      closeDetail: () => this.setState({ detailId: null }),
+      confirm: s.confirm, closeConfirm: () => this.setState({ confirm: null }), runConfirm: this.runConfirm,
+      doLogin: () => this.setState({ screen: 'pedidos' }), goEstados: () => this.setState({ screen: 'estados' }),
+      swatches: [
+        { name: 'Canvas', use: 'fundo da tela', color: 'var(--bg)' },
+        { name: 'Superfície', use: 'cartões e painéis', color: 'var(--surface)' },
+        { name: 'Borda', use: 'separação, sem sombra', color: 'var(--line)' },
+        { name: 'Tinta', use: 'texto e números', color: 'var(--ink)' },
+        { name: 'Tinta 2', use: 'apoio e rótulos', color: 'var(--ink2)' },
+        { name: 'Oliva', use: 'ação, pronto, ativo', color: 'var(--accent)' },
+        { name: 'Âmbar', use: 'exige ação agora', color: 'var(--warn-strong)' },
+        { name: 'Vermelho', use: 'destrutivo e falha', color: 'var(--danger)' }
+      ],
+      typeScale: [
+        { spec: 'Total do pedido · 24/700', size: '24px', weight: 700, sample: 'R$ 101,00' },
+        { spec: 'Título de tela · 17/600', size: '17px', weight: 600, sample: 'Pedidos' },
+        { spec: 'Nome no cartão · 16/600', size: '16px', weight: 600, sample: 'Marcela Andrade' },
+        { spec: 'Corpo · 14/400', size: '14px', weight: 400, sample: 'Cartão na entrega' },
+        { spec: 'Rótulo · 12,5/600', size: '12.5px', weight: 600, sample: 'Forma de pagamento' }
+      ],
+      ...this.b1(s),
+      ...this.clean(this.b2(s)),
+      ...this.clean(this.b3(s)),
+      ...this.clean(this.b4(s))
+    };
+  }
+}
+
+</script>
+</body>
+</html>

@@ -11,7 +11,18 @@ import tseslint from "typescript-eslint";
  * baixar a versão real do TypeScript do projeto.
  */
 export default tseslint.config(
-  { ignores: ["**/node_modules", "**/dist", "**/build", "**/.turbo", "**/migrations"] },
+  {
+    ignores: [
+      "**/node_modules",
+      "**/dist",
+      "**/build",
+      "**/.turbo",
+      "**/migrations",
+      // Protótipo de design copiado do handoff: código gerado por outra
+      // ferramenta, referência visual e não código do projeto.
+      "docs/design",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
