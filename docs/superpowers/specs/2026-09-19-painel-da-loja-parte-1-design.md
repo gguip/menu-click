@@ -11,7 +11,7 @@ e despachar pedidos, e manter o cardápio.
 
 Fontes deste desenho:
 
-- **Handoff de design** em `~/Downloads/design_handoff_painel_loja/` — `README.md`
+- **Handoff de design** em `docs/design/painel-da-loja/` — `README.md`
   (tokens, 21 telas, copy final, mapa para Mantine) e `Painel da Loja.dc.html`
   (protótipo de referência, não é código de produção). Alta fidelidade: cores,
   tipografia, espaçamento, estados e **toda a copy** são finais.
