@@ -1,5 +1,6 @@
 import { Navigate, type RouteObject } from "react-router";
 import { RedirectIfSession, RequireSession, RequireVerified } from "./auth/guards.tsx";
+import { EmailBlockedPage } from "./features/access/EmailBlockedPage.tsx";
 import { ForgotPasswordPage } from "./features/access/ForgotPasswordPage.tsx";
 import { LoginPage } from "./features/access/LoginPage.tsx";
 import { RegisterPage } from "./features/access/RegisterPage.tsx";
@@ -27,7 +28,7 @@ export const routes: RouteObject[] = [
   {
     element: <RequireSession />,
     children: [
-      { path: "/confirme-seu-email", element: <Placeholder title="Confirme o e-mail da loja" /> },
+      { path: "/confirme-seu-email", element: <EmailBlockedPage /> },
       {
         element: <RequireVerified />,
         children: [{ path: "/pedidos", element: <Placeholder title="Pedidos" /> }],
