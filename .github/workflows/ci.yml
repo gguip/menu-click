@@ -59,5 +59,11 @@ jobs:
       - name: Typecheck
         run: pnpm --filter @menuclick/api run build
 
+      - name: Build (painel)
+        run: pnpm --filter @menuclick/panel run build
+
+      - name: Test (painel)
+        run: pnpm --filter @menuclick/panel run test
+
       - name: Test
         run: pnpm --filter @menuclick/api run test
