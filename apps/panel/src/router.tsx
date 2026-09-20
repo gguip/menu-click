@@ -6,6 +6,7 @@ import { LoginPage } from "./features/access/LoginPage.tsx";
 import { RegisterPage } from "./features/access/RegisterPage.tsx";
 import { ResetPasswordPage } from "./features/access/ResetPasswordPage.tsx";
 import { VerifyEmailLinkPage } from "./features/access/VerifyEmailLinkPage.tsx";
+import { OrderDrawer } from "./features/orders/OrderDrawer.tsx";
 import { OrdersPage } from "./features/orders/OrdersPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
 
@@ -32,7 +33,12 @@ export const routes: RouteObject[] = [
           {
             element: <PanelLayout />,
             children: [
-              { path: "/pedidos", handle: { title: "Pedidos" }, element: <OrdersPage /> },
+              {
+                path: "/pedidos",
+                handle: { title: "Pedidos" },
+                element: <OrdersPage />,
+                children: [{ path: ":orderId", element: <OrderDrawer /> }],
+              },
             ],
           },
         ],

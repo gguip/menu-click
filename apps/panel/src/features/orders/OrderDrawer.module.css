@@ -1,0 +1,218 @@
+.drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.header {
+  display: grid;
+  gap: 4px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--mc-line);
+}
+
+.headTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--mc-ink3);
+}
+
+.code {
+  font-weight: 700;
+}
+
+.close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  margin-left: auto;
+  border: 1px solid var(--mc-line);
+  border-radius: 6px;
+  background: var(--mc-surface);
+  color: var(--mc-ink2);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--mc-surface3);
+}
+
+.name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.contact {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--mc-ink2);
+}
+
+.body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 16px 18px;
+}
+
+.items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--mc-line);
+}
+
+.qty,
+.itemName,
+.price {
+  font-size: 15px;
+}
+
+.qty {
+  font-weight: 700;
+}
+
+.itemName,
+.price {
+  font-weight: 600;
+}
+
+.options {
+  display: block;
+  font-size: 13px;
+  color: var(--mc-ink2);
+}
+
+.totals {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.totals div {
+  display: flex;
+  justify-content: space-between;
+}
+
+.totals dt,
+.totals dd {
+  margin: 0;
+}
+
+.total {
+  padding-top: 8px;
+  border-top: 1px solid var(--mc-line-hi);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.payment {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--mc-ink2);
+}
+
+.progress {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: var(--mc-surface2);
+  border: 1px solid var(--mc-line);
+  border-radius: 10px;
+}
+
+.steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+}
+
+.stepDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--mc-line-hi);
+}
+
+.step_done .stepDot {
+  background: var(--mc-accent);
+}
+
+.step_current .stepDot {
+  background: var(--mc-warn-strong);
+}
+
+.step_current {
+  font-weight: 700;
+}
+
+.stepTime {
+  margin-left: auto;
+  color: var(--mc-ink3);
+}
+
+.footer {
+  display: grid;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid var(--mc-line);
+}
+
+.footRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.note {
+  font-size: 12.5px;
+  color: var(--mc-ink3);
+}
+
+.closed {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--mc-surface2);
+  border: 1px solid var(--mc-line);
+  border-radius: 6px;
+  color: var(--mc-ink2);
+}
+
+.missing {
+  padding: 18px;
+  color: var(--mc-ink2);
+}
+
+/* Escondido só visualmente: continua dando nome ao diálogo. */
+.srHeader {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
