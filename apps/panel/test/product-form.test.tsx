@@ -127,6 +127,41 @@ describe("ProductFormPage", () => {
     ).toBeTruthy();
   });
 
+  it("produto recém-criado troca para edição quando os grupos falham, e salvar de novo não duplica", async () => {
+    const api = setup(
+      [
+        { method: "POST", path: `${BASE}/products`, status: 201, body: makeProduct({ id: "prod-9" }) },
+        {
+          method: "PUT",
+          path: `${BASE}/products/prod-9/option-groups`,
+          status: 400,
+          body: { message: "Grupo de opções inexistente" },
+        },
+        { method: "GET", path: `${BASE}/products/prod-9`, body: makeProduct({ id: "prod-9" }) },
+        { method: "PATCH", path: `${BASE}/products/prod-9`, body: makeProduct({ id: "prod-9" }) },
+      ],
+      "/produtos/novo",
+    );
+    await screen.findByLabelText("Nome");
+    type("Nome", "Pizza Grande");
+    type("Preço (R$)", "45,90");
+    type("Estoque", "12");
+    await screen.findByRole("option", { name: "Sabores" });
+    type("Adicionar grupo já cadastrado", "grp-1");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    expect(
+      await screen.findByText("O produto foi salvo, mas os grupos de opções não: Grupo de opções inexistente"),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+    expect((await screen.findByTestId("location")).textContent).toBe("/produtos");
+    expect(api.calls.some((call) => call.method === "PATCH" && call.path === `${BASE}/products/prod-9`)).toBe(
+      true,
+    );
+    expect(api.calls.filter((call) => call.method === "POST" && call.path === `${BASE}/products`)).toHaveLength(1);
+  });
+
   it("preço inválido não chega à API", async () => {
     const api = setup([], "/produtos/novo");
     await screen.findByLabelText("Nome");
