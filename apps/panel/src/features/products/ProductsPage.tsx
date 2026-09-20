@@ -163,21 +163,24 @@ export function ProductsPage() {
         ))}
         <div className={classes.footer}>
           <span className="n">{data ? `${shownUpTo} de ${data.total} produtos` : ""}</span>
-          <div className={classes.pager}>
-            <Button variant="default" disabled={page <= 1} onClick={() => setParam("page", String(page - 1))}>
-              Anterior
-            </Button>
-            <Button
-              variant="default"
-              // Só desabilita quando JÁ se sabe que não há próxima página —
-              // sem dado ainda (primeira carga), o botão fica clicável em vez
-              // de travar esperando a resposta.
-              disabled={data !== undefined && offset + PAGE_SIZE >= data.total}
-              onClick={() => setParam("page", String(page + 1))}
-            >
-              Próxima
-            </Button>
-          </div>
+          {/* Só existe depois que a primeira página carrega — otimista aqui
+              (clicável antes de saber se há próxima página) navegaria para
+              uma página que pode não existir, e o footer mostraria "N de N"
+              sem explicar por que a tabela veio vazia. */}
+          {data && (
+            <div className={classes.pager}>
+              <Button variant="default" disabled={page <= 1} onClick={() => setParam("page", String(page - 1))}>
+                Anterior
+              </Button>
+              <Button
+                variant="default"
+                disabled={offset + PAGE_SIZE >= data.total}
+                onClick={() => setParam("page", String(page + 1))}
+              >
+                Próxima
+              </Button>
+            </div>
+          )}
         </div>
       </div>
       <p className={classes.note}>
