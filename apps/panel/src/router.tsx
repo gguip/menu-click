@@ -9,6 +9,7 @@ import { VerifyEmailLinkPage } from "./features/access/VerifyEmailLinkPage.tsx";
 import { CategoriesPage } from "./features/categories/CategoriesPage.tsx";
 import { OrderDrawer } from "./features/orders/OrderDrawer.tsx";
 import { OrdersPage } from "./features/orders/OrdersPage.tsx";
+import { ProductsPage } from "./features/products/ProductsPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
 
 export const routes: RouteObject[] = [
@@ -40,6 +41,7 @@ export const routes: RouteObject[] = [
                 element: <OrdersPage />,
                 children: [{ path: ":orderId", element: <OrderDrawer /> }],
               },
+              { path: "/produtos", handle: { title: "Produtos" }, element: <ProductsPage /> },
               { path: "/secoes", handle: { title: "Seções do cardápio" }, element: <CategoriesPage /> },
             ],
           },
