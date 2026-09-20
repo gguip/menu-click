@@ -5,7 +5,13 @@ import { UserMenu } from "./UserMenu.tsx";
 
 // O rail mostra SÓ o que existe (spec): cada tela entra aqui na task dela.
 const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = [
-  { title: "Operação", items: [{ to: "/pedidos", label: "Pedidos" }] },
+  {
+    title: "Operação",
+    items: [
+      { to: "/pedidos", label: "Pedidos" },
+      { to: "/secoes", label: "Seções" },
+    ],
+  },
 ];
 
 function navClass({ isActive }: { isActive: boolean }): string {
