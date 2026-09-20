@@ -1,6 +1,6 @@
 # Painel da loja, parte 1 — fundação e operação — desenho
 
-**Data:** 2026-09-19 · **Estado:** aprovado, não implementado (branch `feat/painel-da-loja`)
+**Data:** 2026-09-19 · **Estado:** implementado (branch `feat/painel-da-loja`)
 
 ## O problema
 
