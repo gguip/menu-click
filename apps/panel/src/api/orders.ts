@@ -71,3 +71,16 @@ export function getOrdersSummary(restaurantId: string, range: OrderRange): Promi
     query: rangeQuery(range),
   });
 }
+
+/**
+ * Todos os `pending`, de qualquer data (sem período, a API não filtra por
+ * data). É o que o aviso de pedido novo vigia — independente do filtro que o
+ * kanban estiver mostrando, e de qual tela do painel estiver aberta.
+ */
+export function listPendingOrders(restaurantId: string): Promise<Order[]> {
+  return fetchAllPages((offset) =>
+    apiRequest<Page<Order>>(`/restaurants/${restaurantId}/orders`, {
+      query: { status: "pending", sort: "createdAt", order: "asc", limit: 100, offset },
+    }),
+  );
+}

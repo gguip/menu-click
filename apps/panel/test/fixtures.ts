@@ -173,9 +173,21 @@ export function makeOptionGroup(overrides: Partial<OptionGroup> = {}): OptionGro
 
 /** O mínimo que toda tela de dentro do painel pede. Específicos antes. */
 export function panelHandlers(
-  options: { me?: Partial<Me>; restaurant?: Partial<Restaurant>; summary?: Partial<OrdersSummary> } = {},
+  options: {
+    me?: Partial<Me>;
+    restaurant?: Partial<Restaurant>;
+    summary?: Partial<OrdersSummary>;
+    pending?: Order[];
+  } = {},
 ): MockHandler[] {
+  const pending = options.pending ?? [];
   return [
+    {
+      method: "GET",
+      path: `/restaurants/${RESTAURANT_ID}/orders`,
+      query: { status: "pending" },
+      body: { data: pending, limit: 100, offset: 0, total: pending.length },
+    },
     { method: "GET", path: "/auth/me", body: makeMe(options.me) },
     { method: "GET", path: `/restaurants/${RESTAURANT_ID}`, body: makeRestaurant(options.restaurant) },
     {

@@ -12,7 +12,19 @@ function navClass({ isActive }: { isActive: boolean }): string {
   return isActive ? `${classes.item} ${classes.active}` : classes.item;
 }
 
-export function Rail({ restaurant, me }: { restaurant: Restaurant | undefined; me: Me }) {
+export function Rail({
+  restaurant,
+  me,
+  pendingCount,
+  soundBlocked,
+  onEnableSound,
+}: {
+  restaurant: Restaurant | undefined;
+  me: Me;
+  pendingCount: number;
+  soundBlocked: boolean;
+  onEnableSound: () => void;
+}) {
   const paused = restaurant?.acceptingOrders === false;
   return (
     <nav className={classes.rail} aria-label="Navegação do painel">
@@ -24,6 +36,11 @@ export function Rail({ restaurant, me }: { restaurant: Restaurant | undefined; m
           <span className={classes.dot} aria-hidden="true" />
           {paused ? "Pausada agora" : "Aceitando pedidos"}
         </span>
+        {soundBlocked && (
+          <button type="button" className={classes.sound} onClick={onEnableSound}>
+            Som desligado · Ativar som
+          </button>
+        )}
       </div>
       <div className={classes.nav}>
         {NAV_GROUPS.map((group) => (
@@ -32,6 +49,11 @@ export function Rail({ restaurant, me }: { restaurant: Restaurant | undefined; m
             {group.items.map((item) => (
               <NavLink key={item.to} to={item.to} className={navClass}>
                 {item.label}
+                {item.to === "/pedidos" && (
+                  <span className={`${classes.badge} ${pendingCount > 0 ? classes.badgeWarn : ""} n`}>
+                    {pendingCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>

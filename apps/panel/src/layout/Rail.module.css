@@ -87,3 +87,31 @@
   padding: 10px;
   border-top: 1px solid var(--mc-line);
 }
+
+.badge {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--mc-surface3);
+  color: var(--mc-ink2);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.badgeWarn {
+  background: var(--mc-warn-soft);
+  color: var(--mc-warn);
+}
+
+.sound {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--mc-warn);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}

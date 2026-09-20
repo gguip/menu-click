@@ -1,5 +1,6 @@
 import { Outlet, useMatches } from "react-router";
 import { useSessionUser } from "../auth/useMe.ts";
+import { useNewOrderAlert } from "../features/orders/useNewOrderAlert.ts";
 import { useRestaurant } from "../features/restaurant/useRestaurant.ts";
 import { Header } from "./Header.tsx";
 import classes from "./PanelLayout.module.css";
@@ -23,10 +24,17 @@ export function PanelLayout() {
   const restaurant = useRestaurant(me.restaurantId);
   const title = useRouteTitle();
   const paused = restaurant.data?.acceptingOrders === false;
+  const alert = useNewOrderAlert(me.restaurantId);
 
   return (
     <div className={classes.shell}>
-      <Rail restaurant={restaurant.data} me={me} />
+      <Rail
+        restaurant={restaurant.data}
+        me={me}
+        pendingCount={alert.pendingCount}
+        soundBlocked={alert.soundBlocked}
+        onEnableSound={alert.enableSound}
+      />
       <div className={classes.main}>
         <Header title={title} restaurantId={me.restaurantId} restaurant={restaurant.data} />
         {paused && <PauseBanner />}
