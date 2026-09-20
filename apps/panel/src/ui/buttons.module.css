@@ -1,0 +1,16 @@
+/* Destrutivo em fundo suave: o vermelho é reservado a isso (handoff). */
+.danger,
+.danger:hover {
+  background: var(--mc-danger-soft);
+  border: 1px solid var(--mc-danger-line);
+  color: var(--mc-danger);
+}
+
+.dangerText,
+.dangerText:hover {
+  color: var(--mc-danger);
+}
+
+.dangerText:hover {
+  background: var(--mc-danger-soft);
+}

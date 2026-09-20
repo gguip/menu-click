@@ -7,6 +7,7 @@ import { useOnline } from "../../lib/useOnline.ts";
 import { useRestaurant } from "../restaurant/useRestaurant.ts";
 import { FilterBar } from "./FilterBar.tsx";
 import { Kanban } from "./Kanban.tsx";
+import { OrderActionProvider } from "./orderActionFlow.tsx";
 import { isRange, useOrderFilters } from "./orderFilters.ts";
 import { DeliveryAlert, EmptyOrders, OfflineNotice } from "./OrdersNotices.tsx";
 import classes from "./OrdersPage.module.css";
@@ -37,27 +38,29 @@ export function OrdersPage() {
     navigate({ pathname: `/pedidos/${orderId}`, search: location.search });
 
   return (
-    <div className={classes.page}>
-      {offline && (
-        <OfflineNotice updatedAt={orders.dataUpdatedAt} now={now} onRetry={() => void orders.refetch()} />
-      )}
-      {deliveryAlert && <DeliveryAlert />}
-      <FilterBar
-        filters={filters}
-        onChange={setFilters}
-        tables={tables.data ?? []}
-        syncLabel={
-          orders.isPending
-            ? "Carregando pedidos…"
-            : `Atualiza sozinho · ${formatSecondsAgo(orders.dataUpdatedAt, now)}`
-        }
-      />
-      {showEmpty ? (
-        <EmptyOrders />
-      ) : (
-        <Kanban orders={list} loading={orders.isPending} now={now} onOpen={openOrder} />
-      )}
-      <Outlet />
-    </div>
+    <OrderActionProvider restaurantId={me.restaurantId} disabled={offline}>
+      <div className={classes.page}>
+        {offline && (
+          <OfflineNotice updatedAt={orders.dataUpdatedAt} now={now} onRetry={() => void orders.refetch()} />
+        )}
+        {deliveryAlert && <DeliveryAlert />}
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          tables={tables.data ?? []}
+          syncLabel={
+            orders.isPending
+              ? "Carregando pedidos…"
+              : `Atualiza sozinho · ${formatSecondsAgo(orders.dataUpdatedAt, now)}`
+          }
+        />
+        {showEmpty ? (
+          <EmptyOrders />
+        ) : (
+          <Kanban orders={list} loading={orders.isPending} now={now} onOpen={openOrder} />
+        )}
+        <Outlet />
+      </div>
+    </OrderActionProvider>
   );
 }

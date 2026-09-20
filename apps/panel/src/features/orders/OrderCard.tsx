@@ -1,11 +1,45 @@
+import { Button } from "@mantine/core";
 import type { Order } from "../../api/types.ts";
 import { formatCents } from "../../lib/money.ts";
 import { orderCode } from "../../lib/orderCode.ts";
 import { formatElapsed } from "../../lib/time.ts";
+import { useOrderAction } from "./orderActionFlow.tsx";
 import classes from "./OrderCard.module.css";
-import { displayName } from "./orderRules.ts";
+import { displayName, primaryAction } from "./orderRules.ts";
 import { isUrgent, paymentLabel } from "./presentation.ts";
 import { TypePill } from "./TypePill.tsx";
+
+/** Os botões param a propagação: aceitar não pode abrir o drawer. */
+function CardActions({ order }: { order: Order }) {
+  const { request, busyOrderId, disabled } = useOrderAction();
+  const action = primaryAction(order);
+  if (action === null) return null;
+  const busy = busyOrderId === order.id;
+  const isNew = order.status === "pending";
+  return (
+    <div
+      className={classes.actions}
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      <Button
+        fullWidth
+        h={38}
+        variant={isNew ? "filled" : "default"}
+        disabled={disabled}
+        loading={busy}
+        onClick={() => request(order, action.transition)}
+      >
+        {action.cardLabel}
+      </Button>
+      {isNew && (
+        <Button variant="default" h={38} disabled={disabled || busy} onClick={() => request(order, "cancel")}>
+          Recusar
+        </Button>
+      )}
+    </div>
+  );
+}
 
 export function OrderCard({
   order,
@@ -39,6 +73,7 @@ export function OrderCard({
         <span className={classes.payment}>{paymentLabel(order)}</span>
         <span className={`${classes.total} n`}>{formatCents(order.totalInCents)}</span>
       </div>
+      <CardActions order={order} />
     </article>
   );
 }
