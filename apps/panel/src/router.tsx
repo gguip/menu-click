@@ -12,6 +12,7 @@ import { OrdersPage } from "./features/orders/OrdersPage.tsx";
 import { ProductFormPage } from "./features/products/ProductFormPage.tsx";
 import { ProductsPage } from "./features/products/ProductsPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
+import { RouteError } from "./layout/RouteError.tsx";
 
 export const routes: RouteObject[] = [
   {
@@ -35,6 +36,11 @@ export const routes: RouteObject[] = [
         children: [
           {
             element: <PanelLayout />,
+            // Sem isto, um throw em qualquer tela do shell (columnOf com
+            // status desconhecido, useSessionUser fora de guarda, qualquer
+            // bug de render) derrubava a árvore inteira numa tela branca
+            // (FIX 6 da revisão).
+            errorElement: <RouteError />,
             children: [
               {
                 path: "/pedidos",

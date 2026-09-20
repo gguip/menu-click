@@ -32,6 +32,10 @@ describe("colunas do kanban", () => {
     }
   });
 
+  it("status desconhecido cai em Finalizados, em vez de estourar (FIX 6)", () => {
+    expect(columnOf("shipped" as OrderStatus)).toBe("done");
+  });
+
   it("agrupa preservando a ordem recebida", () => {
     const a = makeOrder({ status: "pending" });
     const b = makeOrder({ status: "completed" });

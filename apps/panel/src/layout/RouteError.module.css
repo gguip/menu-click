@@ -1,0 +1,36 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  padding: 24px;
+  background: var(--mc-bg);
+}
+
+.card {
+  max-width: 420px;
+  display: grid;
+  gap: 12px;
+  padding: 28px;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-line);
+  border-radius: 10px;
+}
+
+.title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--mc-ink);
+}
+
+.body {
+  margin: 0;
+  font-size: 14px;
+  color: var(--mc-ink2);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}

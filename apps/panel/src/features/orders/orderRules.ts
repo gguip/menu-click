@@ -36,10 +36,18 @@ export const COLUMNS: readonly Column[] = [
   },
 ];
 
+/**
+ * Um status desconhecido cai em "Finalizados", em vez de estourar. A API já
+ * declara que o conjunto de status pode mudar (pendência de backend na
+ * spec), e um `throw` aqui não tem `errorElement` que o pegue antes do
+ * `RouteError` do layout — a tela inteira ficava em branco por causa de UM
+ * pedido com status que o painel ainda não conhece. "Finalizados" é o lugar
+ * onde um status estranho incomoda menos: já é a coluna sem ação disponível,
+ * então nada tenta transicionar um pedido que ninguém entende (FIX 6).
+ */
 export function columnOf(status: OrderStatus): ColumnId {
   const column = COLUMNS.find((candidate) => candidate.statuses.includes(status));
-  if (column === undefined) throw new Error(`status sem coluna: ${status}`);
-  return column.id;
+  return column?.id ?? "done";
 }
 
 export function groupByColumn(orders: readonly Order[]): Record<ColumnId, Order[]> {
