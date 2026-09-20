@@ -21,8 +21,9 @@ describe("API de pedidos", () => {
         body: { data: [makeOrder()], limit: 100, offset: 100, total: 101 },
       },
     ]);
-    const orders = await listAllOrders(RESTAURANT_ID, { period: "today", sort: "createdAt", order: "desc" });
-    expect(orders).toHaveLength(101);
+    const result = await listAllOrders(RESTAURANT_ID, { period: "today", sort: "createdAt", order: "desc" });
+    expect(result.items).toHaveLength(101);
+    expect(result.truncated).toBe(false);
     expect(api.calls[0].query).toEqual({
       period: "today",
       sort: "createdAt",
@@ -30,6 +31,19 @@ describe("API de pedidos", () => {
       limit: "100",
       offset: "0",
     });
+  });
+
+  it("estoura o teto de 10 páginas e devolve truncated: true, sem sumir calado", async () => {
+    mockApi([
+      {
+        method: "GET",
+        path: LIST,
+        body: { data: Array.from({ length: 100 }, () => makeOrder()), limit: 100, offset: 0, total: 5000 },
+      },
+    ]);
+    const result = await listAllOrders(RESTAURANT_ID, { period: "thisMonth", sort: "createdAt", order: "desc" });
+    expect(result.items).toHaveLength(1000);
+    expect(result.truncated).toBe(true);
   });
 
   it("intervalo manda from/to e nunca period", async () => {

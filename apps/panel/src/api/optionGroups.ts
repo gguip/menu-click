@@ -7,5 +7,5 @@ export function listAllOptionGroups(restaurantId: string): Promise<OptionGroup[]
     apiRequest<Page<OptionGroup>>(`/restaurants/${restaurantId}/option-groups`, {
       query: { limit: 100, offset },
     }),
-  );
+  ).then((result) => result.items);
 }

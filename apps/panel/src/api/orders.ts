@@ -1,5 +1,5 @@
 import { apiRequest } from "./client.ts";
-import { fetchAllPages } from "./pagination.ts";
+import { type FetchAllResult, fetchAllPages } from "./pagination.ts";
 import type {
   Order,
   OrderDetail,
@@ -34,9 +34,12 @@ const ENDPOINT: Record<OrderTransition, string> = {
 
 /**
  * Todas as páginas, não só a primeira: com "mais recentes" num dia cheio, um
- * pedido aberto antigo cairia da página 1 e SUMIRIA do kanban.
+ * pedido aberto antigo cairia da página 1 e SUMIRIA do kanban. `truncated`
+ * sai `true` quando o teto de 10 páginas (1000 pedidos) é atingido com
+ * pedido ainda restando — quem chama mostra isso, em vez de exibir uma lista
+ * curta como se fosse o total.
  */
-export function listAllOrders(restaurantId: string, query: OrderListQuery): Promise<Order[]> {
+export function listAllOrders(restaurantId: string, query: OrderListQuery): Promise<FetchAllResult<Order>> {
   return fetchAllPages((offset) =>
     apiRequest<Page<Order>>(`/restaurants/${restaurantId}/orders`, {
       query: {
@@ -73,14 +76,19 @@ export function getOrdersSummary(restaurantId: string, range: OrderRange): Promi
 }
 
 /**
- * Todos os `pending`, de qualquer data (sem período, a API não filtra por
- * data). É o que o aviso de pedido novo vigia — independente do filtro que o
- * kanban estiver mostrando, e de qual tela do painel estiver aberta.
+ * Todos os `pending` DE HOJE. É o que o aviso de pedido novo vigia —
+ * independente do filtro que o kanban estiver mostrando, e de qual tela do
+ * painel estiver aberta. Escopado a `period: "today"` de propósito (FIX 5 da
+ * revisão): sem isso, um pedido nunca recusado de dias atrás mantinha o rail
+ * âmbar e o título da aba incrementado para sempre, e o conjunto vigiado
+ * deixava de ser o mesmo que o operador vê no kanban ("Novos" já é filtrado
+ * por hoje). O custo aceito: um `pending` das 23:55 para de ser vigiado à
+ * meia-noite — ele sai do "hoje" mesmo continuando pendente.
  */
 export function listPendingOrders(restaurantId: string): Promise<Order[]> {
   return fetchAllPages((offset) =>
     apiRequest<Page<Order>>(`/restaurants/${restaurantId}/orders`, {
-      query: { status: "pending", sort: "createdAt", order: "asc", limit: 100, offset },
+      query: { status: "pending", period: "today", sort: "createdAt", order: "asc", limit: 100, offset },
     }),
-  );
+  ).then((result) => result.items);
 }

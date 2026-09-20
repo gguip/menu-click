@@ -10,10 +10,10 @@ export function sortCategories(categories: readonly Category[]): Category[] {
 }
 
 export async function listAllCategories(restaurantId: string): Promise<Category[]> {
-  const all = await fetchAllPages((offset) =>
+  const { items } = await fetchAllPages((offset) =>
     apiRequest<Page<Category>>(`/restaurants/${restaurantId}/categories`, { query: { limit: 100, offset } }),
   );
-  return sortCategories(all);
+  return sortCategories(items);
 }
 
 export function createCategory(restaurantId: string, name: string): Promise<Category> {
