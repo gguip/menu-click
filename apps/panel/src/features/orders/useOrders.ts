@@ -4,11 +4,13 @@ import { getOrder, listAllOrders } from "../../api/orders.ts";
 import { listAllTables } from "../../api/tables.ts";
 import type { Restaurant } from "../../api/types.ts";
 import { type OrderFilters, toListQuery } from "./orderFilters.ts";
-import { ORDERS_POLL_MS } from "./polling.ts";
+import { ORDER_DETAIL_POLL_MS, ORDERS_POLL_MS } from "./polling.ts";
 
 /**
  * Polling também com a aba em segundo plano: o painel passa o dia atrás de
- * outras janelas, e ninguém vai apertar F5.
+ * outras janelas, e ninguém vai apertar F5. `data.truncated` sai `true`
+ * quando o teto de páginas foi atingido com pedido ainda restando — quem usa
+ * o hook decide como mostrar isso (ver `OrdersPage`).
  */
 export function useOrders(restaurantId: string, filters: OrderFilters) {
   const query = toListQuery(filters);
@@ -21,11 +23,16 @@ export function useOrders(restaurantId: string, filters: OrderFilters) {
   });
 }
 
+/**
+ * 20 s, não os 10 s da lista: a lista já atualiza nesse ritmo e qualquer
+ * ação invalida `["orders"]`, então o detalhe do drawer não precisa do
+ * mesmo passo (ver `polling.ts`, FIX 3 da revisão).
+ */
 export function useOrder(restaurantId: string, orderId: string) {
   return useQuery({
     queryKey: ["orders", "detail", restaurantId, orderId],
     queryFn: () => getOrder(restaurantId, orderId),
-    refetchInterval: ORDERS_POLL_MS,
+    refetchInterval: ORDER_DETAIL_POLL_MS,
     refetchIntervalInBackground: true,
   });
 }

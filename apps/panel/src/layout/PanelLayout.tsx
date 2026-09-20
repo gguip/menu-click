@@ -1,7 +1,7 @@
 import { Outlet, useMatches } from "react-router";
 import { useSessionUser } from "../auth/useMe.ts";
 import { useNewOrderAlert } from "../features/orders/useNewOrderAlert.ts";
-import { useRestaurant } from "../features/restaurant/useRestaurant.ts";
+import { usePolledRestaurant } from "../features/restaurant/useRestaurant.ts";
 import { Header } from "./Header.tsx";
 import classes from "./PanelLayout.module.css";
 import { PauseBanner } from "./PauseBanner.tsx";
@@ -21,7 +21,9 @@ function useRouteTitle(): string {
 
 export function PanelLayout() {
   const me = useSessionUser();
-  const restaurant = useRestaurant(me.restaurantId);
+  // O shell é o único dono do polling do restaurante (FIX 3 da revisão);
+  // OrdersPage e o cabeçalho do drawer só leem esta mesma query.
+  const restaurant = usePolledRestaurant(me.restaurantId);
   const title = useRouteTitle();
   const paused = restaurant.data?.acceptingOrders === false;
   const alert = useNewOrderAlert(me.restaurantId);
