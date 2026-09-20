@@ -84,8 +84,10 @@ export function EmailBlockedPage() {
         <section className={classes.wrong}>
           <strong>O endereço está errado?</strong>
           <p>
-            Não é possível trocar o e-mail pelo painel. Duas saídas: falar com o suporte, ou aguardar
-            7 dias — nesse prazo o cadastro é liberado automaticamente e você entra sem confirmar.
+            Não é possível trocar o e-mail pelo painel. Duas saídas: falar com o suporte, ou esperar
+            7 dias e se cadastrar de novo com o mesmo e-mail — o cadastro antigo sai do caminho nesse
+            momento, e o novo assume. Só esperar não destrava este login: a conta atual continua
+            bloqueada até lá.
           </p>
           <div className={classes.actions}>
             {SUPPORT_URL && (

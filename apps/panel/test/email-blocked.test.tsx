@@ -22,6 +22,17 @@ describe("EmailBlockedPage", () => {
     expect(screen.getByText("Painel bloqueado")).toBeTruthy();
   });
 
+  it("não promete destravar o login só por esperar 7 dias (FIX 4)", async () => {
+    signIn();
+    mockApi([me]);
+    renderRoutes(routes, "/confirme-seu-email");
+    expect(
+      await screen.findByText(
+        "Não é possível trocar o e-mail pelo painel. Duas saídas: falar com o suporte, ou esperar 7 dias e se cadastrar de novo com o mesmo e-mail — o cadastro antigo sai do caminho nesse momento, e o novo assume. Só esperar não destrava este login: a conta atual continua bloqueada até lá.",
+      ),
+    ).toBeTruthy();
+  });
+
   it("reenvio aceito mostra a mensagem neutra", async () => {
     signIn();
     mockApi([me, { method: "POST", path: "/auth/resend-verification", status: 202, body: { message: "ok" } }]);
