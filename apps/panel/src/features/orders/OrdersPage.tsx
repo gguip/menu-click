@@ -31,6 +31,14 @@ export function OrdersPage() {
   // próprio aviso em OfflineNotice, e nunca junto de "sem internet": os dois
   // avisos ao mesmo tempo não ajudam ninguém.
   const showError = !offline && orders.isError;
+  // Com keepPreviousData, uma falha de POLL EM SEGUNDO PLANO (a lista já
+  // tinha carregado com sucesso antes) deixa `orders.data` com a última
+  // lista boa mesmo com `isError: true` — só o `status` da query vira
+  // "error", o dado anterior não é limpo. Tratar essa falha do mesmo jeito
+  // que a do primeiro carregamento jogaria fora um kanban perfeitamente bom
+  // que estava na tela um segundo atrás, bem no momento em que o orçamento
+  // de polling é mais apertado (um 429 isolado já apagaria o quadro em uso).
+  const hasData = orders.data !== undefined;
   const list = orders.data?.items ?? [];
   const truncated = orders.data?.truncated === true;
   const showEmpty =
@@ -68,9 +76,14 @@ export function OrdersPage() {
               : "Carregando pedidos…"
           }
         />
-        {showError ? (
+        {showError && (
+          // Aditivo, como o OfflineNotice acima: com dado na tela (poll em
+          // segundo plano que falhou), o aviso entra JUNTO do kanban com a
+          // lista antiga — não no lugar dele. Só quando não há dado nenhum
+          // (primeiro carregamento falhou) é que ele fica sozinho, abaixo.
           <OrdersLoadError error={orders.error} onRetry={() => void orders.refetch()} />
-        ) : showEmpty ? (
+        )}
+        {showError && !hasData ? null : showEmpty ? (
           <EmptyOrders />
         ) : (
           <Kanban orders={list} loading={orders.isPending} now={now} onOpen={openOrder} />

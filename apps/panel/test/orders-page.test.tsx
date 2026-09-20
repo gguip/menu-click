@@ -95,6 +95,32 @@ describe("OrdersPage", () => {
     await waitFor(() => expect(screen.getByText("Nenhum pedido ainda hoje")).toBeTruthy());
   });
 
+  it("falha de um POLL em segundo plano mantém o kanban com a lista antiga (regressão)", async () => {
+    signIn();
+    const order = makeOrder({ status: "pending" });
+    const api = mockApi([listHandler([order]), noTables, ...panelHandlers()]);
+    const { queryClient } = renderInPanel(routes, "/pedidos");
+
+    // primeira carga: sucesso, o cartão aparece
+    expect(await screen.findByRole("article", { name: `Pedido ${orderCode(order.id)}` })).toBeTruthy();
+
+    // um poll seguinte falha (429/500/403) — troca o handler e força o refetch,
+    // como o refetchInterval faria em segundo plano
+    api.add({
+      method: "GET",
+      path: LIST,
+      status: 500,
+      body: { statusCode: 500, error: "Internal", message: "Falhou de novo" },
+    });
+    await queryClient.refetchQueries({ queryKey: ["orders", "list"] });
+
+    // o aviso aparece, ADITIVO — e o cartão que já estava na tela continua lá:
+    // um poll ruim não pode apagar um kanban bom que um segundo antes estava
+    // certo (a mesma degradação que o OfflineNotice já fazia para NetworkError)
+    expect(await screen.findByText("Não foi possível carregar os pedidos")).toBeTruthy();
+    expect(screen.getByRole("article", { name: `Pedido ${orderCode(order.id)}` })).toBeTruthy();
+  });
+
   it("teto de 1000 pedidos avisa em vez de sumir os mais antigos calado", async () => {
     signIn();
     const manyOrders = Array.from({ length: 100 }, () => makeOrder());
