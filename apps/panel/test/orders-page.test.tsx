@@ -78,6 +78,37 @@ describe("OrdersPage", () => {
     ).toBeTruthy();
   });
 
+  it("falha real na lista mostra o aviso de erro, e NUNCA 'Nenhum pedido ainda hoje'", async () => {
+    signIn();
+    const api = mockApi([
+      { method: "GET", path: LIST, status: 500, body: { statusCode: 500, error: "Internal", message: "Falhou" } },
+      noTables,
+      ...panelHandlers(),
+    ]);
+    renderInPanel(routes, "/pedidos");
+    expect(await screen.findByText("Não foi possível carregar os pedidos")).toBeTruthy();
+    expect(screen.getByText("Falhou")).toBeTruthy();
+    expect(screen.queryByText("Nenhum pedido ainda hoje")).toBeNull();
+
+    api.add(listHandler([]));
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    await waitFor(() => expect(screen.getByText("Nenhum pedido ainda hoje")).toBeTruthy());
+  });
+
+  it("teto de 1000 pedidos avisa em vez de sumir os mais antigos calado", async () => {
+    signIn();
+    const manyOrders = Array.from({ length: 100 }, () => makeOrder());
+    mockApi([
+      { method: "GET", path: LIST, body: { data: manyOrders, limit: 100, offset: 0, total: 5000 } },
+      noTables,
+      ...panelHandlers(),
+    ]);
+    renderInPanel(routes, "/pedidos");
+    expect(
+      await screen.findByText("Mostrando só os 1000 pedidos mais recentes do período"),
+    ).toBeTruthy();
+  });
+
   it("intervalo de datas desliga o período, na tela e na requisição", async () => {
     signIn();
     const api = mockApi([listHandler([]), noTables, ...panelHandlers()]);

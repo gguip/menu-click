@@ -1,4 +1,5 @@
 import { Button } from "@mantine/core";
+import { describeError } from "../../api/client.ts";
 import { formatAge } from "../../lib/time.ts";
 import { Notice } from "../../ui/Notice.tsx";
 import classes from "./OrdersPage.module.css";
@@ -37,6 +38,45 @@ export function OfflineNotice({
             Tentar de novo
           </Button>
         </div>
+      </Notice>
+    </div>
+  );
+}
+
+/**
+ * Falha de verdade na lista (429, 500, 403 — qualquer coisa que NÃO seja
+ * `NetworkError`, que tem o próprio aviso em `OfflineNotice`). Substitui o
+ * kanban por inteiro: sem isso, `showEmpty` exigia só `!isPending`, e uma
+ * requisição que falhava no primeiro carregamento (sem dado nenhum) renderizava
+ * "Nenhum pedido ainda hoje" — uma mentira no pior momento (FIX 1 da revisão).
+ */
+export function OrdersLoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  return (
+    <div className={classes.notice}>
+      <Notice tone="danger" title="Não foi possível carregar os pedidos">
+        <div className={classes.noticeRow}>
+          <span>{describeError(error)}</span>
+          <Button variant="default" onClick={onRetry}>
+            Tentar de novo
+          </Button>
+        </div>
+      </Notice>
+    </div>
+  );
+}
+
+/**
+ * O teto de páginas (1000 pedidos, 10 páginas de 100) foi atingido com
+ * pedido ainda restando: a lista parou antes do fim. Silenciar isso era o
+ * mesmo defeito que a paginação completa existe para evitar, só que na outra
+ * ponta (FIX 2 da revisão).
+ */
+export function TruncatedOrdersNotice() {
+  return (
+    <div className={classes.notice}>
+      <Notice tone="warn" title="Mostrando só os 1000 pedidos mais recentes do período">
+        Há mais pedidos do que isso no recorte escolhido. Estreite o período, o intervalo de datas ou o
+        filtro de mesa para ver os demais.
       </Notice>
     </div>
   );
