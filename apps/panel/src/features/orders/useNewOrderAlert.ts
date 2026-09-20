@@ -82,6 +82,12 @@ export function useNewOrderAlert(restaurantId: string) {
 
   useEffect(() => {
     document.title = pendingCount > 0 ? `(${pendingCount}) Pedidos · MenuClick` : "MenuClick · Painel da loja";
+    // Ao desmontar (logout, navegação para fora do painel) o título volta ao
+    // default — sem isso, a aba de login continuava lendo "(3) Pedidos ·
+    // MenuClick" depois de sair da conta (FIX 8 da revisão).
+    return () => {
+      document.title = "MenuClick · Painel da loja";
+    };
   }, [pendingCount]);
 
   const enableSound = () => {

@@ -32,7 +32,13 @@ export function readSession(): Session | null {
 }
 
 export function saveSession(session: Session): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // storage indisponível (janela privada, cota estourada, bloqueio de
+    // navegador): sem isso, o login inteiro quebrava por causa de um
+    // `localStorage` que nem é essencial ao gesto de "entrar" (FIX 8).
+  }
 }
 
 export function clearSession(): void {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { clearSession, readSession, saveSession } from "../src/api/session.ts";
 
 describe("session", () => {
@@ -22,5 +22,18 @@ describe("session", () => {
     saveSession({ token: "abc", expiresAt: "2099-01-01T00:00:00.000Z" });
     clearSession();
     expect(readSession()).toBeNull();
+  });
+
+  it("storage bloqueado (janela privada) não derruba o login (FIX 8)", () => {
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage bloqueado");
+    });
+    try {
+      expect(() =>
+        saveSession({ token: "abc", expiresAt: "2099-01-01T00:00:00.000Z" }),
+      ).not.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

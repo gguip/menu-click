@@ -60,6 +60,15 @@ describe("aviso de pedido novo", () => {
     await waitFor(() => expect(playBeep).toHaveBeenCalledOnce());
   });
 
+  it("desmontar restaura o título da aba", async () => {
+    signIn();
+    mockApi(panelHandlers({ pending: [makeOrder(), makeOrder()] }));
+    const view = renderRoutes(routes, "/pedidos");
+    await waitFor(() => expect(document.title).toBe("(2) Pedidos · MenuClick"));
+    view.unmount();
+    expect(document.title).toBe("MenuClick · Painel da loja");
+  });
+
   it("sem gesto na página, oferece ativar o som", async () => {
     signIn();
     mockApi(panelHandlers());
