@@ -1,0 +1,90 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px 14px;
+}
+
+.segmented {
+  display: inline-flex;
+  height: 36px;
+  overflow: hidden;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-line);
+  border-radius: 6px;
+}
+
+.segment {
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--mc-line);
+  background: transparent;
+  color: var(--mc-ink2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segment:first-child {
+  border-left: 0;
+}
+
+.segment:hover {
+  background: var(--mc-surface3);
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--mc-accent-soft);
+  color: var(--mc-accent-hi);
+}
+
+.dashed {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px dashed var(--mc-line-hi);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mc-ink2);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.dashedActive {
+  border-style: solid;
+  border-color: var(--mc-accent-line);
+  background: var(--mc-accent-soft);
+  color: var(--mc-accent-hi);
+}
+
+.tableActive {
+  background: var(--mc-accent-soft);
+  border-color: var(--mc-accent-line);
+}
+
+.rangeForm {
+  display: grid;
+  gap: 10px;
+  min-width: 220px;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.sync {
+  font-size: 12.5px;
+  color: var(--mc-ink3);
+}
+
+.rangeNote {
+  margin: -6px 20px 12px;
+  font-size: 12.5px;
+  color: var(--mc-ink3);
+}

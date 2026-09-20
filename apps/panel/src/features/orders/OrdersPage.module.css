@@ -1,0 +1,39 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.notice {
+  margin: 16px 20px 0;
+}
+
+.noticeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.empty {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  margin: 0 20px 20px;
+  padding: 32px;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-line);
+  border-radius: 10px;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.emptyBody {
+  margin: 0;
+  max-width: 60ch;
+  color: var(--mc-ink2);
+}

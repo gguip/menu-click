@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
+import reactHooks from "eslint-plugin-react-hooks";
 
 /**
  * Config única pra todo o workspace. O `typescript-eslint` daqui roda em
@@ -11,7 +12,18 @@ import tseslint from "typescript-eslint";
  * baixar a versão real do TypeScript do projeto.
  */
 export default tseslint.config(
-  { ignores: ["**/node_modules", "**/dist", "**/build", "**/.turbo", "**/migrations"] },
+  {
+    ignores: [
+      "**/node_modules",
+      "**/dist",
+      "**/build",
+      "**/.turbo",
+      "**/migrations",
+      // Protótipo de design copiado do handoff: código gerado por outra
+      // ferramenta, referência visual e não código do projeto.
+      "docs/design",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -39,5 +51,12 @@ export default tseslint.config(
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
     },
+  },
+  {
+    // Regras de hooks (e as do React Compiler, que vêm no `recommended` da
+    // v7) só onde existe React. Se uma delas acusar um padrão legítimo,
+    // corrija o código — não desligue a regra sem falar com o usuário.
+    files: ["apps/panel/**/*.{ts,tsx}"],
+    ...reactHooks.configs.flat.recommended,
   },
 );

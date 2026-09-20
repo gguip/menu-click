@@ -1,0 +1,36 @@
+.overlay {
+  background: var(--mc-overlay);
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.body {
+  display: grid;
+  gap: 12px;
+}
+
+.text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--mc-ink2);
+}
+
+.warn {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--mc-warn-soft);
+  color: var(--mc-warn);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}

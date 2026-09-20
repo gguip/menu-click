@@ -1,0 +1,13 @@
+.neutral {
+  min-height: 100vh;
+  background: var(--mc-bg);
+}
+
+.failure {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 12px;
+  justify-items: center;
+  color: var(--mc-ink2);
+}

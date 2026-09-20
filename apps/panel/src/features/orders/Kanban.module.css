@@ -1,0 +1,99 @@
+.board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(268px, 1fr));
+  gap: 12px;
+  align-items: start;
+  overflow-x: auto;
+  padding: 0 20px 20px;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-height: calc(100vh - 210px);
+  background: var(--mc-surface2);
+  border: 1px solid var(--mc-line);
+  border-radius: 10px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 13px;
+  border-bottom: 1px solid var(--mc-line);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.dot_new {
+  background: var(--mc-warn-strong);
+}
+
+.dot_preparing {
+  background: var(--mc-ink3);
+}
+
+.dot_ready {
+  background: var(--mc-accent);
+}
+
+.dot_done {
+  background: var(--mc-line-hi);
+}
+
+.title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.count {
+  min-width: 24px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--mc-surface3);
+  color: var(--mc-ink2);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.countWarn {
+  background: var(--mc-warn-soft);
+  color: var(--mc-warn);
+}
+
+.body {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.empty {
+  margin: 16px 0;
+  font-size: 13px;
+  color: var(--mc-ink3);
+  text-align: center;
+}
+
+.skeleton {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-line);
+  border-radius: 6px;
+}
+
+.bar {
+  border-radius: 4px;
+  background: var(--mc-surface3);
+}

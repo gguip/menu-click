@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: hoje existe só a API (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, taxa de entrega por bairro ou fixa com pedido mínimo, mesas do salão com QR code próprio, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: existem a API e o painel da loja (`apps/panel`, parte 1 — acesso, pedidos e cardápio). A API tem (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, taxa de entrega por bairro ou fixa com pedido mínimo, mesas do salão com QR code próprio, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -26,6 +26,10 @@ pnpm --filter @menuclick/api migrate:create X # cria uma migration SQL nova
 pnpm --filter @menuclick/api db:seed          # popula dados de exemplo (idempotente)
 pnpm --filter @menuclick/api openapi:generate # regera o openapi.json versionado
 pnpm --filter @menuclick/api test             # suíte de integração (precisa do Postgres de pé)
+
+pnpm --filter @menuclick/panel dev            # painel em http://localhost:5173 (proxy /api → :3333)
+pnpm --filter @menuclick/panel test           # testes do painel (jsdom, sem banco)
+pnpm --filter @menuclick/panel build          # type-check + vite build
 ```
 
 A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). 🚨 **`MENU_BASE_URL` é obrigatória e não tem default — sem ela a API não sobe** (é a raiz da URL do cardápio, de onde sai o endereço dentro do QR code das mesas; ver a seção de mesas). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
@@ -643,6 +647,20 @@ O `app.ts` fecha o pool no hook `onClose` (registrado no `buildApp()`, junto do 
 O schema é versionado com **`node-pg-migrate`**, em migrations de **SQL puro** dentro de `apps/api/migrations/` (`-- Up Migration` / `-- Down Migration`, controle na tabela `pgmigrations`). Dados de exemplo ficam em `src/db/seed.sql`.
 
 🚨 **Este projeto usa soft delete: nada é apagado do banco.** Todo `DELETE` da API é um `update ... set deleted_at = now()`, e **toda** consulta filtra `deleted_at is null`. As regras completas (cascata transacional, índices parciais, como criar migration e como fazer baseline de banco existente) estão em `.claude/rules/database.md` — **leia antes de escrever qualquer SQL**.
+
+### Painel da loja (`apps/panel`)
+
+SPA em Vite + React 19 + Mantine 9 + React Router 8 + TanStack Query 5 — **o painel não tem SSR**: está inteiro atrás de login e o token Bearer mora no navegador. Spec: `docs/superpowers/specs/2026-09-19-painel-da-loja-parte-1-design.md`; handoff de design (tokens, medidas e **copy final**) em `docs/design/painel-da-loja/`.
+
+- **A copy do handoff é literal.** Os desvios estão na tabela "Onde este desenho diverge do handoff" da spec — mudar um texto fora dela é decisão, não ajuste.
+- **Cor só por `var(--mc-*)`**, injetada pelo `cssVariablesResolver` a partir de `src/theme/tokens.ts` (o único arquivo com hex). Sem sombra, sem transição, sem animação.
+- **Toda chamada passa por `apiRequest`** (`src/api/client.ts`): ele põe o Bearer, só declara `Content-Type` quando há corpo (o Fastify recusa JSON vazio com 400) e trata 401 com sessão como sessão expirada.
+- **Tudo que é pedido tem chave de query começando em `"orders"`**, para uma invalidação cobrir lista, detalhe, pendentes e resumo. O header e o futuro Resumo leem a MESMA query de resumo.
+- **Polling de 10 s continua com a aba em segundo plano** (`refetchIntervalInBackground`): o painel passa o dia atrás de outras janelas. O aviso de pedido novo (bipe, título da aba, contador) vigia os `pending` de qualquer data, na casca — toca em qualquer tela.
+- **A lista de pedidos pagina até o fim** (`fetchAllPages`): com "mais recentes" num dia cheio, um pedido aberto antigo sumiria do kanban.
+- **"Aceitar" encadeia `confirm` + `start-preparing`**; se o segundo falhar, o pedido fica `confirmed` com "Começar preparo" como rede. Cancelar tem **três** textos (recusar / devolve / não devolve estoque), regra em `features/orders/orderRules.ts`.
+- ⚠️ **Token em `localStorage` é provisório** (pendência de integração); as rotas `/recuperar-senha` e `/verificar-email` casam com os defaults de `PASSWORD_RESET_URL` e `EMAIL_VERIFICATION_URL`. O `MENU_BASE_URL` default também aponta para `:5173` — até o cardápio do cliente existir, o QR de uma mesa abriria o painel.
+- **Testes:** Vitest + Testing Library + jsdom, `fetch` mockado por `test/api-mock.ts`, Mantine com `env="test"`. Não há `jest-dom`.
 
 ### Monorepo
 

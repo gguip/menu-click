@@ -1,0 +1,25 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--mc-bg);
+}
+
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.banner {
+  padding: 10px 20px;
+  background: var(--mc-warn-soft);
+  border-bottom: 1px solid var(--mc-warn-line);
+  color: var(--mc-warn);
+  font-size: 13.5px;
+}

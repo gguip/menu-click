@@ -1,0 +1,51 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  background: var(--mc-surface);
+  border-bottom: 1px solid var(--mc-line);
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.indicator {
+  display: grid;
+  gap: 1px;
+}
+
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mc-ink3);
+}
+
+.value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mc-ink);
+}
+
+.divider {
+  width: 1px;
+  height: 32px;
+  background: var(--mc-line);
+}
