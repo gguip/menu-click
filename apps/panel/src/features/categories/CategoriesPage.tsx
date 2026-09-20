@@ -26,6 +26,17 @@ export function countLabel(count: number | undefined): string {
   return count === 1 ? "1 produto" : `${count} produtos`;
 }
 
+/**
+ * Prefixo PRÓPRIO, fora de `["categories", restaurantId]` (FIX 7 da
+ * revisão): antes, as chaves de contagem viviam DEBAIXO da chave da lista, e
+ * `queryClient.invalidateQueries({ queryKey: key })` — chamado por criar,
+ * renomear e reordenar, nenhum dos quais muda quantos produtos uma seção
+ * tem — invalidava as N contagens de brinde a cada mutação.
+ */
+function categoryCountKey(restaurantId: string, categoryId: string) {
+  return ["category-counts", restaurantId, categoryId] as const;
+}
+
 export function CategoriesPage() {
   const { restaurantId } = useSessionUser();
   const queryClient = useQueryClient();
@@ -34,7 +45,7 @@ export function CategoriesPage() {
   const list = categories.data ?? [];
   const counts = useQueries({
     queries: list.map((category) => ({
-      queryKey: ["categories", restaurantId, "count", category.id],
+      queryKey: categoryCountKey(restaurantId, category.id),
       queryFn: () => countProductsInCategory(restaurantId, category.id),
       staleTime: 30_000,
     })),
@@ -85,6 +96,10 @@ export function CategoriesPage() {
     onSuccess: () => {
       setRemoving(null);
       void refresh();
+      // A única mutação daqui que pode alterar uma contagem: os produtos da
+      // seção removida saem dela (viram "Sem categoria"). Criar, renomear e
+      // reordenar não mexem em contagem nenhuma — por isso só aqui.
+      void queryClient.invalidateQueries({ queryKey: ["category-counts", restaurantId] });
     },
     onError: (cause) => {
       setRemoving(null);

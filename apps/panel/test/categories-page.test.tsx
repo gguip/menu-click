@@ -91,6 +91,26 @@ describe("CategoriesPage", () => {
     ]);
   });
 
+  it("reordenar não refaz as contagens de produtos (FIX 7)", async () => {
+    const api = setup([
+      { method: "PATCH", path: `${BASE}/cat-1`, body: { ...pizzas, position: 1 } },
+      { method: "PATCH", path: `${BASE}/cat-2`, body: { ...entradas, position: 0 } },
+    ]);
+    await screen.findByRole("listitem", { name: "Pizzas" });
+    await within(row("Pizzas")).findByText("3 produtos");
+    const countCallsBefore = api.calls.filter((call) => call.path === PRODUCTS).length;
+
+    fireEvent.click(screen.getByRole("button", { name: "Descer Pizzas" }));
+    await waitFor(() => expect(api.calls.filter((call) => call.method === "PATCH")).toHaveLength(2));
+    // espera o refresh da lista (onSettled) ir e voltar, para dar tempo de
+    // qualquer refetch indevido de contagem acontecer também
+    await waitFor(() =>
+      expect(api.calls.filter((call) => call.path === BASE && call.method === "GET").length).toBeGreaterThan(1),
+    );
+
+    expect(api.calls.filter((call) => call.path === PRODUCTS).length).toBe(countCallsBefore);
+  });
+
   it("remover diz o que NÃO acontece com os produtos", async () => {
     const api = setup([{ method: "DELETE", path: `${BASE}/cat-1`, status: 204 }]);
     fireEvent.click(within(await screen.findByRole("listitem", { name: "Pizzas" })).getByRole("button", { name: "Remover" }));
