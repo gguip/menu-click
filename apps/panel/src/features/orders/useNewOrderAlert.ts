@@ -6,8 +6,16 @@ import { hasUserGesture, playBeep, unlockAudio } from "../../lib/audio.ts";
 import { detectNewPending } from "./newOrders.ts";
 import { ORDERS_POLL_MS } from "./polling.ts";
 
+/**
+ * Escopado a "hoje" (FIX 5 da revisão): `listPendingOrders` já manda
+ * `period: "today"` para a API, e a chave carrega o mesmo recorte — o rail
+ * âmbar, o contador e o título da aba precisam descrever o mesmo conjunto
+ * que o operador vê na coluna "Novos" do kanban (que também é `today`), não
+ * "todo `pending` que a loja já recebeu". Sem isso, um pedido nunca recusado
+ * de dias atrás deixava o alerta ligado para sempre.
+ */
 function pendingQueryKey(restaurantId: string) {
-  return ["orders", "pending", restaurantId] as const;
+  return ["orders", "pending", "today", restaurantId] as const;
 }
 
 /**
