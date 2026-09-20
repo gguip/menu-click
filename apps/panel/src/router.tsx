@@ -6,12 +6,8 @@ import { LoginPage } from "./features/access/LoginPage.tsx";
 import { RegisterPage } from "./features/access/RegisterPage.tsx";
 import { ResetPasswordPage } from "./features/access/ResetPasswordPage.tsx";
 import { VerifyEmailLinkPage } from "./features/access/VerifyEmailLinkPage.tsx";
+import { OrdersPage } from "./features/orders/OrdersPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
-
-// Provisório: cada tela entra no lugar do seu Placeholder na task dela.
-function Placeholder({ title }: { title: string }) {
-  return <h1>{title}</h1>;
-}
 
 export const routes: RouteObject[] = [
   {
@@ -36,7 +32,7 @@ export const routes: RouteObject[] = [
           {
             element: <PanelLayout />,
             children: [
-              { path: "/pedidos", handle: { title: "Pedidos" }, element: <Placeholder title="Pedidos" /> },
+              { path: "/pedidos", handle: { title: "Pedidos" }, element: <OrdersPage /> },
             ],
           },
         ],

@@ -1,0 +1,30 @@
+.pill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border: 1px solid var(--mc-line);
+  border-radius: 999px;
+  color: var(--mc-ink2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.delivery {
+  background: var(--mc-accent);
+}
+
+.takeaway {
+  background: var(--mc-pickup);
+}
+
+.dine_in {
+  background: var(--mc-warn-strong);
+}
