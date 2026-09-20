@@ -89,3 +89,13 @@
   display: flex;
   gap: 8px;
 }
+
+.primaryAction {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.secondaryAction {
+  flex: 0 0 auto;
+  padding-inline: 12px;
+}

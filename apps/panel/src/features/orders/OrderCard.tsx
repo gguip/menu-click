@@ -23,7 +23,7 @@ function CardActions({ order }: { order: Order }) {
       onKeyDown={(event) => event.stopPropagation()}
     >
       <Button
-        fullWidth
+        className={classes.primaryAction}
         h={38}
         variant={isNew ? "filled" : "default"}
         disabled={disabled}
@@ -33,7 +33,13 @@ function CardActions({ order }: { order: Order }) {
         {action.cardLabel}
       </Button>
       {isNew && (
-        <Button variant="default" h={38} disabled={disabled || busy} onClick={() => request(order, "cancel")}>
+        <Button
+          className={classes.secondaryAction}
+          variant="default"
+          h={38}
+          disabled={disabled || busy}
+          onClick={() => request(order, "cancel")}
+        >
           Recusar
         </Button>
       )}
