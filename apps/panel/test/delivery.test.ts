@@ -45,6 +45,15 @@ describe("addNeighborhood", () => {
       error: "Informe o frete em reais, como 8,50 — ou 0 para entrega grátis.",
     });
   });
+
+  it("barra nome com mais de 100 caracteres", () => {
+    expect(addNeighborhood([], "a".repeat(101), "5,00")).toEqual({
+      error: "O nome do bairro vai até 100 caracteres.",
+    });
+    expect(addNeighborhood([], "a".repeat(100), "5,00")).toEqual({
+      list: [{ name: "a".repeat(100), feeInCents: 500 }],
+    });
+  });
 });
 
 describe("neighborhoodsChanged", () => {

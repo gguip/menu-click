@@ -25,6 +25,9 @@ export function addNeighborhood(
   const trimmed = name.trim();
   const key = normalizeNeighborhood(trimmed);
   if (key === "") return { error: "Informe o nome do bairro." };
+  // A API recusa nome com mais de 100 caracteres com a mensagem do Ajv, em
+  // inglês — barrar aqui evita que ela chegue à tela.
+  if (trimmed.length > 100) return { error: "O nome do bairro vai até 100 caracteres." };
   const feeInCents = parseReaisToCents(feeText);
   if (feeInCents === null) return { error: "Informe o frete em reais, como 8,50 — ou 0 para entrega grátis." };
   if (list.some((item) => normalizeNeighborhood(item.name) === key)) {
