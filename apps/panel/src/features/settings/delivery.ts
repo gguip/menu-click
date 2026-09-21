@@ -78,8 +78,17 @@ export function validateDeliveryForm(form: DeliveryForm): string | null {
   if (form.mode === "fixed" && parseReaisToCents(form.fixedFee) === null) {
     return "Informe a taxa fixa em reais, como 8,50.";
   }
-  if (form.freeAbove.trim() !== "" && parseReaisToCents(form.freeAbove) === null) {
-    return "Informe o valor da entrega grátis em reais, como 50,00 — ou deixe em branco.";
+  if (form.freeAbove.trim() !== "") {
+    const free = parseReaisToCents(form.freeAbove);
+    if (free === null) {
+      return "Informe o valor da entrega grátis em reais, como 50,00 — ou deixe em branco.";
+    }
+    // A API aceita 0 (significaria "sempre grátis", que já se expressa com
+    // taxa fixa R$ 0), mas aqui o zero quase sempre é engano de quem quis
+    // desligar a promoção — o campo vizinho (Pedido mínimo) ensina que zero desliga.
+    if (free === 0) {
+      return "Para desligar a entrega grátis, deixe o campo em branco.";
+    }
   }
   if (parseReaisToCents(form.minimumOrder) === null) {
     return "Informe o pedido mínimo em reais, como 30,00 — ou 0 para sem mínimo.";

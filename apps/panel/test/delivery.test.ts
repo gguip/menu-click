@@ -115,6 +115,18 @@ describe("o formulário de entrega", () => {
     );
   });
 
+  it("'grátis acima de' 0 recusa — só o campo vazio desliga a promoção", () => {
+    const form = fromRestaurant(makeRestaurant());
+    expect(validateDeliveryForm({ ...form, freeAbove: "0" })).toBe(
+      "Para desligar a entrega grátis, deixe o campo em branco.",
+    );
+    expect(validateDeliveryForm({ ...form, freeAbove: "0,00" })).toBe(
+      "Para desligar a entrega grátis, deixe o campo em branco.",
+    );
+    expect(validateDeliveryForm({ ...form, freeAbove: "50,00" })).toBeNull();
+    expect(validateDeliveryForm({ ...form, freeAbove: "" })).toBeNull();
+  });
+
   it("texto inválido deixa a tela suja, para o Salvar mostrar o erro", () => {
     const restaurant = makeRestaurant();
     expect(isDeliveryDirty({ ...fromRestaurant(restaurant), minimumOrder: "x" }, restaurant, false)).toBe(true);
