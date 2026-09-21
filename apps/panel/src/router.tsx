@@ -12,6 +12,7 @@ import { OrdersPage } from "./features/orders/OrdersPage.tsx";
 import { ProductFormPage } from "./features/products/ProductFormPage.tsx";
 import { ProductsPage } from "./features/products/ProductsPage.tsx";
 import { ModalitiesPage } from "./features/settings/ModalitiesPage.tsx";
+import { OpeningHoursPage } from "./features/settings/OpeningHoursPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
 import { RouteError } from "./layout/RouteError.tsx";
 
@@ -57,6 +58,11 @@ export const routes: RouteObject[] = [
                 path: "/modalidades",
                 handle: { title: "Modalidades e pagamento" },
                 element: <ModalitiesPage />,
+              },
+              {
+                path: "/horario",
+                handle: { title: "Horário de funcionamento" },
+                element: <OpeningHoursPage />,
               },
             ],
           },

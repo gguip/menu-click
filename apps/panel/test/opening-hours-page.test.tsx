@@ -1,0 +1,91 @@
+import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { OpeningHoursPage } from "../src/features/settings/OpeningHoursPage.tsx";
+import { type MockHandler, mockApi } from "./api-mock.ts";
+import { panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
+import { renderInPanel } from "./render.tsx";
+
+const HOURS = `/restaurants/${RESTAURANT_ID}/opening-hours`;
+const routes = [{ path: "/horario", element: <OpeningHoursPage /> }];
+
+function gradeHandler(
+  hours: { id: string; weekday: number; opensAt: string; closesAt: string }[],
+): MockHandler {
+  return { method: "GET", path: HOURS, body: { openingHours: hours } };
+}
+
+const SEGUNDA_E_SABADO = [
+  { id: "1", weekday: 1, opensAt: "11:30", closesAt: "15:00" },
+  { id: "2", weekday: 1, opensAt: "18:00", closesAt: "23:30" },
+  { id: "3", weekday: 6, opensAt: "18:00", closesAt: "02:00" },
+];
+
+function setup(extra: MockHandler[] = [], hours = SEGUNDA_E_SABADO) {
+  signIn();
+  const api = mockApi([...extra, gradeHandler(hours), ...panelHandlers()]);
+  renderInPanel(routes, "/horario");
+  return api;
+}
+
+describe("OpeningHoursPage", () => {
+  it("resume cada dia, e dia sem faixa é dia fechado", async () => {
+    setup();
+    const segunda = await screen.findByRole("listitem", { name: "Segunda" });
+    expect(segunda.textContent).toContain("2 faixas");
+    expect(screen.getByRole("listitem", { name: "Domingo" }).textContent).toContain("Fechado");
+  });
+
+  it("a faixa que vira a madrugada é marcada, não recusada", async () => {
+    setup();
+    const sabado = await screen.findByRole("listitem", { name: "Sábado" });
+    expect(sabado.textContent).toContain("vira a madrugada");
+  });
+
+  it("acrescentar faixa manda a grade inteira", async () => {
+    const api = setup([{ method: "PUT", path: HOURS, body: { openingHours: SEGUNDA_E_SABADO } }]);
+    fireEvent.click(await screen.findByRole("button", { name: "Adicionar faixa em quarta" }));
+    fireEvent.change(screen.getByLabelText("Quarta: abre (faixa 1)"), { target: { value: "18:00" } });
+    fireEvent.change(screen.getByLabelText("Quarta: fecha (faixa 1)"), { target: { value: "23:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar horário" }));
+    await waitFor(() => expect(api.calls.some((call) => call.method === "PUT")).toBe(true));
+    expect(api.calls.find((call) => call.method === "PUT")?.body).toEqual({
+      openingHours: [
+        { weekday: 1, opensAt: "11:30", closesAt: "15:00" },
+        { weekday: 1, opensAt: "18:00", closesAt: "23:30" },
+        { weekday: 3, opensAt: "18:00", closesAt: "23:00" },
+        { weekday: 6, opensAt: "18:00", closesAt: "02:00" },
+      ],
+    });
+  });
+
+  it("dia esvaziado sai do corpo", async () => {
+    const api = setup([{ method: "PUT", path: HOURS, body: { openingHours: [] } }]);
+    fireEvent.click(await screen.findByRole("button", { name: "Remover faixa 1 de sábado" }));
+    fireEvent.click(screen.getByRole("button", { name: "Salvar horário" }));
+    await waitFor(() => expect(api.calls.some((call) => call.method === "PUT")).toBe(true));
+    const body = api.calls.find((call) => call.method === "PUT")?.body as {
+      openingHours: { weekday: number }[];
+    };
+    expect(body.openingHours.some((hour) => hour.weekday === 6)).toBe(false);
+  });
+
+  it("faixa que começa e termina no mesmo horário nem chega à API", async () => {
+    const api = setup();
+    fireEvent.click(await screen.findByRole("button", { name: "Adicionar faixa em terça" }));
+    fireEvent.change(screen.getByLabelText("Terça: abre (faixa 1)"), { target: { value: "19:00" } });
+    fireEvent.change(screen.getByLabelText("Terça: fecha (faixa 1)"), { target: { value: "19:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar horário" }));
+    expect(screen.getByText("A faixa de terça começa e termina no mesmo horário.")).toBeTruthy();
+    expect(api.calls.some((call) => call.method === "PUT")).toBe(false);
+  });
+
+  it("a pausa no rodapé é o mesmo interruptor do topo", async () => {
+    setup();
+    expect(await screen.findByRole("switch", { name: "Aceitando pedidos" })).toBeTruthy();
+    expect(
+      screen.getByText(
+        "É o botão de cozinha afogada, e não mexe no horário cadastrado. Ele está sempre na barra do topo — daqui é só o mesmo interruptor.",
+      ),
+    ).toBeTruthy();
+  });
+});

@@ -15,7 +15,10 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = 
   },
   {
     title: "Configuração",
-    items: [{ to: "/modalidades", label: "Modalidades" }],
+    items: [
+      { to: "/modalidades", label: "Modalidades" },
+      { to: "/horario", label: "Horário" },
+    ],
   },
 ];
 
