@@ -158,6 +158,9 @@ export type Table = { id: string; restaurantId: string; label: string; hash: str
 
 export type DeliveryNeighborhood = { name: string; feeInCents: number };
 
+/** Uma faixa de funcionamento. `opensAt`/`closesAt` são hora de parede, "HH:MM". */
+export type OpeningHour = { id: string; weekday: number; opensAt: string; closesAt: string };
+
 export type RegisterInput = {
   restaurant: {
     name: string;
