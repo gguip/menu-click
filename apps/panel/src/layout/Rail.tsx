@@ -18,6 +18,7 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = 
     items: [
       { to: "/modalidades", label: "Modalidades" },
       { to: "/horario", label: "Horário" },
+      { to: "/dados-da-loja", label: "Dados da loja" },
     ],
   },
 ];

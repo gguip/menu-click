@@ -1,0 +1,50 @@
+.page {
+  display: grid;
+  gap: 16px;
+  padding: 18px 20px 0;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-line);
+  border-radius: 10px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.address {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 0.7fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.error {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--mc-danger);
+}
+
+.loading {
+  padding: 18px 20px;
+  color: var(--mc-ink2);
+}
