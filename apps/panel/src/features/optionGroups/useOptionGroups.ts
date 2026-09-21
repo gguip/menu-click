@@ -72,16 +72,20 @@ export function useUpdateOptionGroup(restaurantId: string, groupId: string) {
   });
 }
 
-/** Remover o grupo muda os `optionGroupIds` dos produtos: produtos (e a contagem) também invalidam. */
+/**
+ * Remover o grupo muda os `optionGroupIds` dos produtos, então a contagem de
+ * uso também invalida — mas só a invalidação de grupos é aguardada, porque é
+ * ela que tira o cartão da tela. A de produtos refaz a varredura inteira (até
+ * 20 GETs) e roda em segundo plano (`void`), sem prender o diálogo de
+ * remoção até ela terminar.
+ */
 export function useRemoveOptionGroup(restaurantId: string, groupId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => deleteOptionGroup(restaurantId, groupId),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: optionGroupsQueryKey(restaurantId) }),
-        queryClient.invalidateQueries({ queryKey: ["products", restaurantId] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: optionGroupsQueryKey(restaurantId) });
+      void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
     },
   });
 }
