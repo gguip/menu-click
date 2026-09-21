@@ -241,6 +241,21 @@ Nenhuma dependência nova. O CI já roda o painel. O rail ganha o grupo
 barra de salvar), interruptor salva sozinho com volta atrás, e remover a loja
 encerra a sessão.
 
+## Onde a implementação diverge do handoff
+
+| O quê | Por quê |
+| --- | --- |
+| Vale-refeição como quarto interruptor | Já justificado acima, em "Modalidades e pagamento" — só referência. |
+| Aviso "Entrega ligada com frete grátis" | Copy nova; o handoff não previu o caso. A parte 1 cria a loja com taxa fixa R$ 0 e Entrega desligada exatamente para evitar entregar de graça, e ligar a Entrega aqui reabriria isso em silêncio. Informa, não trava: frete zero é estado legítimo. |
+| Quatro fusos a mais (MS, RR, AL/SE, TO) | A lista da spec deixava esses estados sem opção com o próprio nome; e fuso fora da lista aparece como opção "(atual)". |
+| Setas ↑↓ para reordenar faixas, listadas no handoff, ficaram de fora | A API devolve as faixas ordenadas por `opens_at`, então a ordem manual não sobreviveria ao salvar. |
+| Dados da loja: endereço em card próprio à direita e zona destrutiva embaixo das duas colunas | Em vez de endereço dentro de Identificação e zona destrutiva como coluna direita. |
+
+## Perguntas em aberto
+
+- A copy literal da zona destrutiva diz que remover "apaga … usuários e o histórico de pedidos", mas a API não remove usuários nem pedidos (pedido é histórico e não cascateia). Os usuários `staff` da loja removida continuam conseguindo entrar e caem numa casca sem restaurante. É pergunta de produto e de API.
+- Lojas que ganharam a grade 24x7 no backfill veem 14 faixas no Horário (`00:00–23:59` e `23:59–00:00` por dia), com o selo "vira a madrugada" em sete delas. Esperado, mas feio — um "limpar grade" ou uma tradução especial fica para depois.
+
 ## Fora de escopo, de propósito
 
 - **Entrega e Grupos de opções** — parte 2b.
