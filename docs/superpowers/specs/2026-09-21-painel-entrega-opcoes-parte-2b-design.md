@@ -1,6 +1,6 @@
 # Painel da loja, parte 2b — Entrega e Grupos de opções — desenho
 
-**Data:** 2026-09-21 · **Estado:** aprovado, não implementado (branch `feat/painel-entrega-opcoes`)
+**Data:** 2026-09-21 · **Estado:** implementado (branch `feat/painel-entrega-opcoes`)
 
 ## O problema
 
@@ -49,13 +49,11 @@ Rotas dentro do `PanelLayout`, cada uma com `handle: { title }`, como as da 2a.
 
 - O `DeliveryAlert` do kanban (`features/orders/OrdersNotices.tsx`) ganha o botão
   **"Configurar entrega"** para `/entrega` — o handoff o previa e o comentário da
-  parte 1 o adiou até esta tela existir. Como Modalidades e Entrega reusam o
-  mesmo componente, o botão aparece nas três telas.
+  parte 1 o adiou até esta tela existir. Na própria tela de Entrega o botão não aparece (`withAction={false}`): apontaria para a tela em que a pessoa já está.
 - Em Modalidades, a ajuda do interruptor de Entrega ("Frete e área atendida ficam
   na tela de Entrega") passa a ter link para `/entrega`, e o aviso "Entrega ligada
   com frete grátis" também.
-- O formulário de produto mostra link para `/grupos-de-opcoes` quando a loja não
-  tem nenhum grupo cadastrado — hoje o bloco fica vazio sem dizer onde se cria.
+- O formulário de produto transforma "Grupos de opções", na nota que já existia, em link para `/grupos-de-opcoes` — sempre, o que cobre o caso da loja sem grupo nenhum sem uma condição a mais.
 
 ### O que muda em `src/api/`
 
@@ -244,6 +242,8 @@ da API, e a mensagem aparece no próprio cartão.
 | Aviso de grupo que não se completa | Copy nova: o handoff não previu o estado, que a API aceita e deixa o produto sem como ser pedido |
 | Texto do diálogo de remover grupo | Copy nova: o handoff não desenhou a confirmação, e a remoção desmonta produtos em silêncio |
 | Intervalo "escolhe {n}" quando mínimo = máximo | O protótipo só mostra "escolhe X a Y"; "escolhe 2 a 2" leria como erro |
+| Placeholder "Sem entrega grátis" no campo "Entrega grátis acima de" | O handoff não diz o que o campo vazio significa; sem a dica, ninguém descobre que em branco desliga a promoção |
+| Rótulo "sem produtos" / "usado em pelo menos N produtos" | O protótipo só tem "usado em N produtos"; zero e contagem interrompida (mais de 2.000 produtos) precisam de texto próprio |
 
 ## Repo
 
