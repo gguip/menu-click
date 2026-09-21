@@ -93,6 +93,11 @@ export function ModalitiesPage() {
   }
 
   const noModality = !data.isDelivery && !data.isTakeaway && !data.isQrcode;
+  // A parte 1 cria a loja com Entrega desligada e taxa fixa R$ 0 de propósito
+  // (entregar de graça seria um acidente). Ligar Entrega aqui, sem tocar no
+  // frete, reabre exatamente isso em silêncio.
+  const freeDelivery =
+    data.isDelivery && data.deliveryFeeMode === "fixed" && data.deliveryFixedFeeInCents === 0;
 
   const renderFlag = (flag: Flag) => (
     <FlagRow key={flag.field} restaurantId={restaurantId} flag={flag} checked={data[flag.field]} />
@@ -113,6 +118,13 @@ export function ModalitiesPage() {
       )}
 
       {data.isDelivery && deliveryAlert && <DeliveryAlert />}
+
+      {freeDelivery && (
+        <Notice tone="warn" title="Entrega ligada com frete grátis">
+          A taxa fixa está em R$ 0,00: todo pedido de entrega sai sem frete. Se não é essa a intenção,
+          desligue a Entrega até o frete ser configurado.
+        </Notice>
+      )}
 
       <section className={classes.card}>
         <h2 className={classes.cardTitle}>Pagamento</h2>

@@ -126,6 +126,29 @@ describe("ModalitiesPage", () => {
     expect(screen.queryByText("Entrega por bairro sem nenhum bairro cadastrado")).toBeNull();
   });
 
+  it("entrega ligada com taxa fixa em R$ 0 avisa que o frete sai grátis", async () => {
+    signIn();
+    mockApi(
+      panelHandlers({
+        restaurant: { isDelivery: true, deliveryFeeMode: "fixed", deliveryFixedFeeInCents: 0 },
+      }),
+    );
+    renderInPanel(routes, "/modalidades");
+    expect(await screen.findByText("Entrega ligada com frete grátis")).toBeTruthy();
+  });
+
+  it("entrega ligada com taxa fixa positiva não avisa de frete grátis", async () => {
+    signIn();
+    mockApi(
+      panelHandlers({
+        restaurant: { isDelivery: true, deliveryFeeMode: "fixed", deliveryFixedFeeInCents: 500 },
+      }),
+    );
+    renderInPanel(routes, "/modalidades");
+    await screen.findByRole("switch", { name: "Entrega" });
+    expect(screen.queryByText("Entrega ligada com frete grátis")).toBeNull();
+  });
+
   it("o erro fica embaixo do interruptor que falhou, mesmo com dois cliques seguidos", async () => {
     signIn();
     const deferredA = defer<Response>();
