@@ -9,6 +9,7 @@ import { VerifyEmailLinkPage } from "./features/access/VerifyEmailLinkPage.tsx";
 import { CategoriesPage } from "./features/categories/CategoriesPage.tsx";
 import { OrderDrawer } from "./features/orders/OrderDrawer.tsx";
 import { OrdersPage } from "./features/orders/OrdersPage.tsx";
+import { OptionGroupsPage } from "./features/optionGroups/OptionGroupsPage.tsx";
 import { ProductFormPage } from "./features/products/ProductFormPage.tsx";
 import { ProductsPage } from "./features/products/ProductsPage.tsx";
 import { DeliveryPage } from "./features/settings/DeliveryPage.tsx";
@@ -56,6 +57,11 @@ export const routes: RouteObject[] = [
               { path: "/produtos/novo", handle: { title: "Novo produto" }, element: <ProductFormPage /> },
               { path: "/produtos/:productId", handle: { title: "Editar produto" }, element: <ProductFormPage /> },
               { path: "/secoes", handle: { title: "Seções do cardápio" }, element: <CategoriesPage /> },
+              {
+                path: "/grupos-de-opcoes",
+                handle: { title: "Grupos de opções" },
+                element: <OptionGroupsPage />,
+              },
               {
                 path: "/modalidades",
                 handle: { title: "Modalidades e pagamento" },

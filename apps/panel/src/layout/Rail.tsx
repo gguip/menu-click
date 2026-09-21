@@ -11,6 +11,7 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = 
       { to: "/pedidos", label: "Pedidos" },
       { to: "/produtos", label: "Produtos" },
       { to: "/secoes", label: "Seções" },
+      { to: "/grupos-de-opcoes", label: "Grupos de opções" },
     ],
   },
   {
