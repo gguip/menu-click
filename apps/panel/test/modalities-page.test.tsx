@@ -160,6 +160,36 @@ describe("ModalitiesPage", () => {
     expect(screen.queryByText("Entrega ligada com frete grátis")).toBeNull();
   });
 
+  it("o interruptor muda na hora, antes da resposta do PATCH (escrita otimista)", async () => {
+    signIn();
+    const deferred = defer<Response>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = new URL(String(input), "http://localhost");
+      const path = url.pathname.replace(/^\/api/, "");
+      const method = init.method ?? "GET";
+      if (method === "GET" && path === "/auth/me") return jsonResponse(makeMe());
+      if (method === "GET" && path === `/restaurants/${RESTAURANT_ID}`) return jsonResponse(makeRestaurant());
+      if (method === "PATCH" && path === `/restaurants/${RESTAURANT_ID}`) return deferred.promise;
+      throw new Error(`Chamada sem mock: ${method} ${path}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderInPanel(routes, "/modalidades");
+
+    const mealVoucher = await screen.findByRole("switch", { name: "Vale-refeição" });
+    expect((mealVoucher as HTMLInputElement).checked).toBe(false);
+
+    fireEvent.click(mealVoucher);
+    // Antes de a promessa do PATCH resolver, o interruptor já mudou — é a
+    // escrita otimista de `useToggleRestaurantFlag` (onMutate), não o
+    // resultado do PATCH.
+    await waitFor(() => expect((mealVoucher as HTMLInputElement).checked).toBe(true));
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH")).toHaveLength(1);
+
+    deferred.resolve(jsonResponse(makeRestaurant({ acceptsMealVoucher: true })));
+    await waitFor(() => expect((mealVoucher as HTMLInputElement).checked).toBe(true));
+  });
+
   it("o erro fica embaixo do interruptor que falhou, mesmo com dois cliques seguidos", async () => {
     signIn();
     const deferredA = defer<Response>();
