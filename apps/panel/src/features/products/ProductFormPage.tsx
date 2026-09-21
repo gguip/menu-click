@@ -11,6 +11,7 @@ import type { Category, OptionGroup, Product } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { moveItem } from "../../lib/moveItem.ts";
 import buttons from "../../ui/buttons.module.css";
+import { SaveBar } from "../../ui/SaveBar.tsx";
 import { PRICE_RULES } from "./priceRules.ts";
 import classes from "./ProductFormPage.module.css";
 import {
@@ -232,15 +233,13 @@ function ProductEditor({
           </p>
         )}
       </div>
-      <div className={classes.saveBar}>
-        {isDirty(form, initial) && <span className={classes.dirty}>Alterações não salvas</span>}
-        <Button component={Link} to="/produtos" variant="default">
-          Cancelar
-        </Button>
-        <Button loading={save.isPending} onClick={submit}>
-          Salvar produto
-        </Button>
-      </div>
+      <SaveBar
+        dirty={isDirty(form, initial)}
+        busy={save.isPending}
+        saveLabel="Salvar produto"
+        onSave={submit}
+        cancel={{ to: "/produtos" }}
+      />
     </>
   );
 }
