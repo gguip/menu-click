@@ -1,6 +1,6 @@
 # Painel da loja, parte 2a — configuração direta — desenho
 
-**Data:** 2026-09-20 · **Estado:** aprovado, não implementado (branch `feat/painel-configuracao`)
+**Data:** 2026-09-20 · **Estado:** implementado (branch `feat/painel-configuracao`)
 
 ## O problema
 
