@@ -1,8 +1,8 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { OptionGroupsPage } from "../src/features/optionGroups/OptionGroupsPage.tsx";
 import { type MockHandler, mockApi } from "./api-mock.ts";
-import { makeOptionGroup, makeProduct, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
+import { makeMe, makeOptionGroup, makeProduct, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
 import { renderInPanel } from "./render.tsx";
 
 const BASE = `/restaurants/${RESTAURANT_ID}`;
@@ -22,6 +22,22 @@ function setup(extra: MockHandler[], groups = [makeOptionGroup({ id: "grp-1", na
 
 function type(scope: ReturnType<typeof within> | typeof screen, label: string, value: string) {
   fireEvent.change(scope.getByLabelText(label), { target: { value } });
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(status === 204 ? null : JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+/** Promessa resolvida à mão, para segurar o DELETE em voo (mesmo padrão de modalities-page.test.tsx). */
+function defer<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 describe("OptionGroupsPage (grupos)", () => {
@@ -87,5 +103,50 @@ describe("OptionGroupsPage (grupos)", () => {
     expect(await screen.findByText("O grupo sai dos 2 produtos que o usam. Pedidos já feitos não mudam.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Remover grupo" }));
     await waitFor(() => expect(api.calls.some((call) => call.method === "DELETE")).toBe(true));
+  });
+
+  it("Esc não fecha o diálogo, nem o gatilho reabre, enquanto o DELETE está em voo", async () => {
+    signIn();
+    const deferred = defer<Response>();
+    let currentGroups = [makeOptionGroup({ id: "grp-1", name: "Sabores" })];
+    const products = [
+      makeProduct({ id: "p1", optionGroupIds: ["grp-1"] }),
+      makeProduct({ id: "p2", optionGroupIds: ["grp-1"] }),
+    ];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = new URL(String(input), "http://localhost");
+      const path = url.pathname.replace(/^\/api/, "");
+      const method = init.method ?? "GET";
+      if (method === "GET" && path === "/auth/me") return jsonResponse(makeMe());
+      if (method === "GET" && path === `${BASE}/option-groups`) {
+        return jsonResponse({ data: currentGroups, limit: 100, offset: 0, total: currentGroups.length });
+      }
+      if (method === "GET" && path === `${BASE}/products`) {
+        return jsonResponse({ data: products, limit: 100, offset: 0, total: products.length });
+      }
+      if (method === "DELETE" && path === `${BASE}/option-groups/grp-1`) return deferred.promise;
+      throw new Error(`Chamada sem mock: ${method} ${path}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderInPanel(routes, "/grupos-de-opcoes");
+
+    await screen.findByText("usado em 2 produtos");
+    fireEvent.click(screen.getByRole("button", { name: "Remover grupo Sabores" }));
+    const confirmationText = "O grupo sai dos 2 produtos que o usam. Pedidos já feitos não mudam.";
+    expect(await screen.findByText(confirmationText)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Remover grupo" }));
+
+    // O DELETE está em voo (a promessa ainda não resolveu): Esc não pode fechar o diálogo.
+    await waitFor(() => expect(fetchMock.mock.calls.some(([, init]) => init?.method === "DELETE")).toBe(true));
+    fireEvent.keyDown(document.body, { key: "Escape", code: "Escape" });
+    expect(screen.getByText(confirmationText)).toBeTruthy();
+
+    // E o gatilho do cabeçalho não pode reabrir uma segunda confirmação por cima da primeira.
+    expect((screen.getByRole("button", { name: "Remover grupo Sabores" }) as HTMLButtonElement).disabled).toBe(true);
+
+    currentGroups = [];
+    deferred.resolve(jsonResponse(null, 204));
+    await waitFor(() => expect(screen.queryByText(confirmationText)).toBeNull());
   });
 });

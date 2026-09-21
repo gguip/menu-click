@@ -91,6 +91,7 @@ export function GroupCard({
               variant="subtle"
               className={buttons.dangerText}
               aria-label={`Remover grupo ${group.name}`}
+              disabled={remove.isPending}
               onClick={() => {
                 remove.reset();
                 setConfirming(true);

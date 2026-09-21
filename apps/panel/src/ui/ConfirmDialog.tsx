@@ -22,6 +22,12 @@ export function ConfirmDialog({
       centered
       size={460}
       radius="md"
+      // Enquanto `busy` (mutação em voo), o modal não fecha por nenhum
+      // caminho — Esc, clique fora ou X abririam uma segunda confirmação
+      // em cima de uma chamada que já está a caminho.
+      closeOnEscape={!busy}
+      closeOnClickOutside={!busy}
+      withCloseButton={!busy}
       classNames={{ title: classes.title, overlay: classes.overlay }}
     >
       {copy && (
