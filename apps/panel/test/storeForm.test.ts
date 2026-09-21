@@ -54,6 +54,11 @@ describe("formulário de dados da loja", () => {
     });
   });
 
+  it("UF em minúscula não deixa o formulário sujo para sempre", () => {
+    const initialRJ = { ...initial, state: "RJ" };
+    expect(changedPatch({ ...initialRJ, state: "rj" }, initialRJ)).toEqual({});
+  });
+
   it("recusa o que a API recusaria", () => {
     expect(validateStoreForm(initial)).toBeNull();
     expect(validateStoreForm({ ...initial, name: "  " })).toBe("Informe o nome da loja.");

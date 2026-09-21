@@ -66,7 +66,14 @@ export function changedPatch(form: StoreForm, initial: StoreForm): RestaurantPat
   // A API não aceita `photoUrl`/`logoUrl` vazia (é `format: uri`), então o
   // campo esvaziado não vira uma limpeza — só deixa de ser enviado.
   if (logoUrl !== "" && logoUrl !== initial.logoUrl) patch.logoUrl = logoUrl;
-  if (ADDRESS_FIELDS.some((field) => form[field].trim() !== initial[field])) {
+  // `state` é comparado já em maiúsculas: é o valor que de fato vai no PATCH
+  // (`toUpperCase()` abaixo). Comparar o cru deixava "rj" ficar para sempre
+  // "diferente" de "RJ", mesmo depois de salvar.
+  const dirtyAddress = ADDRESS_FIELDS.some((field) => {
+    const value = form[field].trim();
+    return field === "state" ? value.toUpperCase() !== initial.state : value !== initial[field];
+  });
+  if (dirtyAddress) {
     patch.address = {
       street: form.street.trim(),
       number: form.number.trim(),
