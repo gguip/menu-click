@@ -130,8 +130,14 @@ describe("OrdersPage", () => {
       ...panelHandlers(),
     ]);
     renderInPanel(routes, "/pedidos");
+    // Timeout maior só aqui: 10 buscas sequenciais (o teto de 1000 pedidos
+    // pagina até o fim) já estouraram o padrão de 1 s do findBy três vezes.
     expect(
-      await screen.findByText("Mostrando só os 1000 pedidos mais recentes do período"),
+      await screen.findByText(
+        "Mostrando só os 1000 pedidos mais recentes do período",
+        {},
+        { timeout: 5000 },
+      ),
     ).toBeTruthy();
   });
 
