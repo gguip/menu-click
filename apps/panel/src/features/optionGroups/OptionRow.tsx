@@ -44,8 +44,12 @@ function Errors({ messages }: { messages: (string | null)[] }) {
     <>
       {messages
         .filter((message): message is string => message !== null)
-        .map((message) => (
-          <p key={message} role="alert" className={classes.error}>
+        // O índice na lista já filtrada serve de `key`: duas mutações podem
+        // falhar com o MESMO texto (rede fora), e usar o texto como `key`
+        // colidiria — a lista é recalculada inteira a cada render, então o
+        // índice não carrega identidade de item nenhuma para se perder.
+        .map((message, index) => (
+          <p key={index} role="alert" className={classes.error}>
             {message}
           </p>
         ))}
