@@ -157,8 +157,8 @@ function ProductEditor({
           <section className={classes.card}>
             <h2 className={classes.cardTitle}>Grupos de opções</h2>
             <p className={classes.note}>
-              A ordem aqui é a ordem que o cliente vê. Os grupos pertencem à loja — crie e edite em Grupos
-              de opções.
+              A ordem aqui é a ordem que o cliente vê. Os grupos pertencem à loja — crie e edite em{" "}
+              <Link to="/grupos-de-opcoes">Grupos de opções</Link>.
             </p>
             {form.optionGroupIds.map((id, index) => {
               const group = groups.find((candidate) => candidate.id === id);

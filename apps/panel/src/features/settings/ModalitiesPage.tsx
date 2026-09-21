@@ -1,4 +1,6 @@
-import { Switch } from "@mantine/core";
+import { Button, Switch } from "@mantine/core";
+import type { ReactNode } from "react";
+import { Link } from "react-router";
 import { describeError } from "../../api/client.ts";
 import type { RestaurantPatch } from "../../api/restaurant.ts";
 import type { Restaurant } from "../../api/types.ts";
@@ -20,10 +22,18 @@ type FlagField = keyof Pick<
   | "acceptsMealVoucher"
 >;
 
-type Flag = { field: FlagField; label: string; help: string };
+type Flag = { field: FlagField; label: string; help: ReactNode };
 
 const MODALITIES: readonly Flag[] = [
-  { field: "isDelivery", label: "Entrega", help: "Frete e área atendida ficam na tela de Entrega" },
+  {
+    field: "isDelivery",
+    label: "Entrega",
+    help: (
+      <>
+        Frete e área atendida ficam na tela de <Link to="/entrega">Entrega</Link>
+      </>
+    ),
+  },
   { field: "isTakeaway", label: "Retirada no balcão", help: "O cliente busca no endereço da loja" },
   { field: "isQrcode", label: "Salão", help: "Pedido pela mesa, com QR code" },
 ];
@@ -126,8 +136,15 @@ export function ModalitiesPage() {
 
       {freeDelivery && (
         <Notice tone="warn" title="Entrega ligada com frete grátis">
-          A taxa fixa está em R$ 0,00: todo pedido de entrega sai sem frete. Se não é essa a intenção,
-          desligue a Entrega até o frete ser configurado.
+          <div className={classes.noticeRow}>
+            <span>
+              A taxa fixa está em R$ 0,00: todo pedido de entrega sai sem frete. Se não é essa a
+              intenção, desligue a Entrega até o frete ser configurado.
+            </span>
+            <Button component={Link} to="/entrega" variant="default">
+              Configurar entrega
+            </Button>
+          </div>
         </Notice>
       )}
 
