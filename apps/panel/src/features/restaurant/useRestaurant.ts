@@ -48,7 +48,17 @@ export function useUpdateRestaurant(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (patch: RestaurantPatch) => updateRestaurant(id, patch),
-    onSuccess: (restaurant) => queryClient.setQueryData(restaurantQueryKey(id), restaurant),
+    onSuccess: (restaurant, patch) => {
+      queryClient.setQueryData(restaurantQueryKey(id), restaurant);
+      // O fuso decide onde o dia começa: "pedidos de hoje" e o faturamento
+      // do header dependem dele. Sem invalidar, o header e o kanban ficam no
+      // dia antigo até o próximo poll — o prefixo `["orders"]` existe
+      // exatamente para uma invalidação cobrir lista, detalhe, pendentes e
+      // resumo de uma vez.
+      if (patch.timezone !== undefined) {
+        void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      }
+    },
   });
 }
 
