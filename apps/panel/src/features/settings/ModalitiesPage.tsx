@@ -4,6 +4,7 @@ import type { RestaurantPatch } from "../../api/restaurant.ts";
 import type { Restaurant } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { Notice } from "../../ui/Notice.tsx";
+import { DeliveryAlert } from "../orders/OrdersNotices.tsx";
 import { useDeliveryAlert } from "../orders/useOrders.ts";
 import { useRestaurant, useToggleRestaurantFlag } from "../restaurant/useRestaurant.ts";
 import classes from "./ModalitiesPage.module.css";
@@ -111,12 +112,7 @@ export function ModalitiesPage() {
         </Notice>
       )}
 
-      {data.isDelivery && deliveryAlert && (
-        <Notice tone="warn" title="Entrega ligada, mas o frete não está configurado">
-          O modo é por bairro e nenhum bairro está cadastrado: a loja recusa todo pedido de entrega até
-          a tela de Entrega ser preenchida.
-        </Notice>
-      )}
+      {data.isDelivery && deliveryAlert && <DeliveryAlert />}
 
       <section className={classes.card}>
         <h2 className={classes.cardTitle}>Pagamento</h2>

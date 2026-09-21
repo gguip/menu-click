@@ -106,7 +106,24 @@ describe("ModalitiesPage", () => {
       ...panelHandlers({ restaurant: { isDelivery: true, deliveryFeeMode: "neighborhood" } }),
     ]);
     renderInPanel(routes, "/modalidades");
-    expect(await screen.findByText("Entrega ligada, mas o frete não está configurado")).toBeTruthy();
+    expect(await screen.findByText("Entrega por bairro sem nenhum bairro cadastrado")).toBeTruthy();
+  });
+
+  it("entrega ligada, modo bairro sem bairro, mas frete a combinar ligado — não avisa", async () => {
+    signIn();
+    mockApi([
+      {
+        method: "GET",
+        path: `/restaurants/${RESTAURANT_ID}/delivery-neighborhoods`,
+        body: { neighborhoods: [] },
+      },
+      ...panelHandlers({
+        restaurant: { isDelivery: true, deliveryFeeMode: "neighborhood", deliveryFeeToArrange: true },
+      }),
+    ]);
+    renderInPanel(routes, "/modalidades");
+    await screen.findByRole("switch", { name: "Entrega" });
+    expect(screen.queryByText("Entrega por bairro sem nenhum bairro cadastrado")).toBeNull();
   });
 
   it("o erro fica embaixo do interruptor que falhou, mesmo com dois cliques seguidos", async () => {
