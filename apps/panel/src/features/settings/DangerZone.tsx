@@ -8,6 +8,7 @@ import { deleteRestaurant } from "../../api/restaurant.ts";
 import { clearSession } from "../../api/session.ts";
 import type { Restaurant } from "../../api/types.ts";
 import buttons from "../../ui/buttons.module.css";
+import dialog from "../../ui/ConfirmDialog.module.css";
 import classes from "./DangerZone.module.css";
 
 /**
@@ -68,6 +69,7 @@ export function DangerZone({ restaurant }: { restaurant: Restaurant }) {
         centered
         size={460}
         radius="md"
+        classNames={{ title: dialog.title, overlay: dialog.overlay }}
       >
         <div className={classes.dialog}>
           <p className={classes.body}>
