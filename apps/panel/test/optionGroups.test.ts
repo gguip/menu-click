@@ -173,4 +173,8 @@ describe("formulário da opção", () => {
     expect(changedOptionPatch(optionToForm(opt), opt)).toEqual({});
     expect(changedOptionPatch({ ...optionToForm(opt), price: "75,00" }, opt)).toEqual({ priceInCents: 7500 });
   });
+
+  it("preço ilegível não vira zero: falha alto", () => {
+    expect(() => optionFormToBody({ name: "Bacon", price: "seis", maxQuantity: "1" })).toThrow();
+  });
 });

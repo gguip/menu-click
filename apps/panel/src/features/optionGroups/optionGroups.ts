@@ -186,13 +186,19 @@ export function validateOptionForm(form: OptionForm): string | null {
   return null;
 }
 
-/** Preço vazio é R$ 0,00: a escolha obrigatória sem custo ("ponto da carne"). */
+/**
+ * Preço vazio é R$ 0,00: a escolha obrigatória sem custo ("ponto da carne").
+ * Preço ilegível NÃO vira zero — seria entregar a opção de graça por um erro
+ * de digitação. A tela valida antes (`validateOptionForm`); chegar aqui com
+ * texto ilegível é erro de programação, e falha alto.
+ */
 export function optionFormToBody(form: OptionForm): NewOptionBody {
-  return {
-    name: form.name.trim(),
-    priceInCents: form.price.trim() === "" ? 0 : (parseReaisToCents(form.price) ?? 0),
-    maxQuantity: Number(form.maxQuantity.trim()),
-  };
+  const text = form.price.trim();
+  const priceInCents = text === "" ? 0 : parseReaisToCents(text);
+  if (priceInCents === null) {
+    throw new Error(`Preço ilegível chegou a optionFormToBody: "${form.price}". Valide antes.`);
+  }
+  return { name: form.name.trim(), priceInCents, maxQuantity: Number(form.maxQuantity.trim()) };
 }
 
 export function changedOptionPatch(form: OptionForm, option: Option): Partial<OptionBody> {
