@@ -2,7 +2,6 @@ import { Button } from "@mantine/core";
 import { useState } from "react";
 import { describeError } from "../../api/client.ts";
 import type { OptionGroup } from "../../api/types.ts";
-import { formatCents } from "../../lib/money.ts";
 import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import { Notice } from "../../ui/Notice.tsx";
@@ -20,6 +19,7 @@ import {
   validateGroupForm,
 } from "./optionGroups.ts";
 import classes from "./OptionGroupsPage.module.css";
+import { NewOptionRow, OptionRow } from "./OptionRow.tsx";
 import { useRemoveOptionGroup, useUpdateOptionGroup } from "./useOptionGroups.ts";
 
 export function GroupCard({
@@ -36,6 +36,7 @@ export function GroupCard({
   const [editing, setEditing] = useState<GroupForm | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [adding, setAdding] = useState(false);
   // Cabeçalho e remoção são controles independentes: cada um com a sua mutação.
   const update = useUpdateOptionGroup(restaurantId, group.id);
   const remove = useRemoveOptionGroup(restaurantId, group.id);
@@ -144,23 +145,25 @@ export function GroupCard({
           <span>Opção</span>
           <span className={classes.price}>Preço</span>
           <span>Qtd. máx.</span>
-          <span />
+          <span>Disponível</span>
           <span />
         </div>
-        {group.options.length === 0 ? (
-          <p className={classes.noOptions}>Nenhuma opção cadastrada.</p>
-        ) : (
-          <ul className={classes.rows}>
-            {group.options.map((option) => (
-              <li key={option.id} className={classes.tr}>
-                <span className={classes.cell}>{option.name}</span>
-                <span className={`${classes.cell} ${classes.price} n`}>{formatCents(option.priceInCents)}</span>
-                <span className={`${classes.cell} n`}>{option.maxQuantity}</span>
-                <span />
-                <span />
-              </li>
-            ))}
-          </ul>
+        {group.options.length === 0 && !adding && <p className={classes.noOptions}>Nenhuma opção cadastrada.</p>}
+        <ul className={classes.rows}>
+          {group.options.map((option) => (
+            <OptionRow key={option.id} restaurantId={restaurantId} groupId={group.id} option={option} />
+          ))}
+          {adding && <NewOptionRow restaurantId={restaurantId} groupId={group.id} onDone={() => setAdding(false)} />}
+        </ul>
+        {!adding && (
+          <button
+            type="button"
+            className={classes.dashed}
+            aria-label={`Adicionar opção em ${group.name}`}
+            onClick={() => setAdding(true)}
+          >
+            + Adicionar opção
+          </button>
         )}
       </div>
 
