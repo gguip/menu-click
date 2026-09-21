@@ -1,9 +1,22 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { OpeningHoursPage } from "../src/features/settings/OpeningHoursPage.tsx";
 import { type MockHandler, mockApi } from "./api-mock.ts";
-import { panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
+import { makeMe, makeRestaurant, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
 import { renderInPanel } from "./render.tsx";
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+/** Promessa resolvida à mão, para segurar o PUT enquanto a tela é editada. */
+function defer<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
 
 const HOURS = `/restaurants/${RESTAURANT_ID}/opening-hours`;
 const routes = [{ path: "/horario", element: <OpeningHoursPage /> }];
@@ -98,6 +111,67 @@ describe("OpeningHoursPage", () => {
     expect(await screen.findByLabelText("Quarta: abre (faixa 1)")).toBeTruthy();
     expect((screen.getByLabelText("Quarta: abre (faixa 1)") as HTMLInputElement).value).toBe("18:00");
     expect(screen.queryByText("Fora do ar")).toBeNull();
+  });
+
+  it("o que se edita durante o PUT em voo não se perde", async () => {
+    signIn();
+    const put = defer<Response>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = new URL(String(input), "http://localhost");
+      const path = url.pathname.replace(/^\/api/, "");
+      const method = init.method ?? "GET";
+      if (method === "GET" && path === "/auth/me") return jsonResponse(makeMe());
+      if (method === "GET" && path === `/restaurants/${RESTAURANT_ID}`) return jsonResponse(makeRestaurant());
+      if (method === "GET" && path === `/restaurants/${RESTAURANT_ID}/orders`) {
+        return jsonResponse({ data: [], limit: 100, offset: 0, total: 0 });
+      }
+      if (method === "GET" && path === `/restaurants/${RESTAURANT_ID}/orders/summary`) {
+        return jsonResponse({
+          period: { from: "2026-09-19T03:00:00.000Z", to: "2026-09-20T03:00:00.000Z" },
+          counts: {
+            pending: 0,
+            confirmed: 0,
+            preparing: 0,
+            ready_for_pickup: 0,
+            out_for_delivery: 0,
+            completed: 0,
+            cancelled: 0,
+          },
+          revenueInCents: 0,
+          revenueOrderCount: 0,
+          averageTicketInCents: 0,
+        });
+      }
+      if (method === "GET" && path === HOURS) return jsonResponse({ openingHours: SEGUNDA_E_SABADO });
+      if (method === "PUT" && path === HOURS) return put.promise;
+      throw new Error(`Chamada sem mock: ${method} ${path}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderInPanel(routes, "/horario");
+    await screen.findByRole("listitem", { name: "Segunda" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Salvar horário" }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(1),
+    );
+
+    // Enquanto o PUT está em voo, acrescenta uma faixa nova.
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar faixa em quarta" }));
+    fireEvent.change(screen.getByLabelText("Quarta: abre (faixa 1)"), { target: { value: "18:00" } });
+
+    // O PUT resolve com a grade que foi enviada (sem a faixa nova).
+    put.resolve(jsonResponse({ openingHours: SEGUNDA_E_SABADO }));
+    await waitFor(() =>
+      expect((screen.getByRole("button", { name: "Salvar horário" }) as HTMLButtonElement).disabled).toBe(
+        false,
+      ),
+    );
+
+    // A faixa acrescentada depois de clicar salvar continua na tela...
+    expect((screen.getByLabelText("Quarta: abre (faixa 1)") as HTMLInputElement).value).toBe("18:00");
+    // ...e a barra continua suja, porque ela nunca foi enviada.
+    expect(screen.getByText("Alterações não salvas")).toBeTruthy();
   });
 
   it("a pausa no rodapé é o mesmo interruptor do topo", async () => {

@@ -38,6 +38,25 @@ export function toApi(days: readonly Day[]): { weekday: number; opensAt: string;
   );
 }
 
+function sortedApi(days: readonly Day[]) {
+  return toApi(days)
+    .slice()
+    .sort(
+      (a, b) =>
+        a.weekday - b.weekday || a.opensAt.localeCompare(b.opensAt) || a.closesAt.localeCompare(b.closesAt),
+    );
+}
+
+/**
+ * Compara duas grades sem depender de ordem: a API devolve as faixas
+ * ordenadas por `opens_at`, mas o estado da tela nasce na ordem em que a
+ * pessoa acrescentou. Os dois lados passam pela mesma normalização
+ * (`toApi` + a mesma ordenação) antes de comparar.
+ */
+export function sameGrade(a: readonly Day[], b: readonly Day[]): boolean {
+  return JSON.stringify(sortedApi(a)) === JSON.stringify(sortedApi(b));
+}
+
 function mapDay(days: readonly Day[], weekday: number, change: (ranges: Range[]) => Range[]): Day[] {
   return days.map((day) => (day.weekday === weekday ? { ...day, ranges: change([...day.ranges]) } : day));
 }

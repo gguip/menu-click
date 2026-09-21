@@ -1,6 +1,7 @@
 import { Button, TextInput } from "@mantine/core";
 import { useState } from "react";
 import { describeError } from "../../api/client.ts";
+import type { OpeningHour } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { PauseSwitch } from "../../layout/PauseSwitch.tsx";
@@ -12,6 +13,7 @@ import {
   daySummary,
   fromApi,
   removeRange,
+  sameGrade,
   setRangeTime,
   toApi,
   validate,
@@ -19,26 +21,34 @@ import {
 import classes from "./OpeningHoursPage.module.css";
 import { useOpeningHours, useSaveOpeningHours } from "./useOpeningHours.ts";
 
-function OpeningHoursEditor({ restaurantId, initial }: { restaurantId: string; initial: Day[] }) {
+/**
+ * A referência de "salvo" vem do CACHE (`saved`), não de estado local: um
+ * `onSuccess` por chamada que sobrescrevesse `days` apagaria o que a pessoa
+ * tivesse acrescentado enquanto o `PUT` estava em voo. `useSaveOpeningHours`
+ * já atualiza a query no seu próprio `onSuccess` — aqui só se lê.
+ */
+function OpeningHoursEditor({
+  restaurantId,
+  initial,
+  saved,
+}: {
+  restaurantId: string;
+  initial: Day[];
+  saved: readonly OpeningHour[];
+}) {
   const [days, setDays] = useState(initial);
-  const [baseline, setBaseline] = useState(initial);
   const [problem, setProblem] = useState<string | null>(null);
   const save = useSaveOpeningHours(restaurantId);
   const restaurant = useRestaurant(restaurantId);
 
-  const dirty = JSON.stringify(days) !== JSON.stringify(baseline);
+  const savedDays = fromApi(saved);
+  const dirty = !sameGrade(days, savedDays);
 
   const submit = () => {
     const found = validate(days);
     setProblem(found);
     if (found !== null) return;
-    save.mutate(toApi(days), {
-      onSuccess: (hours) => {
-        const next = fromApi(hours);
-        setDays(next);
-        setBaseline(next);
-      },
-    });
+    save.mutate(toApi(days));
   };
 
   return (
@@ -148,7 +158,7 @@ function OpeningHoursEditor({ restaurantId, initial }: { restaurantId: string; i
         onSave={submit}
         cancel={{
           onClick: () => {
-            setDays(baseline);
+            setDays(savedDays);
             setProblem(null);
           },
         }}
@@ -173,5 +183,11 @@ export function OpeningHoursPage() {
   }
   // O editor nasce com os dados em mãos: estado de formulário vindo de props,
   // sem setState em efeito.
-  return <OpeningHoursEditor restaurantId={restaurantId} initial={fromApi(hours.data)} />;
+  return (
+    <OpeningHoursEditor
+      restaurantId={restaurantId}
+      initial={fromApi(hours.data)}
+      saved={hours.data}
+    />
+  );
 }
