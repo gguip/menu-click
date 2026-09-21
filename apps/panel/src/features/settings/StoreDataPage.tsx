@@ -85,8 +85,6 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
           </section>
         </div>
 
-        {role === "owner" && <DangerZone restaurant={restaurant} />}
-
         {problem !== null && (
           <p role="alert" className={classes.error}>
             {problem}
@@ -97,6 +95,8 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
             {describeError(update.error)}
           </p>
         )}
+
+        {role === "owner" && <DangerZone restaurant={restaurant} />}
       </div>
       <SaveBar
         dirty={dirty}
