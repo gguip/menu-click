@@ -2,6 +2,7 @@ import { Button, Modal, TextInput } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { logout } from "../../api/auth.ts";
 import { describeError } from "../../api/client.ts";
 import { deleteRestaurant } from "../../api/restaurant.ts";
 import { clearSession } from "../../api/session.ts";
@@ -22,10 +23,18 @@ export function DangerZone({ restaurant }: { restaurant: Restaurant }) {
 
   const remove = useMutation({
     mutationFn: () => deleteRestaurant(restaurant.id),
-    onSuccess: () => {
+    onSuccess: async () => {
       // A remoção marca o restaurante e as filhas, mas NÃO toca no usuário nem
-      // na sessão: ficar no painel deixaria a pessoa numa casca pedindo um
-      // restaurante que já não existe.
+      // na sessão: ela continua válida no servidor por até 12h. Encerra
+      // também do lado do servidor, como o "Sair" já faz — a rota de logout
+      // não tem `:restaurantId`, então funciona com a loja já removida. Uma
+      // falha aqui não pode impedir a saída: a sessão local morre de
+      // qualquer jeito.
+      try {
+        await logout();
+      } catch {
+        // sem rede ou sessão já morta: segue para limpar local mesmo assim
+      }
       clearSession();
       queryClient.clear();
       navigate("/login?motivo=loja-removida", { replace: true });
