@@ -136,4 +136,16 @@ describe("OptionGroupsPage (leitura)", () => {
 
     expect(api.calls.filter((call) => call.method === "GET" && call.path === `${BASE}/products`)).toHaveLength(1);
   });
+
+  it("varredura de uso que falha mostra 'uso não contado', não '…' para sempre", async () => {
+    signIn();
+    mockApi([
+      { method: "GET", path: `${BASE}/option-groups`, body: { data: [makeOptionGroup({ id: "grp-1", name: "Sabores" })], limit: 100, offset: 0, total: 1 } },
+      { method: "GET", path: `${BASE}/products`, status: 500, body: { statusCode: 500, error: "Internal", message: "Falhou" } },
+      ...panelHandlers(),
+    ]);
+    renderInPanel(routes, "/grupos-de-opcoes");
+    const sabores = within(await screen.findByRole("region", { name: "Sabores" }));
+    expect(await sabores.findByText("uso não contado")).toBeTruthy();
+  });
 });

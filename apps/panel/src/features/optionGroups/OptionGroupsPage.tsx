@@ -83,8 +83,14 @@ export function OptionGroupsPage() {
     );
   }
 
+  // Varredura falhou e não há dado nenhum (nem de uma carga anterior):
+  // contagem desconhecida, não zero. Tratar como truncada com 0 cai nos
+  // MESMOS textos de "não sei dizer quantos" que `usageLabel`/`removeGroupCopy`
+  // já tratam — "uso não contado" e a confirmação genérica —, em vez de
+  // deixar o cartão preso em "…" para sempre.
+  const usageUnknown = usage.isError && usage.data === undefined;
   const counts = usage.data?.counts;
-  const truncated = usage.data?.truncated ?? false;
+  const truncated = usageUnknown ? true : (usage.data?.truncated ?? false);
 
   return (
     <div className={classes.page}>
@@ -101,7 +107,7 @@ export function OptionGroupsPage() {
           key={group.id}
           restaurantId={restaurantId}
           group={group}
-          usage={counts === undefined ? undefined : (counts.get(group.id) ?? 0)}
+          usage={usageUnknown ? 0 : counts === undefined ? undefined : (counts.get(group.id) ?? 0)}
           truncated={truncated}
         />
       ))}
