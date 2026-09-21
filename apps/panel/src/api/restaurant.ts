@@ -31,3 +31,8 @@ export function getRestaurant(id: string): Promise<Restaurant> {
 export function updateRestaurant(id: string, patch: RestaurantPatch): Promise<Restaurant> {
   return apiRequest<Restaurant>(`/restaurants/${id}`, { method: "PATCH", body: patch });
 }
+
+/** Soft delete no servidor: cardápio, mesas e grade saem junto. Não tem volta pelo painel. */
+export function deleteRestaurant(id: string): Promise<void> {
+  return apiRequest<void>(`/restaurants/${id}`, { method: "DELETE" });
+}

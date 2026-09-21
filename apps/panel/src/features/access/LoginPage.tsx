@@ -23,6 +23,11 @@ const NOTICES: Record<string, { tone: "warn" | "accent"; title: string; body: st
     title: "Loja criada",
     body: "Entre com o e-mail e a senha que você cadastrou.",
   },
+  "loja-removida": {
+    tone: "warn",
+    title: "Restaurante removido",
+    body: "A loja e o cardápio público saíram do ar. Se isso foi engano, fale com o suporte.",
+  },
 };
 
 function LoginAside() {

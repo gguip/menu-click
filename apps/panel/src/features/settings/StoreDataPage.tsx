@@ -5,11 +5,13 @@ import type { Restaurant } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { useRestaurant, useUpdateRestaurant } from "../restaurant/useRestaurant.ts";
+import { DangerZone } from "./DangerZone.tsx";
 import classes from "./StoreDataPage.module.css";
 import { changedPatch, fromRestaurant, type StoreForm, validateStoreForm } from "./storeForm.ts";
 import { TIMEZONES } from "./timezones.ts";
 
 function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
+  const { role } = useSessionUser();
   const initial = fromRestaurant(restaurant);
   const [form, setForm] = useState<StoreForm>(initial);
   const [problem, setProblem] = useState<string | null>(null);
@@ -75,6 +77,8 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
             </div>
           </section>
         </div>
+
+        {role === "owner" && <DangerZone restaurant={restaurant} />}
 
         {problem !== null && (
           <p role="alert" className={classes.error}>
