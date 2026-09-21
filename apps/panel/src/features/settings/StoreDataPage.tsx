@@ -26,6 +26,13 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
   const patch = changedPatch(form, initial);
   const dirty = Object.keys(patch).length > 0;
 
+  // A API aceita apelidos de fuso (`Brazil/East`) que a lista fechada não
+  // cobre. Sem essa opção extra, o `<select>` mostraria "Brasília" enquanto o
+  // estado guarda outro valor — a tela mentiria sobre o que está salvo.
+  const timezoneOptions = TIMEZONES.some((zone) => zone.value === restaurant.timezone)
+    ? TIMEZONES
+    : [...TIMEZONES, { value: restaurant.timezone, label: `${restaurant.timezone} (atual)` }];
+
   const submit = () => {
     const found = validateStoreForm(form);
     setProblem(found);
@@ -45,7 +52,7 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
               <NativeSelect
                 label="Fuso horário"
                 description="É ele que decide onde o dia começa: “pedidos de hoje” e o faturamento do topo mudam junto."
-                data={TIMEZONES.map((zone) => ({ value: zone.value, label: zone.label }))}
+                data={timezoneOptions.map((zone) => ({ value: zone.value, label: zone.label }))}
                 {...field("timezone")}
               />
             </div>

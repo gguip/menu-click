@@ -55,6 +55,15 @@ describe("StoreDataPage", () => {
     expect(screen.getByText("É ele que decide onde o dia começa: “pedidos de hoje” e o faturamento do topo mudam junto.")).toBeTruthy();
   });
 
+  it("fuso fora da lista aparece como opção '(atual)', selecionada", async () => {
+    signIn();
+    mockApi(panelHandlers({ restaurant: { timezone: "Brazil/East" } }));
+    renderInPanel(routes, "/dados-da-loja");
+    const timezone = (await screen.findByLabelText("Fuso horário")) as HTMLSelectElement;
+    expect(timezone.value).toBe("Brazil/East");
+    expect(screen.getByText("Brazil/East (atual)")).toBeTruthy();
+  });
+
   it("campo obrigatório vazio nem chega à API", async () => {
     signIn();
     const api = mockApi(panelHandlers());
