@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { OptionGroupsPage } from "../src/features/optionGroups/OptionGroupsPage.tsx";
 import type { OptionGroup, Product } from "../src/api/types.ts";
@@ -87,5 +87,53 @@ describe("OptionGroupsPage (leitura)", () => {
         "O cliente não consegue completar este grupo: ele exige 2 escolhas e só 1 opção está disponível.",
       ),
     ).toBeTruthy();
+  });
+
+  it("não refaz a varredura de produtos ao remontar a tela (staleTime)", async () => {
+    signIn();
+    const api = mockApi([
+      {
+        method: "GET",
+        path: `${BASE}/option-groups`,
+        body: {
+          data: [makeOptionGroup({ id: "grp-1", name: "Sabores" })],
+          limit: 100,
+          offset: 0,
+          total: 1,
+        },
+      },
+      {
+        method: "GET",
+        path: `${BASE}/products`,
+        body: {
+          data: [makeProduct({ id: "p1", optionGroupIds: ["grp-1"] })],
+          limit: 100,
+          offset: 0,
+          total: 1,
+        },
+      },
+      ...panelHandlers(),
+    ]);
+    const twoRoutes = [
+      { path: "/grupos-de-opcoes", element: <OptionGroupsPage /> },
+      { path: "/pedidos", element: <p>Tela de pedidos</p> },
+    ];
+    const { router } = renderInPanel(twoRoutes, "/grupos-de-opcoes");
+
+    const sabores = within(await screen.findByRole("region", { name: "Sabores" }));
+    expect(await sabores.findByText("usado em 1 produto")).toBeTruthy();
+
+    await act(async () => {
+      await router.navigate("/pedidos");
+    });
+    expect(await screen.findByText("Tela de pedidos")).toBeTruthy();
+
+    await act(async () => {
+      await router.navigate("/grupos-de-opcoes");
+    });
+    const saboresDeNovo = within(await screen.findByRole("region", { name: "Sabores" }));
+    expect(await saboresDeNovo.findByText("usado em 1 produto")).toBeTruthy();
+
+    expect(api.calls.filter((call) => call.method === "GET" && call.path === `${BASE}/products`)).toHaveLength(1);
   });
 });

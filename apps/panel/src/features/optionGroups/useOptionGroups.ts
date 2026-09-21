@@ -33,6 +33,12 @@ export function useOptionGroups(restaurantId: string) {
 /**
  * Debaixo do prefixo `["products", restaurantId]`: toda invalidação de
  * produto (criar, editar, trocar grupos) refaz a contagem junto.
+ *
+ * `staleTime: 60_000`: a varredura custa até 20 requisições
+ * (`listAllProducts` pagina até o fim), e sem `staleTime` toda remontagem da
+ * tela — sair para outra e voltar — refaria a varredura inteira. A
+ * invalidação de produto continua refazendo a conta na hora, porque
+ * `invalidateQueries` ignora o `staleTime`.
  */
 export function useOptionGroupUsage(restaurantId: string) {
   return useQuery({
@@ -41,6 +47,7 @@ export function useOptionGroupUsage(restaurantId: string) {
       const result = await listAllProducts(restaurantId);
       return { counts: usageCounts(result.items), truncated: result.truncated };
     },
+    staleTime: 60_000,
   });
 }
 
