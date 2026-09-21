@@ -12,6 +12,7 @@ import { useSessionUser } from "../../auth/useMe.ts";
 import { moveItem } from "../../lib/moveItem.ts";
 import buttons from "../../ui/buttons.module.css";
 import { SaveBar } from "../../ui/SaveBar.tsx";
+import { optionGroupsQueryKey } from "../optionGroups/useOptionGroups.ts";
 import { PRICE_RULES } from "./priceRules.ts";
 import classes from "./ProductFormPage.module.css";
 import {
@@ -257,7 +258,7 @@ export function ProductFormPage() {
     queryFn: () => listAllCategories(restaurantId),
   });
   const groups = useQuery({
-    queryKey: ["option-groups", restaurantId],
+    queryKey: optionGroupsQueryKey(restaurantId),
     queryFn: () => listAllOptionGroups(restaurantId),
   });
 

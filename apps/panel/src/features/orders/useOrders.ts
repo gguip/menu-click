@@ -3,6 +3,7 @@ import { listNeighborhoods } from "../../api/delivery.ts";
 import { getOrder, listAllOrders } from "../../api/orders.ts";
 import { listAllTables } from "../../api/tables.ts";
 import type { Restaurant } from "../../api/types.ts";
+import { neighborhoodsQueryKey } from "../settings/useDelivery.ts";
 import { type OrderFilters, toListQuery } from "./orderFilters.ts";
 import { ORDER_DETAIL_POLL_MS, ORDERS_POLL_MS } from "./polling.ts";
 
@@ -58,7 +59,7 @@ export function useDeliveryAlert(restaurantId: string, restaurant: Restaurant | 
     restaurant.deliveryFeeMode === "neighborhood" &&
     !restaurant.deliveryFeeToArrange;
   const neighborhoods = useQuery({
-    queryKey: ["delivery-neighborhoods", restaurantId],
+    queryKey: neighborhoodsQueryKey(restaurantId),
     queryFn: () => listNeighborhoods(restaurantId),
     enabled: byNeighborhood,
     staleTime: 60_000,
