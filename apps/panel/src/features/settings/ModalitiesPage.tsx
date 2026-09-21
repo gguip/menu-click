@@ -1,5 +1,4 @@
 import { Switch } from "@mantine/core";
-import { useState } from "react";
 import { describeError } from "../../api/client.ts";
 import type { RestaurantPatch } from "../../api/restaurant.ts";
 import type { Restaurant } from "../../api/types.ts";
@@ -41,39 +40,52 @@ const PAYMENTS: readonly Flag[] = [
   },
 ];
 
-export function ModalitiesPage() {
-  const { restaurantId } = useSessionUser();
-  const restaurant = useRestaurant(restaurantId);
+/**
+ * Uma mutação PRÓPRIA por linha, e não uma dividida entre as sete. Um
+ * `MutationObserver` do TanStack Query desanexa da mutação anterior assim
+ * que `.mutate()` é chamado de novo nele (`MutationObserver#mutate`, em
+ * `@tanstack/query-core`) — com um observer só para os sete interruptores,
+ * ligar A e, antes de resolver, ligar B fazia o observer largar a mutação de
+ * A no meio, e o `onError`/`onSuccess` daquela chamada nunca disparava (nem
+ * errado: NUNCA). Não era um problema de "de onde a mensagem é lida" — era
+ * de sete interruptores dividindo um observer só. Com uma mutação por linha,
+ * `toggle.error` já é o erro DAQUELE interruptor, e uma chamada nova dele
+ * mesmo limpa o próprio erro sozinha — sem estado local, sem coordenar nada.
+ */
+function FlagRow({ restaurantId, flag, checked }: { restaurantId: string; flag: Flag; checked: boolean }) {
   const toggle = useToggleRestaurantFlag(restaurantId);
-  const [failed, setFailed] = useState<FlagField | null>(null);
-  const deliveryAlert = useDeliveryAlert(restaurantId, restaurant.data);
-
-  const data = restaurant.data;
-  if (data === undefined) return null;
-
-  const change = (field: FlagField, checked: boolean) => {
-    setFailed(null);
-    const patch = { [field]: checked } as RestaurantPatch;
-    toggle.mutate(patch, { onError: () => setFailed(field) });
-  };
-
-  const noModality = !data.isDelivery && !data.isTakeaway && !data.isQrcode;
-
-  const renderFlag = (flag: Flag) => (
-    <div key={flag.field} className={classes.row}>
+  return (
+    <div className={classes.row}>
       <Switch
         label={flag.label}
         description={flag.help}
         aria-label={flag.label}
-        checked={data[flag.field]}
-        onChange={(event) => change(flag.field, event.currentTarget.checked)}
+        checked={checked}
+        onChange={(event) =>
+          toggle.mutate({ [flag.field]: event.currentTarget.checked } as RestaurantPatch)
+        }
       />
-      {failed === flag.field && toggle.error !== null && (
+      {toggle.error !== null && (
         <p role="alert" className={classes.error}>
           {describeError(toggle.error)}
         </p>
       )}
     </div>
+  );
+}
+
+export function ModalitiesPage() {
+  const { restaurantId } = useSessionUser();
+  const restaurant = useRestaurant(restaurantId);
+  const deliveryAlert = useDeliveryAlert(restaurantId, restaurant.data);
+
+  const data = restaurant.data;
+  if (data === undefined) return null;
+
+  const noModality = !data.isDelivery && !data.isTakeaway && !data.isQrcode;
+
+  const renderFlag = (flag: Flag) => (
+    <FlagRow key={flag.field} restaurantId={restaurantId} flag={flag} checked={data[flag.field]} />
   );
 
   return (

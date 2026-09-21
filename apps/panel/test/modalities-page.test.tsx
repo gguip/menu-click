@@ -1,14 +1,28 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ModalitiesPage } from "../src/features/settings/ModalitiesPage.tsx";
+import classes from "../src/features/settings/ModalitiesPage.module.css";
 import { mockApi } from "./api-mock.ts";
-import { makeRestaurant, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
+import { makeMe, makeRestaurant, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
 import { renderInPanel } from "./render.tsx";
 
 const routes = [{ path: "/modalidades", element: <ModalitiesPage /> }];
 
 function toggle(name: string) {
   return screen.getByRole("switch", { name });
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+/** Promessa resolvida à mão, para controlar a ordem em que dois PATCH voltam. */
+function defer<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
 }
 
 describe("ModalitiesPage", () => {
@@ -74,5 +88,59 @@ describe("ModalitiesPage", () => {
     ]);
     renderInPanel(routes, "/modalidades");
     expect(await screen.findByText("Entrega ligada, mas o frete não está configurado")).toBeTruthy();
+  });
+
+  it("o erro fica embaixo do interruptor que falhou, mesmo com dois cliques seguidos", async () => {
+    signIn();
+    const deferredA = defer<Response>();
+    const deferredB = defer<Response>();
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = new URL(String(input), "http://localhost");
+      const path = url.pathname.replace(/^\/api/, "");
+      const method = init.method ?? "GET";
+      if (method === "GET" && path === "/auth/me") return jsonResponse(makeMe());
+      if (method === "GET" && path === `/restaurants/${RESTAURANT_ID}`) return jsonResponse(makeRestaurant());
+      if (method === "PATCH" && path === `/restaurants/${RESTAURANT_ID}`) {
+        const body = JSON.parse(init.body as string) as Record<string, unknown>;
+        if ("isDelivery" in body) return deferredA.promise;
+        if ("isTakeaway" in body) return deferredB.promise;
+      }
+      throw new Error(`Chamada sem mock: ${method} ${path}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderInPanel(routes, "/modalidades");
+
+    const delivery = await screen.findByRole("switch", { name: "Entrega" });
+    const takeaway = await screen.findByRole("switch", { name: "Retirada no balcão" });
+
+    fireEvent.click(delivery);
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH")).toHaveLength(1),
+    );
+    fireEvent.click(takeaway);
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PATCH")).toHaveLength(2),
+    );
+
+    // A (entrega) só resolve DEPOIS de B (retirada) já ter sido disparado, e falha.
+    deferredA.resolve(jsonResponse({ message: "Falha no A" }, 500));
+    await screen.findByRole("alert");
+
+    const deliveryRow = delivery.closest(`.${classes.row}`);
+    const takeawayRow = takeaway.closest(`.${classes.row}`);
+
+    // A mensagem do A fica na linha da entrega, não na da retirada.
+    expect(deliveryRow?.querySelector('[role="alert"]')?.textContent).toBe("Falha no A");
+    expect(takeawayRow?.querySelector('[role="alert"]')).toBeNull();
+
+    // B (retirada) dá certo, sem erro nenhum na sua linha.
+    deferredB.resolve(jsonResponse(makeRestaurant({ isTakeaway: false })));
+    await waitFor(() => expect((toggle("Retirada no balcão") as HTMLInputElement).checked).toBe(false));
+    expect(takeawayRow?.querySelector('[role="alert"]')).toBeNull();
+
+    // A mensagem do A continua lá, intocada pelo sucesso do B.
+    expect(deliveryRow?.querySelector('[role="alert"]')?.textContent).toBe("Falha no A");
   });
 });
