@@ -1,16 +1,30 @@
 import { Button } from "@mantine/core";
+import { Link } from "react-router";
 import { describeError } from "../../api/client.ts";
 import { formatAge } from "../../lib/time.ts";
 import { Notice } from "../../ui/Notice.tsx";
 import classes from "./OrdersPage.module.css";
 
-export function DeliveryAlert() {
-  // O botão "Configurar entrega" do handoff entra com a tela de Entrega (parte 2).
+/**
+ * O botão "Configurar entrega" do handoff, adiado na parte 1 até a tela de
+ * Entrega existir. `withAction={false}` só na própria tela de Entrega: lá ele
+ * apontaria para a tela em que a pessoa já está.
+ */
+export function DeliveryAlert({ withAction = true }: { withAction?: boolean }) {
   return (
     <div className={classes.notice}>
       <Notice tone="warn" title="Entrega por bairro sem nenhum bairro cadastrado">
-        Não é frete grátis: a loja não consegue calcular o frete e vai recusar pedidos de entrega.
-        Cadastre os bairros ou mude para taxa fixa.
+        <div className={classes.noticeRow}>
+          <span>
+            Não é frete grátis: a loja não consegue calcular o frete e vai recusar pedidos de entrega.
+            Cadastre os bairros ou mude para taxa fixa.
+          </span>
+          {withAction && (
+            <Button component={Link} to="/entrega" variant="default">
+              Configurar entrega
+            </Button>
+          )}
+        </div>
       </Notice>
     </div>
   );

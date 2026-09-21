@@ -12,6 +12,7 @@ import { useSessionUser } from "../../auth/useMe.ts";
 import { moveItem } from "../../lib/moveItem.ts";
 import buttons from "../../ui/buttons.module.css";
 import { SaveBar } from "../../ui/SaveBar.tsx";
+import { optionGroupsQueryKey } from "../optionGroups/useOptionGroups.ts";
 import { PRICE_RULES } from "./priceRules.ts";
 import classes from "./ProductFormPage.module.css";
 import {
@@ -157,8 +158,8 @@ function ProductEditor({
           <section className={classes.card}>
             <h2 className={classes.cardTitle}>Grupos de opções</h2>
             <p className={classes.note}>
-              A ordem aqui é a ordem que o cliente vê. Os grupos pertencem à loja — crie e edite em Grupos
-              de opções.
+              A ordem aqui é a ordem que o cliente vê. Os grupos pertencem à loja — crie e edite em{" "}
+              <Link to="/grupos-de-opcoes">Grupos de opções</Link>.
             </p>
             {form.optionGroupIds.map((id, index) => {
               const group = groups.find((candidate) => candidate.id === id);
@@ -257,7 +258,7 @@ export function ProductFormPage() {
     queryFn: () => listAllCategories(restaurantId),
   });
   const groups = useQuery({
-    queryKey: ["option-groups", restaurantId],
+    queryKey: optionGroupsQueryKey(restaurantId),
     queryFn: () => listAllOptionGroups(restaurantId),
   });
 
