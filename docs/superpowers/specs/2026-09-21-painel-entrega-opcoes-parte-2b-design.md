@@ -244,6 +244,8 @@ da API, e a mensagem aparece no próprio cartão.
 | Intervalo "escolhe {n}" quando mínimo = máximo | O protótipo só mostra "escolhe X a Y"; "escolhe 2 a 2" leria como erro |
 | Placeholder "Sem entrega grátis" no campo "Entrega grátis acima de" | O handoff não diz o que o campo vazio significa; sem a dica, ninguém descobre que em branco desliga a promoção |
 | Rótulo "sem produtos" / "usado em pelo menos N produtos" | O protótipo só tem "usado em N produtos"; zero e contagem interrompida (mais de 2.000 produtos) precisam de texto próprio |
+| Botões "Salvar entrega", "Criar grupo" e "Salvar grupo"; vazios "Nenhum grupo cadastrado ainda." e "Nenhuma opção cadastrada." | O handoff não desenhou esses estados nem esses botões; o nome específico evita ambiguidade com dois cartões em edição |
+| "Entrega grátis acima de" recusa 0 ("Para desligar a entrega grátis, deixe o campo em branco.") | A API aceita 0, que significa "sempre grátis"; na tela ele quase sempre é engano de quem quis desligar — o campo vizinho ensina que zero desliga —, e "sempre grátis" já se expressa com taxa fixa R$ 0 |
 
 ## Repo
 
