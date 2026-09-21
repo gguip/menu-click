@@ -48,6 +48,12 @@ describe("OpeningHoursPage", () => {
     expect(screen.getByRole("listitem", { name: "Domingo" }).textContent).toContain("Fechado");
   });
 
+  it("dia sem faixa mostra a nota literal do handoff", async () => {
+    setup();
+    const domingo = await screen.findByRole("listitem", { name: "Domingo" });
+    expect(domingo.textContent).toContain("Sem faixa cadastrada — a loja não abre neste dia.");
+  });
+
   it("a faixa que vira a madrugada é marcada, não recusada", async () => {
     setup();
     const sabado = await screen.findByRole("listitem", { name: "Sábado" });

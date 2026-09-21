@@ -111,6 +111,9 @@ function OpeningHoursEditor({
                         </Button>
                       </div>
                     ))}
+                    {day.ranges.length === 0 && (
+                      <p className={classes.empty}>Sem faixa cadastrada — a loja não abre neste dia.</p>
+                    )}
                     <button
                       type="button"
                       className={classes.dashed}

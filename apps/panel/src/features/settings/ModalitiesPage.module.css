@@ -5,6 +5,13 @@
   padding: 18px 20px;
 }
 
+.note {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--mc-ink2);
+  max-width: 78ch;
+}
+
 .card {
   display: grid;
   gap: 16px;

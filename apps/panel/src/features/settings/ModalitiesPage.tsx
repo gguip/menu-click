@@ -105,6 +105,11 @@ export function ModalitiesPage() {
 
   return (
     <div className={classes.page}>
+      <p className={classes.note}>
+        O que a loja aceita. Desligar uma modalidade tira a opção do cardápio público na hora — pedidos
+        já abertos não são afetados.
+      </p>
+
       <section className={classes.card}>
         <h2 className={classes.cardTitle}>Modalidades</h2>
         {MODALITIES.map(renderFlag)}

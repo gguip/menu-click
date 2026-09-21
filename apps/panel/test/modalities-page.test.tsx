@@ -82,6 +82,17 @@ describe("ModalitiesPage", () => {
     expect(screen.queryByText("Fora do ar")).toBeNull();
   });
 
+  it("a nota do topo é literal do handoff", async () => {
+    signIn();
+    mockApi(panelHandlers());
+    renderInPanel(routes, "/modalidades");
+    expect(
+      await screen.findByText(
+        "O que a loja aceita. Desligar uma modalidade tira a opção do cardápio público na hora — pedidos já abertos não são afetados.",
+      ),
+    ).toBeTruthy();
+  });
+
   it("sem nenhuma modalidade ligada, avisa", async () => {
     signIn();
     mockApi(
