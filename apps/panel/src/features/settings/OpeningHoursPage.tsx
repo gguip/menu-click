@@ -161,8 +161,16 @@ export function OpeningHoursPage() {
   const { restaurantId } = useSessionUser();
   const hours = useOpeningHours(restaurantId);
 
-  if (hours.isPending) return <p className={classes.loading}>Carregando horário…</p>;
-  if (hours.isError) return <p className={classes.loading}>{describeError(hours.error)}</p>;
+  // Carregando/erro só quando não há dado: um refetch que falha ao
+  // reconectar mantém `data` antigo, e checar `isError` primeiro trocaria a
+  // grade que a pessoa está editando pela mensagem de erro.
+  if (hours.data === undefined) {
+    return (
+      <p className={classes.loading}>
+        {hours.isError ? describeError(hours.error) : "Carregando horário…"}
+      </p>
+    );
+  }
   // O editor nasce com os dados em mãos: estado de formulário vindo de props,
   // sem setState em efeito.
   return <OpeningHoursEditor restaurantId={restaurantId} initial={fromApi(hours.data)} />;

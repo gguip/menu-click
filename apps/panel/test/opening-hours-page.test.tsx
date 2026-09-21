@@ -79,6 +79,27 @@ describe("OpeningHoursPage", () => {
     expect(api.calls.some((call) => call.method === "PUT")).toBe(false);
   });
 
+  it("um refetch que falha não troca a grade pela mensagem, e o que foi editado continua lá", async () => {
+    signIn();
+    const api = mockApi([gradeHandler(SEGUNDA_E_SABADO), ...panelHandlers()]);
+    const { queryClient } = renderInPanel(routes, "/horario");
+    fireEvent.click(await screen.findByRole("button", { name: "Adicionar faixa em quarta" }));
+    fireEvent.change(screen.getByLabelText("Quarta: abre (faixa 1)"), { target: { value: "18:00" } });
+
+    api.add({
+      method: "GET",
+      path: HOURS,
+      status: 503,
+      body: { statusCode: 503, error: "Service Unavailable", message: "Fora do ar" },
+      once: true,
+    });
+    await queryClient.refetchQueries({ queryKey: ["opening-hours", RESTAURANT_ID] });
+
+    expect(await screen.findByLabelText("Quarta: abre (faixa 1)")).toBeTruthy();
+    expect((screen.getByLabelText("Quarta: abre (faixa 1)") as HTMLInputElement).value).toBe("18:00");
+    expect(screen.queryByText("Fora do ar")).toBeNull();
+  });
+
   it("a pausa no rodapé é o mesmo interruptor do topo", async () => {
     setup();
     expect(await screen.findByRole("switch", { name: "Aceitando pedidos" })).toBeTruthy();

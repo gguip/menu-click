@@ -57,4 +57,25 @@ describe("StoreDataPage", () => {
     expect(screen.getByText("Informe o nome da loja.")).toBeTruthy();
     expect(api.calls.some((call) => call.method === "PATCH")).toBe(false);
   });
+
+  it("um refetch que falha não troca o editor pela mensagem, e o que foi digitado continua lá", async () => {
+    signIn();
+    const api = mockApi(panelHandlers());
+    const { queryClient } = renderInPanel(routes, "/dados-da-loja");
+    const nome = (await screen.findByLabelText("Nome da loja")) as HTMLInputElement;
+    fireEvent.change(nome, { target: { value: "Trattoria Bela" } });
+
+    api.add({
+      method: "GET",
+      path: `/restaurants/${RESTAURANT_ID}`,
+      status: 503,
+      body: { statusCode: 503, error: "Service Unavailable", message: "Fora do ar" },
+      once: true,
+    });
+    await queryClient.refetchQueries({ queryKey: ["restaurant", RESTAURANT_ID] });
+
+    expect(await screen.findByLabelText("Nome da loja")).toBeTruthy();
+    expect((screen.getByLabelText("Nome da loja") as HTMLInputElement).value).toBe("Trattoria Bela");
+    expect(screen.queryByText("Fora do ar")).toBeNull();
+  });
 });

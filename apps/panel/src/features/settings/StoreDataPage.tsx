@@ -111,8 +111,17 @@ export function StoreDataPage() {
   const { restaurantId } = useSessionUser();
   const restaurant = useRestaurant(restaurantId);
 
-  if (restaurant.isPending) return <p className={classes.loading}>Carregando dados da loja…</p>;
-  if (restaurant.isError) return <p className={classes.loading}>{describeError(restaurant.error)}</p>;
+  // Carregando/erro só quando não há dado: um refetch (poll da casca) que
+  // falha mantém `data` antigo e `isError: true` ao mesmo tempo — checar
+  // `isError` antes trocaria o editor pela mensagem de erro e derrubaria o
+  // que a pessoa estava digitando.
+  if (restaurant.data === undefined) {
+    return (
+      <p className={classes.loading}>
+        {restaurant.isError ? describeError(restaurant.error) : "Carregando dados da loja…"}
+      </p>
+    );
+  }
   // `key`: trocar de restaurante remonta o editor com os dados novos, sem
   // setState em efeito.
   return <StoreDataEditor key={restaurant.data.id} restaurant={restaurant.data} />;

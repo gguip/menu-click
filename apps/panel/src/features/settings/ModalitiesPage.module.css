@@ -30,3 +30,8 @@
   font-size: 12.5px;
   color: var(--mc-danger);
 }
+
+.loading {
+  padding: 18px 20px;
+  color: var(--mc-ink2);
+}

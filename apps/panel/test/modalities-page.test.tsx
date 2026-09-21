@@ -63,6 +63,25 @@ describe("ModalitiesPage", () => {
     await waitFor(() => expect((toggle("Pix") as HTMLInputElement).checked).toBe(true));
   });
 
+  it("um refetch que falha não troca os interruptores pela mensagem", async () => {
+    signIn();
+    const api = mockApi(panelHandlers());
+    const { queryClient } = renderInPanel(routes, "/modalidades");
+    await screen.findByRole("switch", { name: "Pix" });
+
+    api.add({
+      method: "GET",
+      path: `/restaurants/${RESTAURANT_ID}`,
+      status: 503,
+      body: { statusCode: 503, error: "Service Unavailable", message: "Fora do ar" },
+      once: true,
+    });
+    await queryClient.refetchQueries({ queryKey: ["restaurant", RESTAURANT_ID] });
+
+    expect(await screen.findByRole("switch", { name: "Pix" })).toBeTruthy();
+    expect(screen.queryByText("Fora do ar")).toBeNull();
+  });
+
   it("sem nenhuma modalidade ligada, avisa", async () => {
     signIn();
     mockApi(

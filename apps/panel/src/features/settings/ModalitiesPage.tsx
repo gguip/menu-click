@@ -80,7 +80,16 @@ export function ModalitiesPage() {
   const deliveryAlert = useDeliveryAlert(restaurantId, restaurant.data);
 
   const data = restaurant.data;
-  if (data === undefined) return null;
+  // Carregando/erro só quando não há dado: sem isso, um 4xx deixava a tela em
+  // branco para sempre (`return null`), e um refetch que falha trocaria os
+  // interruptores pela mensagem mesmo com o dado antigo em mãos.
+  if (data === undefined) {
+    return (
+      <p className={classes.loading}>
+        {restaurant.isError ? describeError(restaurant.error) : "Carregando modalidades…"}
+      </p>
+    );
+  }
 
   const noModality = !data.isDelivery && !data.isTakeaway && !data.isQrcode;
 
