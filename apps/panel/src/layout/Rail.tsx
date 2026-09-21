@@ -13,6 +13,10 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = 
       { to: "/secoes", label: "Seções" },
     ],
   },
+  {
+    title: "Configuração",
+    items: [{ to: "/modalidades", label: "Modalidades" }],
+  },
 ];
 
 function navClass({ isActive }: { isActive: boolean }): string {
