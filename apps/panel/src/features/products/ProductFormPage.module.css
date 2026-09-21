@@ -94,24 +94,6 @@
   font-size: 12.5px;
 }
 
-.saveBar {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 12px 20px;
-  background: var(--mc-surface);
-  border-top: 1px solid var(--mc-line);
-}
-
-.dirty {
-  margin-right: auto;
-  font-size: 13px;
-  color: var(--mc-ink3);
-}
-
 .error {
   margin: 0;
   font-size: 13.5px;

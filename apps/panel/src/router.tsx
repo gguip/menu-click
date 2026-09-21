@@ -11,6 +11,9 @@ import { OrderDrawer } from "./features/orders/OrderDrawer.tsx";
 import { OrdersPage } from "./features/orders/OrdersPage.tsx";
 import { ProductFormPage } from "./features/products/ProductFormPage.tsx";
 import { ProductsPage } from "./features/products/ProductsPage.tsx";
+import { ModalitiesPage } from "./features/settings/ModalitiesPage.tsx";
+import { OpeningHoursPage } from "./features/settings/OpeningHoursPage.tsx";
+import { StoreDataPage } from "./features/settings/StoreDataPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
 import { RouteError } from "./layout/RouteError.tsx";
 
@@ -52,6 +55,17 @@ export const routes: RouteObject[] = [
               { path: "/produtos/novo", handle: { title: "Novo produto" }, element: <ProductFormPage /> },
               { path: "/produtos/:productId", handle: { title: "Editar produto" }, element: <ProductFormPage /> },
               { path: "/secoes", handle: { title: "Seções do cardápio" }, element: <CategoriesPage /> },
+              {
+                path: "/modalidades",
+                handle: { title: "Modalidades e pagamento" },
+                element: <ModalitiesPage />,
+              },
+              {
+                path: "/horario",
+                handle: { title: "Horário de funcionamento" },
+                element: <OpeningHoursPage />,
+              },
+              { path: "/dados-da-loja", handle: { title: "Dados da loja" }, element: <StoreDataPage /> },
             ],
           },
         ],

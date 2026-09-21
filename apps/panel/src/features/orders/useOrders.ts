@@ -48,10 +48,15 @@ export function useTables(restaurantId: string) {
 /**
  * "Entrega por bairro sem nenhum bairro cadastrado": não é frete grátis — a
  * loja recusa pedidos de entrega sem ninguém perceber. Por isso vira alerta
- * persistente em Pedidos, e não erro de formulário (correção do handoff).
+ * persistente em Pedidos, e não erro de formulário (correção do handoff). Com
+ * `deliveryFeeToArrange` ligado a API aceita o pedido com frete "a
+ * combinar", então a falta de bairro deixa de significar recusa.
  */
 export function useDeliveryAlert(restaurantId: string, restaurant: Restaurant | undefined): boolean {
-  const byNeighborhood = restaurant?.isDelivery === true && restaurant.deliveryFeeMode === "neighborhood";
+  const byNeighborhood =
+    restaurant?.isDelivery === true &&
+    restaurant.deliveryFeeMode === "neighborhood" &&
+    !restaurant.deliveryFeeToArrange;
   const neighborhoods = useQuery({
     queryKey: ["delivery-neighborhoods", restaurantId],
     queryFn: () => listNeighborhoods(restaurantId),

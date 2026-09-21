@@ -1,0 +1,40 @@
+.zone {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 16px 18px;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-danger-line);
+  border-radius: 10px;
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mc-danger);
+}
+
+.body {
+  margin: 0;
+  max-width: 78ch;
+  font-size: 13.5px;
+  color: var(--mc-ink2);
+}
+
+.dialog {
+  display: grid;
+  gap: 12px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.error {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--mc-danger);
+}

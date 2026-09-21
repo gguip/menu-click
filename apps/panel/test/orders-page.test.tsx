@@ -185,6 +185,21 @@ describe("OrdersPage", () => {
     ).toBeTruthy();
   });
 
+  it("entrega por bairro sem bairro, mas com frete a combinar ligado, não recusa — sem alerta", async () => {
+    signIn();
+    mockApi([
+      listHandler([]),
+      noTables,
+      { method: "GET", path: `/restaurants/${RESTAURANT_ID}/delivery-neighborhoods`, body: { neighborhoods: [] } },
+      ...panelHandlers({
+        restaurant: { isDelivery: true, deliveryFeeMode: "neighborhood", deliveryFeeToArrange: true },
+      }),
+    ]);
+    renderInPanel(routes, "/pedidos");
+    await screen.findByText("Nenhum pedido ainda hoje");
+    expect(screen.queryByText("Entrega por bairro sem nenhum bairro cadastrado")).toBeNull();
+  });
+
   it("sem internet, avisa que a lista pode estar velha", async () => {
     signIn();
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
