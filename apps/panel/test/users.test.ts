@@ -58,6 +58,15 @@ describe("regras dos usuários", () => {
     ).toEqual({});
   });
 
+  it("reusa o checkPassword do access: 40 'ç' são 80 bytes e estouram o teto do bcrypt", () => {
+    const overflowing = "ç".repeat(40);
+    expect(
+      validateInvite({ name: "João", email: "joao@loja.com.br", password: overflowing, role: "staff" }),
+    ).toEqual({
+      password: "A senha passou do limite: use até 72 bytes (letras acentuadas contam em dobro).",
+    });
+  });
+
   it("a confirmação de remover diz que a sessão morre e o histórico fica", () => {
     const copy = removeUserConfirm("João");
     expect(copy.title).toBe("Remover o acesso de João?");

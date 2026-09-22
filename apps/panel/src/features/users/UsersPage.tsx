@@ -147,6 +147,7 @@ export function UsersPage() {
             />
             <TextInput
               label="E-mail"
+              type="email"
               value={form.email}
               error={errors.email}
               onChange={(event) => setForm({ ...form, email: event.currentTarget.value })}

@@ -1,5 +1,6 @@
 import type { RestaurantUser, UserRole } from "../../api/types.ts";
 import type { ConfirmCopy } from "../../ui/confirmCopy.ts";
+import { checkPassword } from "../access/password.ts";
 
 /** O mesmo piso da API (`PASSWORD_MIN_LENGTH`): conferido antes da chamada. */
 export const PASSWORD_MIN_LENGTH = 8;
@@ -34,12 +35,21 @@ export type InviteForm = {
 
 export type InviteErrors = Partial<Record<"name" | "email" | "password", string>>;
 
+/**
+ * O mínimo é checado aqui, com a frase própria do convite; o teto de 72
+ * bytes do bcrypt é o mesmo `checkPassword` de `features/access/password.ts`
+ * — duplicar aquela conta divergiria da regra real da API (S20) no dia em
+ * que uma das duas mudasse sozinha.
+ */
 export function validateInvite(form: InviteForm): InviteErrors {
   const errors: InviteErrors = {};
   if (form.name.trim() === "") errors.name = "Diga o nome da pessoa.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) errors.email = "Digite um e-mail válido.";
   if (form.password.length < PASSWORD_MIN_LENGTH) {
     errors.password = "A senha provisória precisa de pelo menos 8 caracteres.";
+  } else {
+    const problem = checkPassword(form.password);
+    if (problem !== null) errors.password = problem;
   }
   return errors;
 }

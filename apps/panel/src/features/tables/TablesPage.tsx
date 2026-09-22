@@ -60,17 +60,23 @@ function TableCard({
     setError(problem);
     if (problem !== null) return;
     rename.mutate(editing.trim(), {
-      onSuccess: () => setEditing(null),
+      onSuccess: () => {
+        setEditing(null);
+        setError(null);
+      },
       onError: (cause) => setError(describeError(cause)),
     });
   };
 
   return (
     <div className={selected ? `${classes.card} ${classes.cardSelected}` : classes.card}>
-      <label className={classes.pick}>
+      {/* `div`, não `label`: o Checkbox do Mantine já renderiza o próprio
+          `label` internamente, e aninhar um dentro do outro é HTML inválido.
+          O `aria-label` do Checkbox já nomeia o controle. */}
+      <div className={classes.pick}>
         <Checkbox size="18" checked={selected} onChange={onToggle} aria-label={`Selecionar ${table.label}`} />
         <span className={classes.label}>{table.label}</span>
-      </label>
+      </div>
       <div className={classes.qr}>
         <QRCode value={table.qrUrl} size={104} level="Q" />
       </div>
@@ -166,7 +172,10 @@ export function TablesPage() {
     setNewError(problem);
     if (problem !== null) return;
     create.mutate(newLabel.trim(), {
-      onSuccess: () => setNewLabel(""),
+      onSuccess: () => {
+        setNewLabel("");
+        setNewError(null);
+      },
       onError: (cause) => setNewError(describeError(cause)),
     });
   };

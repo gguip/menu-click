@@ -23,3 +23,21 @@
   color: var(--mc-warn);
   font-size: 13.5px;
 }
+
+/*
+ * A folha de adesivos é impressa de dentro de /mesas, mas a casca (rail,
+ * cabeçalho, banner de pausa) mora FORA de `.page` — em cima deste componente,
+ * não da feature. A regra de impressão de `TablesPage.module.css` só esconde
+ * os irmãos de `.sheet`; sem esta aqui, a régua imprimiria como uma coluna à
+ * esquerda espremendo os adesivos. Ela vive na casca porque é a casca que
+ * decide o que É casca — a feature não teria como enxergar o rail daqui.
+ */
+@media print {
+  .shell > *:not(.main) {
+    display: none;
+  }
+
+  .main > *:not(.content) {
+    display: none;
+  }
+}

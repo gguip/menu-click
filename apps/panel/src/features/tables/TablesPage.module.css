@@ -121,7 +121,9 @@
 
   .stickerStore {
     font-size: 13px;
-    color: var(--mc-ink2);
+    /* Fixo no tom claro (--mc-print-ink2), não em --mc-ink2: sob o tema
+       escuro esse token vira quase branco, e o texto some no papel branco. */
+    color: var(--mc-print-ink2);
   }
 
   .stickerLabel {
@@ -131,6 +133,7 @@
   .stickerUrl {
     overflow-wrap: anywhere;
     font-size: 10.5px;
-    color: var(--mc-ink3);
+    /* Mesmo motivo do .stickerStore acima. */
+    color: var(--mc-print-ink3);
   }
 }
