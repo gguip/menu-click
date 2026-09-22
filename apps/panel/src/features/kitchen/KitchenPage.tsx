@@ -1,6 +1,6 @@
 import { Button } from "@mantine/core";
 import { Link } from "react-router";
-import { describeError } from "../../api/client.ts";
+import { describeError, NetworkError } from "../../api/client.ts";
 import type { Order } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { orderCode } from "../../lib/orderCode.ts";
@@ -8,6 +8,7 @@ import { formatElapsed } from "../../lib/time.ts";
 import { useNow } from "../../lib/useNow.ts";
 import { useOnline } from "../../lib/useOnline.ts";
 import { OrderActionProvider, useOrderAction } from "../orders/orderActionFlow.tsx";
+import { OfflineNotice } from "../orders/OrdersNotices.tsx";
 import { groupOptions, typeLabel } from "../orders/presentation.ts";
 import { useNewOrderAlert } from "../orders/useNewOrderAlert.ts";
 import { byArrival, KITCHEN_COLUMNS, type KitchenColumnId, kitchenAction } from "./kitchen.ts";
@@ -150,6 +151,25 @@ export function KitchenPage() {
   const online = useOnline();
   const now = useNow();
 
+  // Sem internet, ou qualquer uma das três buscas (pendentes, confirmed,
+  // preparing) sem conseguir nem falar com o servidor — o mesmo critério do
+  // OfflineNotice de Pedidos, aplicado às três buscas da cozinha.
+  const offline =
+    !online ||
+    alert.pendingError instanceof NetworkError ||
+    doing.confirmedError instanceof NetworkError ||
+    doing.preparingError instanceof NetworkError;
+
+  // O menor `dataUpdatedAt` entre as três, ignorando zero (a mais velha não
+  // mente sobre nenhuma das outras); 0 quando nenhuma assentou ainda.
+  const updatedAts = [alert.pendingUpdatedAt, doing.updatedAt].filter((value) => value > 0);
+  const updatedAt = updatedAts.length > 0 ? Math.min(...updatedAts) : 0;
+
+  const retryAll = () => {
+    alert.refetchPending();
+    doing.refetch();
+  };
+
   const byColumn: Record<
     KitchenColumnId,
     { orders: Order[] | undefined; error: unknown; partialError?: unknown }
@@ -162,7 +182,7 @@ export function KitchenPage() {
   };
 
   return (
-    <OrderActionProvider restaurantId={restaurantId} disabled={!online} mode="kitchen">
+    <OrderActionProvider restaurantId={restaurantId} disabled={offline} mode="kitchen">
       <div className={classes.page}>
         <header className={classes.top}>
           <div>
@@ -183,6 +203,7 @@ export function KitchenPage() {
             </Button>
           </div>
         </header>
+        {offline && <OfflineNotice updatedAt={updatedAt} now={now} onRetry={retryAll} />}
         <div className={classes.columns}>
           {KITCHEN_COLUMNS.map((column) => (
             <KitchenColumn

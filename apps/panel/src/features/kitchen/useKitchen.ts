@@ -32,15 +32,33 @@ export function useDoingOrders(restaurantId: string) {
   const preparingSettled = preparing.data !== undefined || preparing.isError;
   const anyData = confirmed.data !== undefined || preparing.data !== undefined;
 
+  // O menor `dataUpdatedAt` das duas, ignorando zero (busca que ainda não
+  // assentou) — a atualização mais velha não mente sobre nenhuma das duas.
+  const settledUpdatedAts = [confirmed.dataUpdatedAt, preparing.dataUpdatedAt].filter((value) => value > 0);
+  const updatedAt = settledUpdatedAts.length > 0 ? Math.min(...settledUpdatedAts) : 0;
+  const refetch = () => void Promise.all([confirmed.refetch(), preparing.refetch()]);
+
   if (confirmedSettled && preparingSettled && anyData) {
     return {
       orders: byArrival([...(confirmed.data ?? []), ...(preparing.data ?? [])]),
       error: null,
       partialError: confirmed.isError ? confirmed.error : preparing.isError ? preparing.error : null,
+      confirmedError: confirmed.error,
+      preparingError: preparing.error,
+      updatedAt,
+      refetch,
     };
   }
 
-  return { orders: undefined, error: confirmed.error ?? preparing.error, partialError: null };
+  return {
+    orders: undefined,
+    error: confirmed.error ?? preparing.error,
+    partialError: null,
+    confirmedError: confirmed.error,
+    preparingError: preparing.error,
+    updatedAt,
+    refetch,
+  };
 }
 
 /**

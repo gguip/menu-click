@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Order } from "../src/api/types.ts";
 import { KitchenPage } from "../src/features/kitchen/KitchenPage.tsx";
 import { OrdersPage } from "../src/features/orders/OrdersPage.tsx";
@@ -168,6 +168,24 @@ describe("KitchenPage", () => {
     const novos = await screen.findByRole("region", { name: "Entraram agora" });
     expect(await within(novos).findByText("Algo deu errado. Tente de novo.")).toBeTruthy();
     expect(within(novos).queryByText("Carregando pedidos…")).toBeNull();
+  });
+
+  it("erro de rede numa das listas avisa 'Sem internet' na cozinha", async () => {
+    signIn();
+    mockApi(kitchenHandlers([], [], []));
+    const innerFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input), "http://localhost");
+        if (url.searchParams.get("status") === "preparing") {
+          throw new TypeError("Failed to fetch");
+        }
+        return innerFetch(input, init);
+      }),
+    );
+    renderInPanel(routes, "/cozinha");
+    expect(await screen.findByText("Sem internet")).toBeTruthy();
   });
 
   it("colunas vazias dizem o texto do protótipo", async () => {

@@ -96,12 +96,16 @@ export function useNewOrderAlert(restaurantId: string) {
 
   // `pendingOrders` é a MESMA lista que o aviso vigia: a cozinha a mostra em
   // "Entraram agora" sem uma requisição a mais. `pendingError` deixa a
-  // cozinha mostrar o próprio erro em vez do "Carregando pedidos…" fixo.
+  // cozinha mostrar o próprio erro em vez do "Carregando pedidos…" fixo, e
+  // `pendingUpdatedAt`/`refetchPending` deixam a cozinha montar o próprio
+  // aviso de "sem conexão" em cima desta mesma busca.
   return {
     pendingCount,
     soundBlocked,
     enableSound,
     pendingOrders: pending.data,
     pendingError: pending.error,
+    pendingUpdatedAt: pending.dataUpdatedAt,
+    refetchPending: () => void pending.refetch(),
   };
 }
