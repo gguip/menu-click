@@ -86,3 +86,51 @@
   font-size: 12.5px;
   color: var(--mc-danger);
 }
+
+.bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/*
+ * Na tela a folha não existe; no papel, ela é a única coisa que existe. Sem o
+ * `display: none` daqui, os adesivos apareceriam duplicados abaixo da grade.
+ */
+.sheet {
+  display: none;
+}
+
+@media print {
+  .page > *:not(.sheet) {
+    display: none;
+  }
+
+  .sheet {
+    display: block;
+  }
+
+  .sticker {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 16px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .stickerStore {
+    font-size: 13px;
+    color: var(--mc-ink2);
+  }
+
+  .stickerLabel {
+    font-size: 26px;
+  }
+
+  .stickerUrl {
+    overflow-wrap: anywhere;
+    font-size: 10.5px;
+    color: var(--mc-ink3);
+  }
+}

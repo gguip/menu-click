@@ -7,7 +7,18 @@ import { useSessionUser } from "../../auth/useMe.ts";
 import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import { Notice } from "../../ui/Notice.tsx";
-import { labelError, removeConfirm, rotateConfirm } from "./tables.ts";
+import { useRestaurant } from "../restaurant/useRestaurant.ts";
+import { PrintSheet } from "./PrintSheet.tsx";
+import {
+  allSelected,
+  labelError,
+  printButtonLabel,
+  removeConfirm,
+  rotateConfirm,
+  selectAllLabel,
+  toggleSelection,
+  visibleSelection,
+} from "./tables.ts";
 import classes from "./TablesPage.module.css";
 import {
   useCreateTable,
@@ -142,6 +153,11 @@ export function TablesPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [newLabel, setNewLabel] = useState("");
   const [newError, setNewError] = useState<string | null>(null);
+
+  const restaurant = useRestaurant(restaurantId);
+  const visible = visibleSelection(selected, list);
+  const everything = allSelected(selected, list);
+  const chosen = list.filter((table) => visible.includes(table.id));
   const create = useCreateTable(restaurantId);
 
   const submitNew = (event: FormEvent) => {
@@ -166,6 +182,18 @@ export function TablesPage() {
           {describeError(tables.error)}
         </Notice>
       )}
+      <div className={classes.bar}>
+        <Button
+          variant="default"
+          disabled={list.length === 0}
+          onClick={() => setSelected(everything ? [] : list.map((table) => table.id))}
+        >
+          {selectAllLabel(everything)}
+        </Button>
+        <Button disabled={visible.length === 0} onClick={() => window.print()}>
+          {printButtonLabel(visible.length)}
+        </Button>
+      </div>
       <div className={classes.grid}>
         {list.map((table) => (
           <TableCard
@@ -173,13 +201,7 @@ export function TablesPage() {
             restaurantId={restaurantId}
             table={table}
             selected={selected.includes(table.id)}
-            onToggle={() =>
-              setSelected((current) =>
-                current.includes(table.id)
-                  ? current.filter((id) => id !== table.id)
-                  : [...current, table.id],
-              )
-            }
+            onToggle={() => setSelected((current) => toggleSelection(current, table.id))}
           />
         ))}
         <form className={classes.newCard} onSubmit={submitNew}>
@@ -199,6 +221,7 @@ export function TablesPage() {
           )}
         </form>
       </div>
+      <PrintSheet storeName={restaurant.data?.name ?? ""} tables={chosen} />
     </div>
   );
 }
