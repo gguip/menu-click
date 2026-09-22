@@ -158,6 +158,18 @@ describe("KitchenPage", () => {
     expect(within(fazendo).getByText(/Parte da lista não carregou/)).toBeTruthy();
   });
 
+  it("'Entraram agora' mostra o erro dos pendentes, não 'Carregando pedidos…'", async () => {
+    signIn();
+    mockApi([
+      { method: "GET", path: LIST, query: { status: "pending" }, status: 500 },
+      ...kitchenHandlers([], [], []),
+    ]);
+    renderInPanel(routes, "/cozinha");
+    const novos = await screen.findByRole("region", { name: "Entraram agora" });
+    expect(await within(novos).findByText("Algo deu errado. Tente de novo.")).toBeTruthy();
+    expect(within(novos).queryByText("Carregando pedidos…")).toBeNull();
+  });
+
   it("colunas vazias dizem o texto do protótipo", async () => {
     signIn();
     mockApi(kitchenHandlers([], [], []));

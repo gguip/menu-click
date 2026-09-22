@@ -154,7 +154,10 @@ export function KitchenPage() {
     KitchenColumnId,
     { orders: Order[] | undefined; error: unknown; partialError?: unknown }
   > = {
-    new: { orders: alert.pendingOrders === undefined ? undefined : byArrival(alert.pendingOrders), error: null },
+    new: {
+      orders: alert.pendingOrders === undefined ? undefined : byArrival(alert.pendingOrders),
+      error: alert.pendingError,
+    },
     doing: { orders: doing.orders, error: doing.error, partialError: doing.partialError },
   };
 

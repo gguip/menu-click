@@ -95,6 +95,13 @@ export function useNewOrderAlert(restaurantId: string) {
   };
 
   // `pendingOrders` é a MESMA lista que o aviso vigia: a cozinha a mostra em
-  // "Entraram agora" sem uma requisição a mais.
-  return { pendingCount, soundBlocked, enableSound, pendingOrders: pending.data };
+  // "Entraram agora" sem uma requisição a mais. `pendingError` deixa a
+  // cozinha mostrar o próprio erro em vez do "Carregando pedidos…" fixo.
+  return {
+    pendingCount,
+    soundBlocked,
+    enableSound,
+    pendingOrders: pending.data,
+    pendingError: pending.error,
+  };
 }
