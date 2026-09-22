@@ -1,6 +1,7 @@
 import type { OrdersSummary, OrderStatus, Period } from "../../api/types.ts";
 import { formatCents } from "../../lib/money.ts";
 import { formatSecondsAgo } from "../../lib/time.ts";
+import { PERIODS } from "../orders/orderFilters.ts";
 
 export type StatusTone = "new" | "preparing" | "ready" | "done" | "cancelled";
 
@@ -55,7 +56,9 @@ export function syncLabel(period: Period, updatedAtMs: number, nowMs: number): s
   return period === "yesterday" ? updated : `Fechamento parcial · ${updated}`;
 }
 
-const PERIOD_VALUES: readonly Period[] = ["today", "yesterday", "last7days", "thisMonth"];
+// Deriva de PERIODS (orderFilters.ts) para um período novo não ficar de fora
+// do parsePeriod por esquecimento de manter as duas listas em sincronia.
+const PERIOD_VALUES: readonly Period[] = PERIODS.map((period) => period.value);
 
 export function parsePeriod(value: string | null): Period {
   return PERIOD_VALUES.find((period) => period === value) ?? "today";
