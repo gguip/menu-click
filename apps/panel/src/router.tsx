@@ -16,6 +16,7 @@ import { DeliveryPage } from "./features/settings/DeliveryPage.tsx";
 import { ModalitiesPage } from "./features/settings/ModalitiesPage.tsx";
 import { OpeningHoursPage } from "./features/settings/OpeningHoursPage.tsx";
 import { StoreDataPage } from "./features/settings/StoreDataPage.tsx";
+import { SummaryPage } from "./features/summary/SummaryPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
 import { RouteError } from "./layout/RouteError.tsx";
 
@@ -53,6 +54,7 @@ export const routes: RouteObject[] = [
                 element: <OrdersPage />,
                 children: [{ path: ":orderId", element: <OrderDrawer /> }],
               },
+              { path: "/resumo", handle: { title: "Resumo do dia" }, element: <SummaryPage /> },
               { path: "/produtos", handle: { title: "Produtos" }, element: <ProductsPage /> },
               { path: "/produtos/novo", handle: { title: "Novo produto" }, element: <ProductFormPage /> },
               { path: "/produtos/:productId", handle: { title: "Editar produto" }, element: <ProductFormPage /> },

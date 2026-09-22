@@ -9,6 +9,7 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = 
     title: "Operação",
     items: [
       { to: "/pedidos", label: "Pedidos" },
+      { to: "/resumo", label: "Resumo do dia" },
       { to: "/produtos", label: "Produtos" },
       { to: "/secoes", label: "Seções" },
       { to: "/grupos-de-opcoes", label: "Grupos de opções" },
