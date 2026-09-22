@@ -94,5 +94,7 @@ export function useNewOrderAlert(restaurantId: string) {
     void unlockAudio().then((unlocked) => setSoundBlocked(!unlocked));
   };
 
-  return { pendingCount, soundBlocked, enableSound };
+  // `pendingOrders` é a MESMA lista que o aviso vigia: a cozinha a mostra em
+  // "Entraram agora" sem uma requisição a mais.
+  return { pendingCount, soundBlocked, enableSound, pendingOrders: pending.data };
 }

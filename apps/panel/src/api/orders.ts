@@ -4,6 +4,7 @@ import type {
   Order,
   OrderDetail,
   OrdersSummary,
+  OrderStatus,
   OrderTransition,
   Page,
   Period,
@@ -89,6 +90,19 @@ export function listPendingOrders(restaurantId: string): Promise<Order[]> {
   return fetchAllPages((offset) =>
     apiRequest<Page<Order>>(`/restaurants/${restaurantId}/orders`, {
       query: { status: "pending", period: "today", sort: "createdAt", order: "asc", limit: 100, offset },
+    }),
+  ).then((result) => result.items);
+}
+
+/**
+ * Todos os pedidos de UM status, sem recorte de data, do mais antigo para o
+ * mais novo. É o "Fazendo" da cozinha: um prato em preparo às 23:50 não pode
+ * sumir da bancada à meia-noite, como sumiria com `period: "today"`.
+ */
+export function listOrdersByStatus(restaurantId: string, status: OrderStatus): Promise<Order[]> {
+  return fetchAllPages((offset) =>
+    apiRequest<Page<Order>>(`/restaurants/${restaurantId}/orders`, {
+      query: { status, sort: "createdAt", order: "asc", limit: 100, offset },
     }),
   ).then((result) => result.items);
 }

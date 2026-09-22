@@ -9,6 +9,7 @@ import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import dialog from "../../ui/ConfirmDialog.module.css";
 import type { ConfirmCopy } from "../../ui/confirmCopy.ts";
+import { kitchenAcceptCopy } from "../kitchen/kitchen.ts";
 import { acceptCopy, cancelCopy } from "./orderRules.ts";
 
 type ActionRequest = { order: Order; transition: OrderTransition };
@@ -41,10 +42,17 @@ const STOCK_MESSAGE = /^Estoque insuficiente/;
 export function OrderActionProvider({
   restaurantId,
   disabled,
+  mode = "panel",
   children,
 }: {
   restaurantId: string;
   disabled: boolean;
+  /**
+   * `"kitchen"`: a confirmação de aceite não mostra nome nem total, e o
+   * diálogo de estoque insuficiente só fecha — cancelar e repor estoque não
+   * são ações da bancada.
+   */
+  mode?: "panel" | "kitchen";
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
@@ -90,7 +98,9 @@ export function OrderActionProvider({
     confirming === null
       ? null
       : confirming.transition === "accept"
-        ? acceptCopy(confirming.order)
+        ? mode === "kitchen"
+          ? kitchenAcceptCopy(confirming.order)
+          : acceptCopy(confirming.order)
         : cancelCopy(confirming.order);
 
   const busyOrderId = mutation.isPending ? (mutation.variables?.order.id ?? null) : null;
@@ -123,7 +133,7 @@ export function OrderActionProvider({
                 : failure.message}
             </p>
             <div className={dialog.actions}>
-              {failure.stock ? (
+              {failure.stock && mode === "panel" ? (
                 <>
                   <Button
                     variant="default"
