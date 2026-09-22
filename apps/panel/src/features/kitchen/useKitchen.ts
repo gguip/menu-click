@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getOrder, listOrdersByStatus } from "../../api/orders.ts";
 import type { OrderStatus } from "../../api/types.ts";
 import { ORDERS_POLL_MS } from "../orders/polling.ts";
-import { byArrival } from "./kitchen.ts";
+import { byArrival, kitchenColumn } from "./kitchen.ts";
 
 /** Sob o prefixo `"orders"`: toda ação num pedido invalida estas listas junto. */
 function useOrdersByStatus(restaurantId: string, status: OrderStatus) {
@@ -39,8 +39,15 @@ export function useDoingOrders(restaurantId: string) {
   const refetch = () => void Promise.all([confirmed.refetch(), preparing.refetch()]);
 
   if (confirmedSettled && preparingSettled && anyData) {
+    // Defensivo: as duas buscas assentam em momentos diferentes, e um
+    // pedido pode mudar de status entre uma e outra (uma ação em Pedidos, ou
+    // a própria bancada avançando o pedido). O filtro protege a coluna de um
+    // pedido que já não é mais "doing" na hora em que as duas listas juntam.
+    const joined = [...(confirmed.data ?? []), ...(preparing.data ?? [])].filter(
+      (order) => kitchenColumn(order.status) === "doing",
+    );
     return {
-      orders: byArrival([...(confirmed.data ?? []), ...(preparing.data ?? [])]),
+      orders: byArrival(joined),
       error: null,
       partialError: confirmed.isError ? confirmed.error : preparing.isError ? preparing.error : null,
       confirmedError: confirmed.error,
