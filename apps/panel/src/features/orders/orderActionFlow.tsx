@@ -129,7 +129,9 @@ export function OrderActionProvider({
           <div className={dialog.body}>
             <p className={dialog.text}>
               {failure.stock
-                ? `${failure.message}. O pedido não foi aceito e o estoque não mudou. Reponha o estoque ou recuse explicando ao cliente.`
+                ? mode === "kitchen"
+                  ? `${failure.message}. O pedido não foi aceito e o estoque não mudou. Avise o caixa: repor o estoque ou recusar o pedido se faz na tela de Pedidos.`
+                  : `${failure.message}. O pedido não foi aceito e o estoque não mudou. Reponha o estoque ou recuse explicando ao cliente.`
                 : failure.message}
             </p>
             <div className={dialog.actions}>

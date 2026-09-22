@@ -109,5 +109,12 @@ describe("OrderActionProvider em modo cozinha", () => {
     expect(within(failure).getByRole("button", { name: "Fechar" })).toBeTruthy();
     expect(within(failure).queryByRole("button", { name: "Recusar pedido" })).toBeNull();
     expect(within(failure).queryByRole("button", { name: "Repor estoque" })).toBeNull();
+    expect(
+      within(failure).getByText(
+        "Avise o caixa: repor o estoque ou recusar o pedido se faz na tela de Pedidos.",
+        { exact: false },
+      ),
+    ).toBeTruthy();
+    expect(failure.textContent).not.toContain("recuse explicando ao cliente");
   });
 });
