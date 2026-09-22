@@ -18,6 +18,7 @@ import { ModalitiesPage } from "./features/settings/ModalitiesPage.tsx";
 import { OpeningHoursPage } from "./features/settings/OpeningHoursPage.tsx";
 import { StoreDataPage } from "./features/settings/StoreDataPage.tsx";
 import { SummaryPage } from "./features/summary/SummaryPage.tsx";
+import { TablesPage } from "./features/tables/TablesPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
 import { RouteError } from "./layout/RouteError.tsx";
 
@@ -77,6 +78,7 @@ export const routes: RouteObject[] = [
                 handle: { title: "Horário de funcionamento" },
                 element: <OpeningHoursPage />,
               },
+              { path: "/mesas", handle: { title: "Mesas e QR" }, element: <TablesPage /> },
               { path: "/dados-da-loja", handle: { title: "Dados da loja" }, element: <StoreDataPage /> },
             ],
           },

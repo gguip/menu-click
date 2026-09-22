@@ -21,6 +21,7 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = 
       { to: "/modalidades", label: "Modalidades" },
       { to: "/entrega", label: "Entrega" },
       { to: "/horario", label: "Horário" },
+      { to: "/mesas", label: "Mesas e QR" },
       { to: "/dados-da-loja", label: "Dados da loja" },
     ],
   },
