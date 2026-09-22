@@ -26,7 +26,14 @@ describe("listOrdersByStatus", () => {
     ]);
     const orders = await listOrdersByStatus(RESTAURANT_ID, "preparing");
     expect(orders).toHaveLength(1);
-    expect(api.calls[0].query).toEqual({ status: "preparing", sort: "createdAt", order: "asc", limit: "100", offset: "0" });
+    expect(api.calls[0].query).toEqual({
+      status: "preparing",
+      period: "last7days",
+      sort: "createdAt",
+      order: "asc",
+      limit: "100",
+      offset: "0",
+    });
   });
 });
 
