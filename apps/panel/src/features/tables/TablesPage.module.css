@@ -54,9 +54,16 @@
   color: var(--mc-ink3);
 }
 
+/*
+ * `wrap` porque os três rótulos do handoff não cabem numa linha só na coluna
+ * de 215px: sem ele o excedente vazava para fora do cartão e pousava em cima
+ * do cartão vizinho. O que não couber desce, em vez de sumir da caixa.
+ */
 .actions {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-width: 0;
   justify-content: space-between;
   padding-top: 8px;
   border-top: 1px solid var(--mc-line);

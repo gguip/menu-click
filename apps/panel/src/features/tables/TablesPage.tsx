@@ -83,14 +83,28 @@ function TableCard({
       <span className={classes.url}>{table.qrUrl}</span>
       {editing === null ? (
         <div className={classes.actions}>
-          <Button variant="subtle" aria-label={`Renomear ${table.label}`} onClick={() => setEditing(table.label)}>
+          <Button
+            variant="subtle"
+            size="compact-sm"
+            px={6}
+            aria-label={`Renomear ${table.label}`}
+            onClick={() => setEditing(table.label)}
+          >
             Renomear
           </Button>
-          <Button variant="subtle" aria-label={`Novo código ${table.label}`} onClick={() => setConfirming("rotate")}>
+          <Button
+            variant="subtle"
+            size="compact-sm"
+            px={6}
+            aria-label={`Novo código ${table.label}`}
+            onClick={() => setConfirming("rotate")}
+          >
             Novo código
           </Button>
           <Button
             variant="subtle"
+            size="compact-sm"
+            px={6}
             className={buttons.dangerText}
             aria-label={`Remover ${table.label}`}
             onClick={() => setConfirming("remove")}
