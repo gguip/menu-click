@@ -7,6 +7,7 @@ import { RegisterPage } from "./features/access/RegisterPage.tsx";
 import { ResetPasswordPage } from "./features/access/ResetPasswordPage.tsx";
 import { VerifyEmailLinkPage } from "./features/access/VerifyEmailLinkPage.tsx";
 import { CategoriesPage } from "./features/categories/CategoriesPage.tsx";
+import { KitchenPage } from "./features/kitchen/KitchenPage.tsx";
 import { OrderDrawer } from "./features/orders/OrderDrawer.tsx";
 import { OrdersPage } from "./features/orders/OrdersPage.tsx";
 import { OptionGroupsPage } from "./features/optionGroups/OptionGroupsPage.tsx";
@@ -40,6 +41,7 @@ export const routes: RouteObject[] = [
       {
         element: <RequireVerified />,
         children: [
+          { path: "/cozinha", element: <KitchenPage />, errorElement: <RouteError /> },
           {
             element: <PanelLayout />,
             // Sem isto, um throw em qualquer tela do shell (columnOf com
