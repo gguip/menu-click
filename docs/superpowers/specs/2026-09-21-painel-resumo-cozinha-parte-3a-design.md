@@ -119,6 +119,9 @@ pagamento, sem telefone — tipografia grande para leitura a um metro."*), o bot
 ligar o som quando o navegador o bloquear, e **"Sair do modo cozinha"**, que volta a
 `/pedidos`.
 
+Com a sessão expirada, o tablet cai no login e, ao entrar de novo, vai para Pedidos —
+é preciso voltar ao Modo cozinha pelo botão.
+
 ### As duas colunas
 
 `minmax(330px, 1fr)`, texto literal do protótipo:
@@ -126,7 +129,7 @@ ligar o som quando o navegador o bloquear, e **"Sair do modo cozinha"**, que vol
 | Coluna | Pedidos | Vazio |
 | --- | --- | --- |
 | Entraram agora | `pending` de hoje — a mesma query do aviso de pedido novo e da coluna Novos do kanban | "Nada novo." |
-| Fazendo | `confirmed` e `preparing` | "Bancada limpa." |
+| Fazendo | `confirmed` e `preparing` dos últimos 7 dias | "Bancada limpa." |
 
 ### O cartão
 
@@ -178,9 +181,9 @@ falhar, o pedido fica `confirmed` e o cartão oferece "Começar preparo" como re
 **Puros:**
 
 - Resumo — a linha de explicação de cada número (singular e plural); "N chegaram no
-  período" como a soma de todos os status; a largura da barra, proporcional ao maior
-  status, e zero com tudo zerado; "Fechamento parcial" só nos períodos que incluem
-  hoje.
+  período" como a soma de todos os status; a largura da barra como a fatia do total
+  que chegou, e zero com tudo zerado; "Fechamento parcial" só nos períodos que
+  incluem hoje.
 - Cozinha — o botão por estado e tipo (as cinco linhas da tabela); em que coluna cada
   pedido cai.
 
@@ -209,6 +212,7 @@ falhar, o pedido fica `confirmed` e o cartão oferece "Começar preparo" como re
 | Na cozinha, a falha de estoque diz "Avise o caixa: repor o estoque ou recusar o pedido se faz na tela de Pedidos." | Os botões de repor e recusar não existem na cozinha; o texto do painel mandaria fazer o que ali não se pode |
 | Cartão da cozinha com "Tentar de novo" quando os itens não carregam, e "Fazendo" mostrando a parte que chegou quando uma das duas listas falha | O detalhe é buscado uma vez só; sem o botão, um erro prenderia o cartão o turno inteiro, e sem a lista parcial uma falha esconderia pedidos que chegaram bem |
 | Sem "atualizado há X s" no topo da cozinha | O protótipo o mostra, mas a tela tem três atualizações independentes (pendentes e duas listas); um relógio só mentiria sobre as outras duas |
+| "Fazendo" recortado nos últimos 7 dias | Sem recorte, todo pedido encalhado em confirmed/preparing voltaria à bancada de uma vez, com um detalhe por cartão — rajada capaz de estourar o teto de requisições da loja; 7 dias cobrem o pedido que vira a meia-noite |
 
 ## Repo
 
