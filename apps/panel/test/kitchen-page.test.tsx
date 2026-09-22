@@ -126,6 +126,38 @@ describe("KitchenPage", () => {
     expect(api.calls.filter((call) => call.path === `${LIST}/${DOING_ID}`)).toHaveLength(1);
   });
 
+  it("itens com erro no detalhe deixam 'Tentar de novo', que traz os itens", async () => {
+    signIn();
+    const order = makeOrder({ id: DOING_ID, status: "preparing" });
+    mockApi([
+      { method: "GET", path: `${LIST}/${DOING_ID}`, status: 500, once: true },
+      ...kitchenHandlers([], [], [order]),
+    ]);
+    renderInPanel(routes, "/cozinha");
+    expect(await screen.findByText("Não foi possível carregar os itens.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(await screen.findByText("Pizza Grande")).toBeTruthy();
+  });
+
+  it("'Fazendo' mostra o que chegou mesmo quando uma das duas listas falha", async () => {
+    signIn();
+    const order = makeOrder({ id: DOING_ID, status: "confirmed" });
+    mockApi([
+      {
+        method: "GET",
+        path: `${LIST}/${DOING_ID}`,
+        body: makeOrderDetail({ id: DOING_ID, status: "confirmed" }),
+      },
+      { method: "GET", path: LIST, query: { status: "confirmed" }, body: page([order]) },
+      { method: "GET", path: LIST, query: { status: "preparing" }, status: 500 },
+      ...panelHandlers(),
+    ]);
+    renderInPanel(routes, "/cozinha");
+    const fazendo = await screen.findByRole("region", { name: "Fazendo" });
+    expect(await within(fazendo).findByText("#B7E1")).toBeTruthy();
+    expect(within(fazendo).getByText(/Parte da lista não carregou/)).toBeTruthy();
+  });
+
   it("colunas vazias dizem o texto do protótipo", async () => {
     signIn();
     mockApi(kitchenHandlers([], [], []));

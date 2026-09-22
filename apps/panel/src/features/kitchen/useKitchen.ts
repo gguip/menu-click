@@ -17,15 +17,30 @@ function useOrdersByStatus(restaurantId: string, status: OrderStatus) {
 /**
  * "Fazendo" = aceitos + em preparo. Duas listas a 10 s (12 req/min); os
  * pendentes vêm da query do aviso de pedido novo, sem custo a mais.
+ *
+ * As duas listas assentam de forma independente: uma tem dado, ou está em
+ * erro. Se só uma falhar, a bancada mostra o que chegou da outra — o pedido
+ * `confirmed` não pode sumir de "Fazendo" só porque `preparing` deu 500 —, e
+ * `partialError` carrega o erro da que faltou para a tela avisar sem
+ * esconder o que deu certo. Só quando NENHUMA tem dado (as duas falharam, ou
+ * ainda estão carregando) `orders` fica `undefined`.
  */
 export function useDoingOrders(restaurantId: string) {
   const confirmed = useOrdersByStatus(restaurantId, "confirmed");
   const preparing = useOrdersByStatus(restaurantId, "preparing");
-  const loaded = confirmed.data !== undefined && preparing.data !== undefined;
-  return {
-    orders: loaded ? byArrival([...(confirmed.data ?? []), ...(preparing.data ?? [])]) : undefined,
-    error: confirmed.error ?? preparing.error,
-  };
+  const confirmedSettled = confirmed.data !== undefined || confirmed.isError;
+  const preparingSettled = preparing.data !== undefined || preparing.isError;
+  const anyData = confirmed.data !== undefined || preparing.data !== undefined;
+
+  if (confirmedSettled && preparingSettled && anyData) {
+    return {
+      orders: byArrival([...(confirmed.data ?? []), ...(preparing.data ?? [])]),
+      error: null,
+      partialError: confirmed.isError ? confirmed.error : preparing.isError ? preparing.error : null,
+    };
+  }
+
+  return { orders: undefined, error: confirmed.error ?? preparing.error, partialError: null };
 }
 
 /**

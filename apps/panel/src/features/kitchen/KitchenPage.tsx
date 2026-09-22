@@ -51,9 +51,16 @@ function KitchenCard({
       </header>
 
       {items.data === undefined ? (
-        <p className={classes.itemsNote}>
-          {items.isError ? "Não foi possível carregar os itens." : "Carregando itens…"}
-        </p>
+        items.isError ? (
+          <div className={classes.itemsError}>
+            <p className={classes.itemsNote}>Não foi possível carregar os itens.</p>
+            <Button variant="default" onClick={() => void items.refetch()}>
+              Tentar de novo
+            </Button>
+          </div>
+        ) : (
+          <p className={classes.itemsNote}>Carregando itens…</p>
+        )
       ) : (
         <ul className={classes.items}>
           {items.data.map((item) => (
@@ -92,6 +99,7 @@ function KitchenColumn({
   empty,
   orders,
   error,
+  partialError,
   now,
 }: {
   restaurantId: string;
@@ -100,6 +108,7 @@ function KitchenColumn({
   empty: string;
   orders: Order[] | undefined;
   error: unknown;
+  partialError?: unknown;
   now: number;
 }) {
   return (
@@ -113,12 +122,19 @@ function KitchenColumn({
         <p className={error ? classes.error : classes.itemsNote}>
           {error ? describeError(error) : "Carregando pedidos…"}
         </p>
-      ) : orders.length === 0 ? (
-        <p className={classes.empty}>{empty}</p>
       ) : (
-        orders.map((order) => (
-          <KitchenCard key={order.id} restaurantId={restaurantId} order={order} column={id} now={now} />
-        ))
+        <>
+          {partialError != null && (
+            <p className={classes.error}>{`Parte da lista não carregou: ${describeError(partialError)}`}</p>
+          )}
+          {orders.length === 0 ? (
+            <p className={classes.empty}>{empty}</p>
+          ) : (
+            orders.map((order) => (
+              <KitchenCard key={order.id} restaurantId={restaurantId} order={order} column={id} now={now} />
+            ))
+          )}
+        </>
       )}
     </section>
   );
@@ -134,9 +150,12 @@ export function KitchenPage() {
   const online = useOnline();
   const now = useNow();
 
-  const byColumn: Record<KitchenColumnId, { orders: Order[] | undefined; error: unknown }> = {
+  const byColumn: Record<
+    KitchenColumnId,
+    { orders: Order[] | undefined; error: unknown; partialError?: unknown }
+  > = {
     new: { orders: alert.pendingOrders === undefined ? undefined : byArrival(alert.pendingOrders), error: null },
-    doing: { orders: doing.orders, error: doing.error },
+    doing: { orders: doing.orders, error: doing.error, partialError: doing.partialError },
   };
 
   return (
@@ -171,6 +190,7 @@ export function KitchenPage() {
               empty={column.empty}
               orders={byColumn[column.id].orders}
               error={byColumn[column.id].error}
+              partialError={byColumn[column.id].partialError}
               now={now}
             />
           ))}
