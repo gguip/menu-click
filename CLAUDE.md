@@ -672,6 +672,9 @@ SPA em Vite + React 19 + Mantine 9 + React Router 8 + TanStack Query 5 — **o p
 - **Confirmação que está salvando não fecha** (`src/ui/ConfirmDialog.tsx`): com `busy`, o modal ignora Esc, clique fora e o X — senão dava para fechar no meio de um `DELETE`, clicar de novo no gatilho e mandar um segundo. O gatilho da ação também fica desabilitado enquanto ela roda.
 - **O Resumo do dia com "Hoje" usa a MESMA query do header** (`usePeriodSummary(id, "today")` = `useTodaySummary`): o handoff exige que os dois saiam do mesmo cálculo — duas fontes divergem, e o operador deixa de confiar nas duas.
 - ⚠️ **O Modo cozinha (`/cozinha`) fica fora da casca e não mostra dinheiro** — nem preço, total, frete, pagamento, telefone ou nome. Ele monta o `useNewOrderAlert` por conta própria (a casca não está lá) e lê dele os pendentes. Os itens de cada pedido vêm do detalhe, buscado **uma vez** sob `["order-items", …]`, fora do prefixo `"orders"`: os itens são congelados na criação, e a chave dentro do prefixo seria refeita a cada ação na bancada.
+- **O QR sai do `qrUrl` que a API monta**, e a impressão é uma folha escondida na própria página (`@media print` + `window.print()`): o painel nunca monta URL de QR, e não há biblioteca de PDF — salvar em PDF é o diálogo do navegador. A seleção é por id e descarta mesa que sumiu da lista (`features/tables/tables.ts`).
+- ⚠️ **Renomear a mesa não invalida o adesivo; "Novo código" invalida.** O `PATCH` da API só muda o rótulo, e a rota `rotate-hash` é separada justamente por isso — a nota do topo da tela promete isso a quem vai imprimir.
+- ⚠️ **O papel de um usuário não se edita:** a API não tem `PATCH .../users/:id` e o e-mail é único, então reconvidar com outro papel também não funciona enquanto a conta existir. A tela diz isso e a troca é remover e convidar de novo. "É você" é decidido pelo **id da sessão**, nunca pelo e-mail.
 
 ### Monorepo
 

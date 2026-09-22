@@ -1,6 +1,6 @@
 # Painel da loja, parte 3b — Mesas e QR, e Usuários — desenho
 
-**Data:** 2026-09-22 · **Estado:** aprovado, não implementado (branch `feat/painel-mesas-usuarios`)
+**Data:** 2026-09-22 · **Estado:** implementado (branch `feat/painel-mesas-usuarios`)
 
 ## O problema
 
