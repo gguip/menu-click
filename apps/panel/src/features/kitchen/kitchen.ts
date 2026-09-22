@@ -1,8 +1,9 @@
 import type { Order, OrderStatus, OrderTransition } from "../../api/types.ts";
-import { orderCode } from "../../lib/orderCode.ts";
-import type { ConfirmCopy } from "../../ui/confirmCopy.ts";
 
 export type KitchenColumnId = "new" | "doing";
+
+/** Mora em `features/orders/orderRules.ts`, ao lado de `acceptCopy`. */
+export { kitchenAcceptCopy } from "../orders/orderRules.ts";
 
 /** Texto literal do protótipo do handoff. */
 export const KITCHEN_COLUMNS: readonly { id: KitchenColumnId; title: string; empty: string }[] = [
@@ -36,20 +37,6 @@ export function kitchenAction(
     default:
       return null;
   }
-}
-
-/**
- * A confirmação de aceite do painel diz o nome e o total; a da cozinha, não —
- * a cozinha não decide dinheiro (handoff). O resto do texto é o mesmo.
- */
-export function kitchenAcceptCopy(order: Pick<Order, "id">): ConfirmCopy {
-  return {
-    title: `Aceitar o pedido ${orderCode(order.id)}?`,
-    body: "Aceitar manda o pedido para a cozinha e baixa o estoque dos itens.",
-    warn: "Não existe desconfirmar. Depois de aceito, só cabe cancelar.",
-    cta: "Aceitar pedido",
-    tone: "accent",
-  };
 }
 
 /** A bancada trabalha na ordem de chegada: o mais antigo primeiro. */

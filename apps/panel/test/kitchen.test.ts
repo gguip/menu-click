@@ -57,7 +57,7 @@ describe("a confirmação de aceite", () => {
     const copy = kitchenAcceptCopy({ id: "a3f9c2d1-0000-4000-8000-000000000001" });
     expect(copy.title).toBe("Aceitar o pedido #A3F9?");
     expect(copy.body).toBe("Aceitar manda o pedido para a cozinha e baixa o estoque dos itens.");
-    expect(copy.warn).toBe("Não existe desconfirmar. Depois de aceito, só cabe cancelar.");
+    expect(copy.warn).toBe("Não existe desconfirmar. Depois de aceito, só cabe cancelar, na tela de Pedidos.");
     expect(copy.cta).toBe("Aceitar pedido");
     expect(JSON.stringify(copy)).not.toMatch(/R\$/);
   });

@@ -9,8 +9,7 @@ import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import dialog from "../../ui/ConfirmDialog.module.css";
 import type { ConfirmCopy } from "../../ui/confirmCopy.ts";
-import { kitchenAcceptCopy } from "../kitchen/kitchen.ts";
-import { acceptCopy, cancelCopy } from "./orderRules.ts";
+import { acceptCopy, cancelCopy, kitchenAcceptCopy } from "./orderRules.ts";
 
 type ActionRequest = { order: Order; transition: OrderTransition };
 type Failure = { order: Order; message: string; stock: boolean };
