@@ -1,6 +1,6 @@
 # Painel da loja, parte 3a — Resumo do dia e Modo cozinha — desenho
 
-**Data:** 2026-09-21 · **Estado:** aprovado, não implementado (branch `feat/painel-resumo-cozinha`)
+**Data:** 2026-09-21 · **Estado:** implementado (branch `feat/painel-resumo-cozinha`)
 
 ## O problema
 
@@ -77,9 +77,11 @@ texto literal do protótipo:
 
 ### Pedidos por status
 
-Uma linha por status, **todos**, zerados ou não (a API devolve todos): rótulo com
-ponto, contagem 16 px/700 e barra de 8 px num trilho `surface3`, proporcional ao
-**maior** status do período (tudo zerado: barras vazias).
+As cinco linhas do protótipo, agrupadas como as colunas do kanban: **Novos**
+(`pending`), **Em preparo** (`confirmed` + `preparing`), **Prontos / em rota**
+(`ready_for_pickup` + `out_for_delivery`), **Concluídos** e **Cancelados**. Rótulo
+com ponto, contagem 16 px/700 e barra de 8 px num trilho `surface3`, com a **fatia
+do total que chegou** no período (período vazio: barras vazias).
 
 ⚠️ **Sem a coluna de valor em reais.** O handoff desenhou o valor por status (e os
 cancelados em vermelho, "— R$ …"), mas a rota de resumo devolve só a contagem por
@@ -123,7 +125,7 @@ ligar o som quando o navegador o bloquear, e **"Sair do modo cozinha"**, que vol
 
 | Coluna | Pedidos | Vazio |
 | --- | --- | --- |
-| Entraram agora | `pending`, de qualquer data | "Nada novo." |
+| Entraram agora | `pending` de hoje — a mesma query do aviso de pedido novo e da coluna Novos do kanban | "Nada novo." |
 | Fazendo | `confirmed` e `preparing` | "Bancada limpa." |
 
 ### O cartão
@@ -203,6 +205,10 @@ falhar, o pedido fica `confirmed` e o cartão oferece "Começar preparo" como re
 | "atualizado há X s" sem "Fechamento parcial" em Ontem | O protótipo só mostra Hoje; num dia que já fechou, "parcial" seria falso |
 | Sem o nome do cliente no cartão da cozinha | O protótipo não o desenha; a cozinha não precisa dele |
 | Modo cozinha fora da casca, com botão de entrada em Pedidos | No protótipo ele está no grupo "Protótipo" do rail (andaime), que o handoff manda não implementar |
+| O diálogo de aceite da cozinha não mostra nome nem total, e o de estoque insuficiente só tem "Fechar" | A cozinha não decide dinheiro; cancelar e repor estoque continuam em Pedidos |
+| Na cozinha, a falha de estoque diz "Avise o caixa: repor o estoque ou recusar o pedido se faz na tela de Pedidos." | Os botões de repor e recusar não existem na cozinha; o texto do painel mandaria fazer o que ali não se pode |
+| Cartão da cozinha com "Tentar de novo" quando os itens não carregam, e "Fazendo" mostrando a parte que chegou quando uma das duas listas falha | O detalhe é buscado uma vez só; sem o botão, um erro prenderia o cartão o turno inteiro, e sem a lista parcial uma falha esconderia pedidos que chegaram bem |
+| Sem "atualizado há X s" no topo da cozinha | O protótipo o mostra, mas a tela tem três atualizações independentes (pendentes e duas listas); um relógio só mentiria sobre as outras duas |
 
 ## Repo
 
