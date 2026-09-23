@@ -156,6 +156,20 @@ export type OptionGroup = {
 
 export type Table = { id: string; restaurantId: string; label: string; hash: string; qrUrl: string };
 
+/**
+ * Usuário do restaurante. O papel não se edita: a API não tem
+ * `PATCH .../users/:id`, então trocar é remover e convidar de novo.
+ */
+export type RestaurantUser = {
+  id: string;
+  restaurantId: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type DeliveryNeighborhood = { name: string; feeInCents: number };
 
 /** Uma faixa de funcionamento. `opensAt`/`closesAt` são hora de parede, "HH:MM". */

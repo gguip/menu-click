@@ -78,4 +78,20 @@ describe("PanelLayout", () => {
     expect(readSession()).toBeNull();
     expect(api.calls.some((call) => call.path === "/auth/logout")).toBe(true);
   });
+
+  it("o item Usuários existe para o dono e some para a equipe", async () => {
+    signIn();
+    mockApi(panelHandlers());
+    renderRoutes(routes, "/pedidos");
+    expect(await screen.findByRole("link", { name: "Usuários" })).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Mesas e QR" })).not.toBeNull();
+  });
+
+  it("para a equipe, Usuários não aparece no rail", async () => {
+    signIn();
+    mockApi(panelHandlers({ me: { role: "staff" } }));
+    renderRoutes(routes, "/pedidos");
+    await screen.findByRole("link", { name: "Mesas e QR" });
+    expect(screen.queryByRole("link", { name: "Usuários" })).toBeNull();
+  });
 });

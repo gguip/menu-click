@@ -61,7 +61,16 @@ function schemeVariables(tokens: Record<TokenName, string>): Record<string, stri
 }
 
 export const cssVariablesResolver: CSSVariablesResolver = () => ({
-  variables: {},
+  variables: {
+    // Fixas nos dois temas, de propósito: o adesivo impresso (TablesPage)
+    // usa `ink2`/`ink3` para o nome da loja e a URL, e sob o tema escuro
+    // esses tokens resolvem para quase branco — invisível no papel. Como
+    // `variables` não é reescrito pelos blocos `light`/`dark` do resolver
+    // (ver `convertCssVariables` do Mantine), o valor abaixo vale sempre,
+    // não importa o tema ativo na hora de imprimir.
+    "--mc-print-ink2": lightTokens.ink2,
+    "--mc-print-ink3": lightTokens.ink3,
+  },
   light: schemeVariables(lightTokens),
   dark: schemeVariables(darkTokens),
 });

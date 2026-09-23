@@ -4,7 +4,7 @@ import classes from "./Rail.module.css";
 import { UserMenu } from "./UserMenu.tsx";
 
 // O rail mostra SÓ o que existe (spec): cada tela entra aqui na task dela.
-const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = [
+const NAV_GROUPS: { title: string; items: { to: string; label: string; ownerOnly?: true }[] }[] = [
   {
     title: "Operação",
     items: [
@@ -21,6 +21,10 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string }[] }[] = 
       { to: "/modalidades", label: "Modalidades" },
       { to: "/entrega", label: "Entrega" },
       { to: "/horario", label: "Horário" },
+      { to: "/mesas", label: "Mesas e QR" },
+      // Só o dono: a API responde 403 nas três rotas de usuários, e link morto
+      // é pior que ausência.
+      { to: "/usuarios", label: "Usuários", ownerOnly: true },
       { to: "/dados-da-loja", label: "Dados da loja" },
     ],
   },
@@ -64,16 +68,18 @@ export function Rail({
         {NAV_GROUPS.map((group) => (
           <div key={group.title} className={classes.group}>
             <span className={classes.groupTitle}>{group.title}</span>
-            {group.items.map((item) => (
-              <NavLink key={item.to} to={item.to} className={navClass}>
-                {item.label}
-                {item.to === "/pedidos" && (
-                  <span className={`${classes.badge} ${pendingCount > 0 ? classes.badgeWarn : ""} n`}>
-                    {pendingCount}
-                  </span>
-                )}
-              </NavLink>
-            ))}
+            {group.items
+              .filter((item) => item.ownerOnly !== true || me.role === "owner")
+              .map((item) => (
+                <NavLink key={item.to} to={item.to} className={navClass}>
+                  {item.label}
+                  {item.to === "/pedidos" && (
+                    <span className={`${classes.badge} ${pendingCount > 0 ? classes.badgeWarn : ""} n`}>
+                      {pendingCount}
+                    </span>
+                  )}
+                </NavLink>
+              ))}
           </div>
         ))}
       </div>
