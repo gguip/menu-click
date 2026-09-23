@@ -9,7 +9,7 @@ import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import dialog from "../../ui/ConfirmDialog.module.css";
 import type { ConfirmCopy } from "../../ui/confirmCopy.ts";
-import { acceptCopy, cancelCopy } from "./orderRules.ts";
+import { acceptCopy, cancelCopy, kitchenAcceptCopy } from "./orderRules.ts";
 
 type ActionRequest = { order: Order; transition: OrderTransition };
 type Failure = { order: Order; message: string; stock: boolean };
@@ -41,10 +41,17 @@ const STOCK_MESSAGE = /^Estoque insuficiente/;
 export function OrderActionProvider({
   restaurantId,
   disabled,
+  mode = "panel",
   children,
 }: {
   restaurantId: string;
   disabled: boolean;
+  /**
+   * `"kitchen"`: a confirmação de aceite não mostra nome nem total, e o
+   * diálogo de estoque insuficiente só fecha — cancelar e repor estoque não
+   * são ações da bancada.
+   */
+  mode?: "panel" | "kitchen";
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
@@ -90,7 +97,9 @@ export function OrderActionProvider({
     confirming === null
       ? null
       : confirming.transition === "accept"
-        ? acceptCopy(confirming.order)
+        ? mode === "kitchen"
+          ? kitchenAcceptCopy(confirming.order)
+          : acceptCopy(confirming.order)
         : cancelCopy(confirming.order);
 
   const busyOrderId = mutation.isPending ? (mutation.variables?.order.id ?? null) : null;
@@ -119,11 +128,13 @@ export function OrderActionProvider({
           <div className={dialog.body}>
             <p className={dialog.text}>
               {failure.stock
-                ? `${failure.message}. O pedido não foi aceito e o estoque não mudou. Reponha o estoque ou recuse explicando ao cliente.`
+                ? mode === "kitchen"
+                  ? `${failure.message}. O pedido não foi aceito e o estoque não mudou. Avise o caixa: repor o estoque ou recusar o pedido se faz na tela de Pedidos.`
+                  : `${failure.message}. O pedido não foi aceito e o estoque não mudou. Reponha o estoque ou recuse explicando ao cliente.`
                 : failure.message}
             </p>
             <div className={dialog.actions}>
-              {failure.stock ? (
+              {failure.stock && mode === "panel" ? (
                 <>
                   <Button
                     variant="default"

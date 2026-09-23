@@ -45,6 +45,16 @@ function pendingQueryKey(restaurantId: string) {
 export function useNewOrderAlert(restaurantId: string) {
   const queryClient = useQueryClient();
   const seen = useRef<Set<string> | null>(null);
+  // Semeia com o que já está no cache desta chave, se houver: um pedido que
+  // chegou durante a troca de tela (casca -> cozinha, ou o contrário) não
+  // pode deixar de apitar só porque este componente acabou de montar — sem
+  // isso, a primeira busca DESTE hook trataria qualquer coisa como "primeira
+  // carga" e só registraria, nunca apitaria. Sem dado no cache, `seen.current`
+  // fica `null` e o comportamento é o de sempre: a primeira carga só registra.
+  if (seen.current === null) {
+    const cached = queryClient.getQueryData<Order[]>(pendingQueryKey(restaurantId));
+    if (cached !== undefined) seen.current = new Set(cached.map((order) => order.id));
+  }
   const [soundBlocked, setSoundBlocked] = useState(() => !hasUserGesture());
 
   const pending = useQuery({
@@ -94,5 +104,18 @@ export function useNewOrderAlert(restaurantId: string) {
     void unlockAudio().then((unlocked) => setSoundBlocked(!unlocked));
   };
 
-  return { pendingCount, soundBlocked, enableSound };
+  // `pendingOrders` é a MESMA lista que o aviso vigia: a cozinha a mostra em
+  // "Entraram agora" sem uma requisição a mais. `pendingError` deixa a
+  // cozinha mostrar o próprio erro em vez do "Carregando pedidos…" fixo, e
+  // `pendingUpdatedAt`/`refetchPending` deixam a cozinha montar o próprio
+  // aviso de "sem conexão" em cima desta mesma busca.
+  return {
+    pendingCount,
+    soundBlocked,
+    enableSound,
+    pendingOrders: pending.data,
+    pendingError: pending.error,
+    pendingUpdatedAt: pending.dataUpdatedAt,
+    refetchPending: () => void pending.refetch(),
+  };
 }

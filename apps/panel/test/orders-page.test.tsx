@@ -123,21 +123,24 @@ describe("OrdersPage", () => {
 
   it("teto de 1000 pedidos avisa em vez de sumir os mais antigos calado", async () => {
     signIn();
-    const manyOrders = Array.from({ length: 100 }, () => makeOrder());
-    mockApi([
-      { method: "GET", path: LIST, body: { data: manyOrders, limit: 100, offset: 0, total: 5000 } },
-      noTables,
-      ...panelHandlers(),
-    ]);
+    // Um handler por página, cada um com um pedido DISTINTO: a versão
+    // anterior devolvia as mesmas 100 ordens em toda página, e 1000 cartões
+    // com ids repetidos (mais o useNow redesenhando tudo a cada segundo)
+    // deixavam o teste lento e cheio de avisos de key duplicada do React.
+    // `order: "desc"` na query separa esta busca da de pendentes, que é
+    // `asc`; `fetchAllPages` usa `items.length` como offset, e como cada
+    // página só devolve 1 pedido, os offsets são 0..9 — as 10 páginas do
+    // teto são percorridas com 10 pedidos só, não 1000.
+    const pages: MockHandler[] = Array.from({ length: 10 }, (_, page) => ({
+      method: "GET",
+      path: LIST,
+      query: { order: "desc", offset: String(page) },
+      body: { data: [makeOrder({ status: "completed" })], limit: 100, offset: page, total: 5000 },
+    }));
+    mockApi([...pages, noTables, ...panelHandlers()]);
     renderInPanel(routes, "/pedidos");
-    // Timeout maior só aqui: 10 buscas sequenciais (o teto de 1000 pedidos
-    // pagina até o fim) já estouraram o padrão de 1 s do findBy três vezes.
     expect(
-      await screen.findByText(
-        "Mostrando só os 1000 pedidos mais recentes do período",
-        {},
-        { timeout: 5000 },
-      ),
+      await screen.findByText("Mostrando só os 1000 pedidos mais recentes do período"),
     ).toBeTruthy();
   });
 

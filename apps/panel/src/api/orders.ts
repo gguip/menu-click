@@ -4,6 +4,7 @@ import type {
   Order,
   OrderDetail,
   OrdersSummary,
+  OrderStatus,
   OrderTransition,
   Page,
   Period,
@@ -89,6 +90,25 @@ export function listPendingOrders(restaurantId: string): Promise<Order[]> {
   return fetchAllPages((offset) =>
     apiRequest<Page<Order>>(`/restaurants/${restaurantId}/orders`, {
       query: { status: "pending", period: "today", sort: "createdAt", order: "asc", limit: 100, offset },
+    }),
+  ).then((result) => result.items);
+}
+
+/**
+ * Todos os pedidos de UM status, do mais antigo para o mais novo, recortado
+ * nos últimos 7 dias. É o "Fazendo" da cozinha: um prato em preparo às 23:50
+ * não pode sumir da bancada à meia-noite, então não dá para usar
+ * `period: "today"` — mas também não dá para deixar sem recorte nenhum, a
+ * conta de "últimos 7 dias" fica no Postgres (no fuso da loja, como o resto
+ * do painel), em vez de reimplementada aqui. E o recorte evita que todo
+ * pedido encalhado em `confirmed`/`preparing` desde sempre volte à bancada
+ * de uma vez: cada cartão busca o próprio detalhe, e a rajada de uma lista
+ * sem fim podia sozinha estourar o teto de 100 req/min do IP da loja.
+ */
+export function listOrdersByStatus(restaurantId: string, status: OrderStatus): Promise<Order[]> {
+  return fetchAllPages((offset) =>
+    apiRequest<Page<Order>>(`/restaurants/${restaurantId}/orders`, {
+      query: { status, period: "last7days", sort: "createdAt", order: "asc", limit: 100, offset },
     }),
   ).then((result) => result.items);
 }

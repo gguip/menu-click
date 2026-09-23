@@ -60,6 +60,33 @@ describe("aviso de pedido novo", () => {
     await waitFor(() => expect(playBeep).toHaveBeenCalledOnce());
   });
 
+  it("com dado no cache, semeia o 'seen' — pedido do meio da troca de tela ainda apita", async () => {
+    signIn();
+    const orderA = makeOrder({ id: "aaaaaaaa-0000-4000-8000-000000000001" });
+    const orderB = makeOrder({ id: "bbbbbbbb-0000-4000-8000-000000000002" });
+    const api = mockApi(panelHandlers({ pending: [orderA] }));
+    const { queryClient } = renderRoutes(routes, "/pedidos", {
+      beforeRender: ({ queryClient }) => {
+        queryClient.setQueryData(["orders", "pending", "today", RESTAURANT_ID], [orderA]);
+      },
+    });
+    await waitFor(() =>
+      expect(api.calls.filter((call) => call.query.status === "pending")).toHaveLength(1),
+    );
+    // a primeira busca DESTE componente devolve o mesmo [A] que já estava no
+    // cache: não é novidade nenhuma, não apita
+    expect(playBeep).not.toHaveBeenCalled();
+
+    api.add({
+      method: "GET",
+      path: `/restaurants/${RESTAURANT_ID}/orders`,
+      query: { status: "pending" },
+      body: { data: [orderA, orderB], limit: 100, offset: 0, total: 2 },
+    });
+    await queryClient.invalidateQueries({ queryKey: ["orders", "pending"] });
+    await waitFor(() => expect(playBeep).toHaveBeenCalledOnce());
+  });
+
   it("desmontar restaura o título da aba", async () => {
     signIn();
     mockApi(panelHandlers({ pending: [makeOrder(), makeOrder()] }));

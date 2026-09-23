@@ -1,0 +1,162 @@
+.page {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  background: var(--mc-bg);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--mc-surface);
+  border-bottom: 1px solid var(--mc-line);
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.note {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--mc-ink2);
+}
+
+.topActions {
+  display: flex;
+  gap: 8px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(330px, 1fr));
+  gap: 16px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  align-items: start;
+}
+
+.column {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.columnHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.dot_new {
+  background: var(--mc-warn-strong);
+}
+
+.dot_doing {
+  background: var(--mc-ink3);
+}
+
+.empty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--mc-ink3);
+  border: 1px dashed var(--mc-line-hi);
+  border-radius: 10px;
+}
+
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-line);
+  border-left: 4px solid var(--mc-ink3);
+  border-radius: 10px;
+}
+
+.card_new {
+  border-left-color: var(--mc-warn-strong);
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.code {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.type {
+  flex: 1 1 auto;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--mc-ink2);
+}
+
+.time {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.items {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  column-gap: 12px;
+  font-size: 21px;
+  line-height: 1.25;
+}
+
+.qty {
+  font-weight: 700;
+}
+
+.option {
+  grid-column: 2;
+  padding-left: 0;
+  font-size: 17px;
+  color: var(--mc-ink2);
+}
+
+.itemsNote {
+  margin: 0;
+  font-size: 15px;
+  color: var(--mc-ink3);
+}
+
+.itemsError {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--mc-danger);
+}

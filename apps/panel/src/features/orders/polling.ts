@@ -23,6 +23,14 @@
  * **46 req/min** com os dois drawers abertos — e ainda ficam abaixo do teto
  * de 100/min por IP, mas a margem não é folgada: um terceiro aparelho, ou um
  * quarto, come o que sobrou rápido.
+ *
+ * A cozinha e o Resumo entram na mesma conta: tablet da cozinha = pendentes
+ * (6) + as duas listas de "Fazendo" (12) = **18 req/min**, mais um detalhe
+ * por pedido novo (uma vez só, sem polling). Resumo com um período diferente
+ * de Hoje soma **+6 req/min** (com Hoje, zero — a tela divide a query do
+ * header). Uma loja com balcão em Pedidos com o drawer aberto (23), tablet
+ * na cozinha (18) e o dono acompanhando o Resumo noutro aparelho (20) fica
+ * perto de **61 req/min** por IP.
  */
 export const ORDERS_POLL_MS = 10_000;
 

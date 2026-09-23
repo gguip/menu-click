@@ -146,6 +146,23 @@ export function acceptCopy(order: Order): ConfirmCopy {
 }
 
 /**
+ * A confirmação de aceite do painel diz o nome e o total; a da cozinha, não —
+ * a cozinha não decide dinheiro (handoff). O resto do texto é o mesmo. Mora
+ * aqui, ao lado de `acceptCopy`, e não em `features/kitchen/kitchen.ts` —
+ * `kitchen.ts` reexporta para os testes e imports existentes continuarem
+ * valendo.
+ */
+export function kitchenAcceptCopy(order: Pick<Order, "id">): ConfirmCopy {
+  return {
+    title: `Aceitar o pedido ${orderCode(order.id)}?`,
+    body: "Aceitar manda o pedido para a cozinha e baixa o estoque dos itens.",
+    warn: "Não existe desconfirmar. Depois de aceito, só cabe cancelar, na tela de Pedidos.",
+    cta: "Aceitar pedido",
+    tone: "accent",
+  };
+}
+
+/**
  * Três textos de cancelamento. O terceiro ("recusar") não está no handoff,
  * que reaproveitava "as unidades voltam" num pedido que nunca baixou nada —
  * afirmar algo falso sobre o estoque é o erro mais caro do fluxo.

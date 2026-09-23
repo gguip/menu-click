@@ -1,5 +1,6 @@
 import { Button, NativeSelect, Popover, TextInput } from "@mantine/core";
 import { useState } from "react";
+import { Link } from "react-router";
 import type { Table } from "../../api/types.ts";
 import classes from "./FilterBar.module.css";
 import {
@@ -91,6 +92,9 @@ export function FilterBar({
         )}
 
         <div className={classes.right}>
+          <Button component={Link} to="/cozinha" variant="default">
+            Modo cozinha
+          </Button>
           <span className={`${classes.sync} n`}>{syncLabel}</span>
           <NativeSelect
             aria-label="Ordenação"

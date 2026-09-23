@@ -7,6 +7,7 @@ import { RegisterPage } from "./features/access/RegisterPage.tsx";
 import { ResetPasswordPage } from "./features/access/ResetPasswordPage.tsx";
 import { VerifyEmailLinkPage } from "./features/access/VerifyEmailLinkPage.tsx";
 import { CategoriesPage } from "./features/categories/CategoriesPage.tsx";
+import { KitchenPage } from "./features/kitchen/KitchenPage.tsx";
 import { OrderDrawer } from "./features/orders/OrderDrawer.tsx";
 import { OrdersPage } from "./features/orders/OrdersPage.tsx";
 import { OptionGroupsPage } from "./features/optionGroups/OptionGroupsPage.tsx";
@@ -16,6 +17,7 @@ import { DeliveryPage } from "./features/settings/DeliveryPage.tsx";
 import { ModalitiesPage } from "./features/settings/ModalitiesPage.tsx";
 import { OpeningHoursPage } from "./features/settings/OpeningHoursPage.tsx";
 import { StoreDataPage } from "./features/settings/StoreDataPage.tsx";
+import { SummaryPage } from "./features/summary/SummaryPage.tsx";
 import { PanelLayout } from "./layout/PanelLayout.tsx";
 import { RouteError } from "./layout/RouteError.tsx";
 
@@ -39,6 +41,7 @@ export const routes: RouteObject[] = [
       {
         element: <RequireVerified />,
         children: [
+          { path: "/cozinha", element: <KitchenPage />, errorElement: <RouteError /> },
           {
             element: <PanelLayout />,
             // Sem isto, um throw em qualquer tela do shell (columnOf com
@@ -53,6 +56,7 @@ export const routes: RouteObject[] = [
                 element: <OrdersPage />,
                 children: [{ path: ":orderId", element: <OrderDrawer /> }],
               },
+              { path: "/resumo", handle: { title: "Resumo do dia" }, element: <SummaryPage /> },
               { path: "/produtos", handle: { title: "Produtos" }, element: <ProductsPage /> },
               { path: "/produtos/novo", handle: { title: "Novo produto" }, element: <ProductFormPage /> },
               { path: "/produtos/:productId", handle: { title: "Editar produto" }, element: <ProductFormPage /> },
