@@ -89,6 +89,10 @@ status e o faturamento total. Somar no painel buscaria todos os pedidos do perí
 arriscaria divergir do faturamento que a API calcula — o contrário do que o handoff
 pede. Fica como pendência de API.
 
+> **Resolvido depois** (branch `feat/api-pendencias-do-painel`): o resumo ganhou
+> `totalsInCents`, o valor por status calculado na API, e a coluna entrou. Cancelado
+> com valor sai como "— R$ …" em `danger`; sem cancelado, "R$ 0,00" neutro.
+
 ### Como ler estes números
 
 As três notas em `surface2`, texto literal do protótipo:
@@ -204,7 +208,7 @@ falhar, o pedido fica `confirmed` e o cartão oferece "Começar preparo" como re
 
 | O quê | Por quê |
 | --- | --- |
-| Sem a coluna de valor por status no Resumo | A rota de resumo não devolve o valor por status; somar no painel divergiria do faturamento da API (pendência de API) |
+| ~~Sem a coluna de valor por status no Resumo~~ | Resolvido: a API passou a devolver `totalsInCents` |
 | "atualizado há X s" sem "Fechamento parcial" em Ontem | O protótipo só mostra Hoje; num dia que já fechou, "parcial" seria falso |
 | Sem o nome do cliente no cartão da cozinha | O protótipo não o desenha; a cozinha não precisa dele |
 | Modo cozinha fora da casca, com botão de entrada em Pedidos | No protótipo ele está no grupo "Protótipo" do rail (andaime), que o handoff manda não implementar |
