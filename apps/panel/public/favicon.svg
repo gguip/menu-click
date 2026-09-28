@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Hex fora de tokens.ts de propósito: asset estático, fora do tema. É o accent (#4A6B3A). -->
+  <rect width="32" height="32" rx="7" fill="#4A6B3A"/>
+  <path d="M9 23V10l7 8 7-8v13" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
