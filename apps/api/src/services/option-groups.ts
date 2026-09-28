@@ -4,6 +4,7 @@ import type {
   CreateOptionInput,
   Option,
   OptionGroup,
+  OptionGroupWithUsage,
   UpdateOptionGroupInput,
   UpdateOptionInput,
 } from "../domain/option.ts";
@@ -76,7 +77,7 @@ export async function create(
 export async function listByRestaurant(
   restaurantId: string,
   pagination: Pagination,
-): Promise<Page<OptionGroup>> {
+): Promise<Page<OptionGroupWithUsage>> {
   await restaurantsService.ensureExists(restaurantId);
   const { rows, total } = await optionGroupsRepository.findByRestaurant(
     restaurantId,

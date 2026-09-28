@@ -83,8 +83,20 @@ const optionGroupResponseSchema = {
   },
 };
 
+// Só a listagem leva a contagem de uso: o schema é outro para criar/editar
+// não prometerem um campo que não calculam (S10 — o serializador filtraria
+// mesmo, mas a documentação mentiria).
+const optionGroupListItemSchema = {
+  ...optionGroupResponseSchema,
+  properties: {
+    ...optionGroupResponseSchema.properties,
+    // produtos VIVOS que usam o grupo; zero quando nenhum
+    productCount: { type: "integer" },
+  },
+};
+
 const optionGroupPageResponseSchema = pageResponseSchema(
-  optionGroupResponseSchema,
+  optionGroupListItemSchema,
 );
 
 const restaurantIdParamsSchema = {

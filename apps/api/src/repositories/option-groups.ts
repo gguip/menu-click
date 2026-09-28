@@ -6,6 +6,7 @@ import type {
   CreateOptionInput,
   Option,
   OptionGroup,
+  OptionGroupWithUsage,
   PriceRule,
   UpdateOptionGroupInput,
   UpdateOptionInput,
@@ -139,10 +140,18 @@ export async function findByRestaurant(
   restaurantId: string,
   { limit, offset }: Pagination,
   db: Queryable = pool,
-): Promise<{ rows: OptionGroup[]; total: number }> {
-  const { rows } = await db.query<OptionGroupRow>(
-    `select * from option_groups
-      where restaurant_id = $1 and deleted_at is null
+): Promise<{ rows: OptionGroupWithUsage[]; total: number }> {
+  // A contagem confere o vínculo vivo E o produto vivo: remover o produto já
+  // derruba o vínculo (na mesma transação), mas a conta não pode depender de
+  // todo caminho de remoção lembrar disso.
+  const { rows } = await db.query<OptionGroupRow & { product_count: string }>(
+    `select g.*,
+            (select count(*)
+               from product_option_groups l
+               join products p on p.id = l.product_id and p.deleted_at is null
+              where l.option_group_id = g.id and l.deleted_at is null) as product_count
+       from option_groups g
+      where g.restaurant_id = $1 and g.deleted_at is null
       ${ORDER_BY}
       limit $2 offset $3`,
     [restaurantId, limit, offset],
@@ -154,7 +163,13 @@ export async function findByRestaurant(
     [restaurantId],
   );
 
-  return { rows: rows.map(toOptionGroup), total: Number(countRows[0].total) };
+  return {
+    rows: rows.map((row) => ({
+      ...toOptionGroup(row),
+      productCount: Number(row.product_count),
+    })),
+    total: Number(countRows[0].total),
+  };
 }
 
 /**
