@@ -135,4 +135,43 @@ describe("CRUD /restaurants/:restaurantId/products", () => {
       );
     });
   });
+
+  describe("PATCH /restaurants/:restaurantId/products/:id", () => {
+    // A foto era de mão única, como o logo do restaurante: `format: "uri"`
+    // recusava `""` e `null`, e colar uma URL errada não tinha volta.
+    it("tira a foto com null, e o campo some da resposta", async () => {
+      const restaurant = await createRestaurant(app);
+      const product = await createProduct(app, restaurant, {
+        photoUrl: "https://example.com/foto.jpg",
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}/products/${product.id}`,
+        headers: restaurant.headers,
+        payload: { photoUrl: null },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().photoUrl).toBeUndefined();
+      const reread = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}/products/${product.id}`,
+        headers: restaurant.headers,
+      });
+      expect(reread.json().photoUrl).toBeUndefined();
+    });
+
+    it("foto vazia continua 400: tirar a foto é null, não string vazia", async () => {
+      const restaurant = await createRestaurant(app);
+      const product = await createProduct(app, restaurant);
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}/products/${product.id}`,
+        headers: restaurant.headers,
+        payload: { photoUrl: "" },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+  });
 });
