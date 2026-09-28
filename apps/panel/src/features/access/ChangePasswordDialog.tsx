@@ -20,7 +20,15 @@ function localProblem(current: string, next: string, repeat: string): string | n
  * é aqui. A API exige a senha atual mesmo com sessão (S31) e, ao trocar,
  * derruba as OUTRAS sessões — a tela diz isso, senão o efeito é invisível.
  */
-export function ChangePasswordDialog({ opened, onClose }: { opened: boolean; onClose: () => void }) {
+export function ChangePasswordDialog({
+  email,
+  opened,
+  onClose,
+}: {
+  email: string;
+  opened: boolean;
+  onClose: () => void;
+}) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [repeat, setRepeat] = useState("");
@@ -78,6 +86,8 @@ export function ChangePasswordDialog({ opened, onClose }: { opened: boolean; onC
             if (problem === null) mutation.mutate();
           }}
         >
+          {/* O gerenciador de senhas precisa saber de QUAL conta é a senha nova. */}
+          <input type="text" name="username" autoComplete="username" value={email} readOnly hidden />
           <PasswordInput
             label="Senha atual"
             autoComplete="current-password"

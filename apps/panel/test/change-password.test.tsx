@@ -58,6 +58,16 @@ describe("trocar senha pelo menu da conta", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  it("leva o e-mail da conta num campo escondido, para o gerenciador de senhas", async () => {
+    signIn();
+    mockApi(panelHandlers());
+    renderRoutes(routes, "/pedidos");
+    const dialog = await openDialog();
+    const username = dialog.querySelector<HTMLInputElement>('input[autocomplete="username"]');
+    expect(username?.value).toBe("gerencia@trattoriabella.com.br");
+    expect(username?.hidden).toBe(true);
+  });
+
   it("senha atual errada (401) aparece no campo e NÃO desloga", async () => {
     signIn();
     mockApi([

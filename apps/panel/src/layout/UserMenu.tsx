@@ -43,7 +43,11 @@ export function UserMenu({ me }: { me: Me }) {
           <Menu.Item onClick={() => logoutMutation.mutate()}>Sair</Menu.Item>
         </Menu.Dropdown>
       </Menu>
-      <ChangePasswordDialog opened={changingPassword} onClose={() => setChangingPassword(false)} />
+      <ChangePasswordDialog
+        email={me.email}
+        opened={changingPassword}
+        onClose={() => setChangingPassword(false)}
+      />
     </>
   );
 }
