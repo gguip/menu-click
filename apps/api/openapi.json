@@ -391,7 +391,8 @@
                   },
                   "logoUrl": {
                     "type": "string",
-                    "format": "uri"
+                    "format": "uri",
+                    "nullable": true
                   },
                   "address": {
                     "type": "object",
@@ -1099,7 +1100,8 @@
                   },
                   "photoUrl": {
                     "type": "string",
-                    "format": "uri"
+                    "format": "uri",
+                    "nullable": true
                   },
                   "stock": {
                     "type": "integer",
@@ -2062,6 +2064,9 @@
                           },
                           "updatedAt": {
                             "type": "string"
+                          },
+                          "productCount": {
+                            "type": "integer"
                           }
                         }
                       }
@@ -5167,6 +5172,32 @@
                       }
                     },
                     "counts": {
+                      "type": "object",
+                      "properties": {
+                        "pending": {
+                          "type": "integer"
+                        },
+                        "confirmed": {
+                          "type": "integer"
+                        },
+                        "preparing": {
+                          "type": "integer"
+                        },
+                        "ready_for_pickup": {
+                          "type": "integer"
+                        },
+                        "out_for_delivery": {
+                          "type": "integer"
+                        },
+                        "completed": {
+                          "type": "integer"
+                        },
+                        "cancelled": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "totalsInCents": {
                       "type": "object",
                       "properties": {
                         "pending": {
