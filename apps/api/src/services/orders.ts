@@ -687,7 +687,13 @@ export async function summary(
   const counts = Object.fromEntries(
     ORDER_STATUSES.map((status) => [status, 0]),
   ) as Record<OrderStatus, number>;
-  for (const tally of tallies) counts[tally.status] = tally.count;
+  const totalsInCents = Object.fromEntries(
+    ORDER_STATUSES.map((status) => [status, 0]),
+  ) as Record<OrderStatus, number>;
+  for (const tally of tallies) {
+    counts[tally.status] = tally.count;
+    totalsInCents[tally.status] = tally.totalInCents;
+  }
 
   const faturamento = tallies.filter((tally) =>
     (REVENUE_STATUSES as readonly OrderStatus[]).includes(tally.status),
@@ -701,6 +707,7 @@ export async function summary(
       ...(bounds.to === null ? {} : { to: bounds.to.toISOString() }),
     },
     counts,
+    totalsInCents,
     revenueInCents,
     revenueOrderCount,
     // divisão por zero viraria NaN, que o serializador transformaria em null

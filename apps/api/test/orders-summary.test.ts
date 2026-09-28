@@ -146,6 +146,32 @@ describe("resumo dos pedidos", () => {
   });
 
   /**
+   * O valor em reais por status, espelho de `counts`. Não é faturamento: o
+   * cancelado entra aqui justamente para a tela mostrar quanto se perdeu, e o
+   * `revenueInCents` continua sendo a regra de `REVENUE_STATUSES`.
+   */
+  it("soma o valor de cada status, inclusive cancelado e os zerados", async () => {
+    const { restaurant, product } = await cenario();
+    await pedido(restaurant, product.id, 2, "pending");
+    await pedido(restaurant, product.id, 3, "confirmed");
+    await pedido(restaurant, product.id, 1, "confirmed");
+    await pedido(restaurant, product.id, 4, "cancelled");
+
+    const { body } = await resumo(restaurant);
+
+    expect(body.totalsInCents).toEqual({
+      pending: 2000,
+      confirmed: 4000,
+      preparing: 0,
+      ready_for_pickup: 0,
+      out_for_delivery: 0,
+      completed: 0,
+      cancelled: 4000,
+    });
+    expect(body.revenueInCents).toBe(4000);
+  });
+
+  /**
    * A regra de negócio do resumo. Contar só `completed` mostraria quase zero
    * no pico do almoço — justamente quando alguém abre o painel.
    */
