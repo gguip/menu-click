@@ -19,6 +19,7 @@ import { moveItem } from "../../lib/moveItem.ts";
 import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
+import { LEAVE_WITHOUT_ASKING } from "../../ui/unsavedChanges.ts";
 import { optionGroupsQueryKey } from "../optionGroups/useOptionGroups.ts";
 import { PRICE_RULES } from "./priceRules.ts";
 import classes from "./ProductFormPage.module.css";
@@ -84,7 +85,9 @@ function ProductEditor({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
-      navigate("/produtos");
+      // a tela ainda está "suja" quando o salvar navega: sem a marca, o aviso
+      // de alteração não salva perguntaria sobre o que acabou de ser salvo
+      navigate("/produtos", { state: LEAVE_WITHOUT_ASKING });
     },
     onError: (cause) => {
       if (!(cause instanceof GroupsNotSaved)) {
@@ -96,7 +99,10 @@ function ProductEditor({
       if (product) setError(notice);
       // produto recém-criado: a tela passa a ser a de edição, senão salvar de
       // novo criaria um segundo produto
-      else navigate(`/produtos/${cause.productId}`, { replace: true, state: { notice } });
+      else navigate(`/produtos/${cause.productId}`, {
+        replace: true,
+        state: { ...LEAVE_WITHOUT_ASKING, notice },
+      });
     },
   });
 
@@ -105,7 +111,7 @@ function ProductEditor({
     mutationFn: (id: string) => deleteProduct(restaurantId, id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
-      navigate("/produtos");
+      navigate("/produtos", { state: LEAVE_WITHOUT_ASKING });
     },
     onError: (cause) => {
       setRemoving(false);

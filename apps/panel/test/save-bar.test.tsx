@@ -1,23 +1,22 @@
-import { MantineProvider } from "@mantine/core";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SaveBar } from "../src/ui/SaveBar.tsx";
+import { renderRoutes } from "./render.tsx";
 
+// A SaveBar usa o `useBlocker` do aviso de alteração não salva, que só existe
+// num router de dados: o app sempre tem um, e o teste também precisa.
 function renderBar(ui: React.ReactElement) {
-  return render(<MantineProvider env="test">{ui}</MantineProvider>);
+  return renderRoutes([{ path: "/", element: ui }], "/");
 }
 
 describe("SaveBar", () => {
-  it("só avisa de alteração quando há alteração", () => {
-    const { rerender } = renderBar(
-      <SaveBar dirty={false} saveLabel="Salvar" onSave={() => {}} cancel={{ onClick: () => {} }} />,
-    );
+  it("sem alteração, não avisa", () => {
+    renderBar(<SaveBar dirty={false} saveLabel="Salvar" onSave={() => {}} cancel={{ onClick: () => {} }} />);
     expect(screen.queryByText("Alterações não salvas")).toBeNull();
-    rerender(
-      <MantineProvider env="test">
-        <SaveBar dirty saveLabel="Salvar" onSave={() => {}} cancel={{ onClick: () => {} }} />
-      </MantineProvider>,
-    );
+  });
+
+  it("com alteração, avisa", () => {
+    renderBar(<SaveBar dirty saveLabel="Salvar" onSave={() => {}} cancel={{ onClick: () => {} }} />);
     expect(screen.getByText("Alterações não salvas")).toBeTruthy();
   });
 

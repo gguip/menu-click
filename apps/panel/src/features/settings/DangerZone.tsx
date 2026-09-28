@@ -9,6 +9,7 @@ import { clearSession } from "../../api/session.ts";
 import type { Restaurant } from "../../api/types.ts";
 import buttons from "../../ui/buttons.module.css";
 import dialog from "../../ui/ConfirmDialog.module.css";
+import { LEAVE_WITHOUT_ASKING } from "../../ui/unsavedChanges.ts";
 import classes from "./DangerZone.module.css";
 
 /**
@@ -38,7 +39,7 @@ export function DangerZone({ restaurant }: { restaurant: Restaurant }) {
       }
       clearSession();
       queryClient.clear();
-      navigate("/login?motivo=loja-removida", { replace: true });
+      navigate("/login?motivo=loja-removida", { replace: true, state: LEAVE_WITHOUT_ASKING });
     },
   });
 

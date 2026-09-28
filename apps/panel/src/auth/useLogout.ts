@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { logout } from "../api/auth.ts";
 import { clearSession } from "../api/session.ts";
+import { LEAVE_WITHOUT_ASKING } from "../ui/unsavedChanges.ts";
 
 /** Sair: avisa a API (que revoga a sessão) e limpa tudo local, dê a API certo ou não. */
 export function useLogout() {
@@ -18,7 +19,7 @@ export function useLogout() {
     onSettled: () => {
       clearSession();
       queryClient.clear();
-      navigate("/login", { replace: true });
+      navigate("/login", { replace: true, state: LEAVE_WITHOUT_ASKING });
     },
   });
 }
