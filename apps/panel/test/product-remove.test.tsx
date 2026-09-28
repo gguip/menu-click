@@ -48,6 +48,9 @@ describe("remover produto", () => {
 
     expect((await screen.findByTestId("location")).textContent).toBe("/produtos");
     expect(api.calls.some((call) => call.method === "DELETE" && call.path === PRODUCT)).toBe(true);
+    // o produto sai dos grupos junto: o "usado em N produtos" tem que refazer
+    // (a listagem de grupos é buscada de novo: uma vez na tela, outra depois)
+    expect(api.calls.filter((call) => call.method === "GET" && call.path === `${BASE}/option-groups`)).toHaveLength(2);
   });
 
   it("'Voltar' não remove nada", async () => {

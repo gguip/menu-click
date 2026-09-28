@@ -85,6 +85,8 @@ function ProductEditor({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
+      // o `productCount` de cada grupo vem da listagem de grupos
+      void queryClient.invalidateQueries({ queryKey: optionGroupsQueryKey(restaurantId) });
       // a tela ainda está "suja" quando o salvar navega: sem a marca, o aviso
       // de alteração não salva perguntaria sobre o que acabou de ser salvo
       navigate("/produtos", { state: LEAVE_WITHOUT_ASKING });
@@ -95,6 +97,7 @@ function ProductEditor({
         return;
       }
       void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
+      void queryClient.invalidateQueries({ queryKey: optionGroupsQueryKey(restaurantId) });
       const notice = `O produto foi salvo, mas os grupos de opções não: ${cause.message}`;
       if (product) setError(notice);
       // produto recém-criado: a tela passa a ser a de edição, senão salvar de
@@ -111,6 +114,8 @@ function ProductEditor({
     mutationFn: (id: string) => deleteProduct(restaurantId, id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
+      // a API tira o produto dos grupos junto: o "usado em N" muda
+      void queryClient.invalidateQueries({ queryKey: optionGroupsQueryKey(restaurantId) });
       navigate("/produtos", { state: LEAVE_WITHOUT_ASKING });
     },
     onError: (cause) => {

@@ -1,10 +1,10 @@
 import { apiRequest } from "./client.ts";
 import { fetchAllPages } from "./pagination.ts";
-import type { Option, OptionGroup, Page, PriceRule } from "./types.ts";
+import type { ListedOptionGroup, Option, OptionGroup, Page, PriceRule } from "./types.ts";
 
-export function listAllOptionGroups(restaurantId: string): Promise<OptionGroup[]> {
+export function listAllOptionGroups(restaurantId: string): Promise<ListedOptionGroup[]> {
   return fetchAllPages((offset) =>
-    apiRequest<Page<OptionGroup>>(`/restaurants/${restaurantId}/option-groups`, {
+    apiRequest<Page<ListedOptionGroup>>(`/restaurants/${restaurantId}/option-groups`, {
       query: { limit: 100, offset },
     }),
   ).then((result) => result.items);

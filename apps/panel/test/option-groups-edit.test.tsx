@@ -2,18 +2,17 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { OptionGroupsPage } from "../src/features/optionGroups/OptionGroupsPage.tsx";
 import { type MockHandler, mockApi } from "./api-mock.ts";
-import { makeMe, makeOptionGroup, makeProduct, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
+import { makeMe, makeOptionGroup, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
 import { renderInPanel } from "./render.tsx";
 
 const BASE = `/restaurants/${RESTAURANT_ID}`;
 const routes = [{ path: "/grupos-de-opcoes", element: <OptionGroupsPage /> }];
 
-function setup(extra: MockHandler[], groups = [makeOptionGroup({ id: "grp-1", name: "Sabores" })], products = [makeProduct()]) {
+function setup(extra: MockHandler[], groups = [makeOptionGroup({ id: "grp-1", name: "Sabores" })]) {
   signIn();
   const api = mockApi([
     ...extra,
     { method: "GET", path: `${BASE}/option-groups`, body: { data: groups, limit: 100, offset: 0, total: groups.length } },
-    { method: "GET", path: `${BASE}/products`, body: { data: products, limit: 100, offset: 0, total: products.length } },
     ...panelHandlers(),
   ]);
   renderInPanel(routes, "/grupos-de-opcoes");
@@ -92,11 +91,7 @@ describe("OptionGroupsPage (grupos)", () => {
   it("a remoção diz quantos produtos perdem o grupo", async () => {
     const api = setup(
       [{ method: "DELETE", path: `${BASE}/option-groups/grp-1`, status: 204 }],
-      [makeOptionGroup({ id: "grp-1", name: "Sabores" })],
-      [
-        makeProduct({ id: "p1", optionGroupIds: ["grp-1"] }),
-        makeProduct({ id: "p2", optionGroupIds: ["grp-1"] }),
-      ],
+      [makeOptionGroup({ id: "grp-1", name: "Sabores", productCount: 2 })],
     );
     await screen.findByText("usado em 2 produtos");
     fireEvent.click(screen.getByRole("button", { name: "Remover grupo Sabores" }));
@@ -108,11 +103,7 @@ describe("OptionGroupsPage (grupos)", () => {
   it("Esc não fecha o diálogo, nem o gatilho reabre, enquanto o DELETE está em voo", async () => {
     signIn();
     const deferred = defer<Response>();
-    let currentGroups = [makeOptionGroup({ id: "grp-1", name: "Sabores" })];
-    const products = [
-      makeProduct({ id: "p1", optionGroupIds: ["grp-1"] }),
-      makeProduct({ id: "p2", optionGroupIds: ["grp-1"] }),
-    ];
+    let currentGroups = [makeOptionGroup({ id: "grp-1", name: "Sabores", productCount: 2 })];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
       const url = new URL(String(input), "http://localhost");
       const path = url.pathname.replace(/^\/api/, "");
@@ -120,9 +111,6 @@ describe("OptionGroupsPage (grupos)", () => {
       if (method === "GET" && path === "/auth/me") return jsonResponse(makeMe());
       if (method === "GET" && path === `${BASE}/option-groups`) {
         return jsonResponse({ data: currentGroups, limit: 100, offset: 0, total: currentGroups.length });
-      }
-      if (method === "GET" && path === `${BASE}/products`) {
-        return jsonResponse({ data: products, limit: 100, offset: 0, total: products.length });
       }
       if (method === "DELETE" && path === `${BASE}/option-groups/grp-1`) return deferred.promise;
       throw new Error(`Chamada sem mock: ${method} ${path}`);

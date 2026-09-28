@@ -8,10 +8,9 @@ import {
   updateOption,
   updateOptionGroup,
 } from "../src/api/optionGroups.ts";
-import { listAllProducts } from "../src/api/products.ts";
 import { updateRestaurant } from "../src/api/restaurant.ts";
 import { mockApi } from "./api-mock.ts";
-import { makeOptionGroup, makeProduct, makeRestaurant, RESTAURANT_ID } from "./fixtures.ts";
+import { makeOptionGroup, makeRestaurant, RESTAURANT_ID } from "./fixtures.ts";
 
 const BASE = `/restaurants/${RESTAURANT_ID}`;
 
@@ -65,28 +64,5 @@ describe("entrega", () => {
     const api = mockApi([{ method: "PATCH", path: BASE, body: makeRestaurant() }]);
     await updateRestaurant(RESTAURANT_ID, { freeDeliveryAboveInCents: null, deliveryFeeMode: "neighborhood" });
     expect(api.calls[0].body).toEqual({ freeDeliveryAboveInCents: null, deliveryFeeMode: "neighborhood" });
-  });
-});
-
-describe("listAllProducts", () => {
-  it("percorre as páginas até o total", async () => {
-    const api = mockApi([
-      {
-        method: "GET",
-        path: `${BASE}/products`,
-        query: { offset: "0" },
-        body: { data: [makeProduct({ id: "p1" })], limit: 100, offset: 0, total: 2 },
-      },
-      {
-        method: "GET",
-        path: `${BASE}/products`,
-        query: { offset: "1" },
-        body: { data: [makeProduct({ id: "p2" })], limit: 100, offset: 1, total: 2 },
-      },
-    ]);
-    const result = await listAllProducts(RESTAURANT_ID);
-    expect(result.items.map((product) => product.id)).toEqual(["p1", "p2"]);
-    expect(result.truncated).toBe(false);
-    expect(api.calls.every((call) => call.query.limit === "100")).toBe(true);
   });
 });

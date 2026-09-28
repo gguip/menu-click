@@ -154,6 +154,12 @@ export type OptionGroup = {
   options: Option[];
 };
 
+/**
+ * O grupo como a LISTAGEM devolve: com `productCount` (produtos vivos que o
+ * usam), calculado no SQL da API. Criar e editar devolvem o grupo sem ele.
+ */
+export type ListedOptionGroup = OptionGroup & { productCount: number };
+
 export type Table = { id: string; restaurantId: string; label: string; hash: string; qrUrl: string };
 
 /**

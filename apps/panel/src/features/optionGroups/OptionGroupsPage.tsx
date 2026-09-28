@@ -6,7 +6,7 @@ import { GroupCard } from "./GroupCard.tsx";
 import { GroupFields } from "./GroupFields.tsx";
 import { EMPTY_GROUP_FORM, type GroupForm, groupFormToBody, RULE_CARD, validateGroupForm } from "./optionGroups.ts";
 import classes from "./OptionGroupsPage.module.css";
-import { useCreateOptionGroup, useOptionGroups, useOptionGroupUsage } from "./useOptionGroups.ts";
+import { useCreateOptionGroup, useOptionGroups } from "./useOptionGroups.ts";
 
 function RuleCard() {
   return (
@@ -71,7 +71,6 @@ function NewGroupCard({ restaurantId, onDone }: { restaurantId: string; onDone: 
 export function OptionGroupsPage() {
   const { restaurantId } = useSessionUser();
   const groups = useOptionGroups(restaurantId);
-  const usage = useOptionGroupUsage(restaurantId);
   const [creating, setCreating] = useState(false);
 
   // Carregando/erro só quando não há dado (a regra da 2a).
@@ -82,15 +81,6 @@ export function OptionGroupsPage() {
       </p>
     );
   }
-
-  // Varredura falhou e não há dado nenhum (nem de uma carga anterior):
-  // contagem desconhecida, não zero. Tratar como truncada com 0 cai nos
-  // MESMOS textos de "não sei dizer quantos" que `usageLabel`/`removeGroupCopy`
-  // já tratam — "uso não contado" e a confirmação genérica —, em vez de
-  // deixar o cartão preso em "…" para sempre.
-  const usageUnknown = usage.isError && usage.data === undefined;
-  const counts = usage.data?.counts;
-  const truncated = usageUnknown ? true : (usage.data?.truncated ?? false);
 
   return (
     <div className={classes.page}>
@@ -107,8 +97,6 @@ export function OptionGroupsPage() {
           key={group.id}
           restaurantId={restaurantId}
           group={group}
-          usage={usageUnknown ? 0 : counts === undefined ? undefined : (counts.get(group.id) ?? 0)}
-          truncated={truncated}
         />
       ))}
     </div>
