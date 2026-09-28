@@ -675,6 +675,7 @@ SPA em Vite + React 19 + Mantine 9 + React Router 8 + TanStack Query 5 — **o p
 - **O QR sai do `qrUrl` que a API monta**, e a impressão é uma folha escondida na própria página (`@media print` + `window.print()`): o painel nunca monta URL de QR, e não há biblioteca de PDF — salvar em PDF é o diálogo do navegador. A seleção é por id e descarta mesa que sumiu da lista (`features/tables/tables.ts`).
 - ⚠️ **Renomear a mesa não invalida o adesivo; "Novo código" invalida.** O `PATCH` da API só muda o rótulo, e a rota `rotate-hash` é separada justamente por isso — a nota do topo da tela promete isso a quem vai imprimir.
 - ⚠️ **O papel de um usuário não se edita:** a API não tem `PATCH .../users/:id` e o e-mail é único, então reconvidar com outro papel também não funciona enquanto a conta existir. A tela diz isso e a troca é remover e convidar de novo. "É você" é decidido pelo **id da sessão**, nunca pelo e-mail.
+- ⚠️ **"Trocar senha" (menu da conta) não trata 401 como sessão expirada.** A API responde 401 para senha atual errada, e o `apiRequest` apagaria a sessão e mandaria para o login: por isso `changePassword()` passa `expireOn401: false`. Se a sessão tiver mesmo vencido, o modal mostra a mensagem e o próximo polling faz o logout. No sucesso a tela avisa que as **outras** sessões caíram (S31).
 
 ### Monorepo
 

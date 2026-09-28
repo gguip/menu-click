@@ -409,6 +409,7 @@ entram na parte 3, e a separação das origens é pendência já registrada.
 | "Salvar e entrar" | "Salvar nova senha" | o reset não devolve sessão e a página não sabe o e-mail |
 | "Aberta · fecha 23:30" no rail | só "Aceitando pedidos" / "Pausada agora" | a rota do restaurante não expõe `isOpen`, e calcular no front duplicaria regra que mora no Postgres |
 | sem logout | "Sair" no menu do rodapé do rail | sem ele, só limpando o navegador |
+| sem troca de senha | "Trocar senha" no mesmo menu, num modal | a senha provisória do convite (parte 3b) promete a troca "no menu da conta"; sem ela, quem foi convidado ficava preso à senha que recebeu |
 
 ## Pendências de backend que este desenho gera
 
