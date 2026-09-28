@@ -53,10 +53,19 @@ describe("SummaryPage", () => {
   it("os três números, as cinco linhas e as três notas", async () => {
     signIn();
     mockApi(
-      panelHandlers({ summary: { counts, revenueInCents: 45000, revenueOrderCount: 6, averageTicketInCents: 7500 } }),
+      panelHandlers({
+        summary: {
+          counts,
+          totalsInCents: { ...makeSummary().totalsInCents, cancelled: 4000 },
+          revenueInCents: 45000,
+          revenueOrderCount: 6,
+          averageTicketInCents: 7500,
+        },
+      }),
     );
     renderInPanel(routes, "/resumo");
     expect(await screen.findByText("10 chegaram no período")).toBeTruthy();
+    expect(screen.getByText("— R$ 40,00")).toBeTruthy();
     expect(screen.getByText("faturamento ÷ pedidos aceitos")).toBeTruthy();
     for (const label of ["Novos", "Em preparo", "Prontos / em rota", "Concluídos", "Cancelados"]) {
       expect(screen.getByText(label)).toBeTruthy();

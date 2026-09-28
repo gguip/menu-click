@@ -19,23 +19,41 @@ const counts = {
   cancelled: 1,
 };
 
+const totals = {
+  pending: 9000,
+  confirmed: 4500,
+  preparing: 3000,
+  ready_for_pickup: 0,
+  out_for_delivery: 5100,
+  completed: 18000,
+  cancelled: 4000,
+};
+
+// o Intl separa "R$" do número com espaço inseparável (ver money.test.ts)
+const brl = (text: string) => text.replace("R$ ", "R$\u00a0");
+
 describe("contagens", () => {
   it("'chegaram' é a soma de todos os status", () => {
     expect(arrivedCount(counts)).toBe(10);
   });
 
-  it("cinco linhas agrupadas como no protótipo, com a fatia do total", () => {
-    expect(statusRows(counts)).toEqual([
-      { label: "Novos", count: 2, share: 0.2, tone: "new" },
-      { label: "Em preparo", count: 2, share: 0.2, tone: "preparing" },
-      { label: "Prontos / em rota", count: 1, share: 0.1, tone: "ready" },
-      { label: "Concluídos", count: 4, share: 0.4, tone: "done" },
-      { label: "Cancelados", count: 1, share: 0.1, tone: "cancelled" },
+  it("cinco linhas agrupadas como no protótipo, com a fatia do total e o valor", () => {
+    expect(statusRows(counts, totals)).toEqual([
+      { label: "Novos", count: 2, share: 0.2, tone: "new", value: brl("R$ 90,00"), lost: false },
+      { label: "Em preparo", count: 2, share: 0.2, tone: "preparing", value: brl("R$ 75,00"), lost: false },
+      { label: "Prontos / em rota", count: 1, share: 0.1, tone: "ready", value: brl("R$ 51,00"), lost: false },
+      { label: "Concluídos", count: 4, share: 0.4, tone: "done", value: brl("R$ 180,00"), lost: false },
+      // o que se perdeu: "— R$ …", como no protótipo
+      { label: "Cancelados", count: 1, share: 0.1, tone: "cancelled", value: brl("— R$ 40,00"), lost: true },
     ]);
   });
 
   it("período vazio: barras zeradas, sem divisão por zero", () => {
-    expect(statusRows({}).every((row) => row.count === 0 && row.share === 0)).toBe(true);
+    const rows = statusRows({}, {});
+    expect(rows.every((row) => row.count === 0 && row.share === 0)).toBe(true);
+    expect(rows[0].value).toBe(brl("R$ 0,00"));
+    // sem cancelado não há perda: nada de "— R$ 0,00" em vermelho
+    expect(rows[4]).toMatchObject({ value: brl("R$ 0,00"), lost: false });
   });
 });
 

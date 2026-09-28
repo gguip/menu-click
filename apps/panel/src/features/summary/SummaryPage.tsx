@@ -63,7 +63,7 @@ export function SummaryPage() {
           <section className={classes.card}>
             <h2 className={classes.cardTitle}>Pedidos por status</h2>
             <ul className={classes.rows}>
-              {statusRows(summary.data.counts).map((row) => (
+              {statusRows(summary.data.counts, summary.data.totalsInCents).map((row) => (
                 <li key={row.label} className={classes.row}>
                   <span className={classes.label}>
                     <span className={`${classes.dot} ${classes[`tone_${row.tone}`]}`} aria-hidden="true" />
@@ -75,6 +75,9 @@ export function SummaryPage() {
                       className={`${classes.fill} ${classes[`tone_${row.tone}`]}`}
                       style={{ width: `${Math.round(row.share * 100)}%` }}
                     />
+                  </span>
+                  <span className={`${classes.amount} ${row.lost ? classes.lost : ""} n`}>
+                    {row.value}
                   </span>
                 </li>
               ))}

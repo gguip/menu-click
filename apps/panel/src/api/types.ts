@@ -112,6 +112,8 @@ export type OrderDetail = Order & { items: OrderItem[] };
 export type OrdersSummary = {
   period: { from: string; to: string };
   counts: Record<OrderStatus, number>;
+  /** Valor por status (frete embutido). Inclui cancelado: NÃO é faturamento. */
+  totalsInCents: Record<OrderStatus, number>;
   revenueInCents: number;
   revenueOrderCount: number;
   averageTicketInCents: number;
