@@ -694,3 +694,17 @@ Regras detalhadas ficam em `.claude/rules/` e são carregadas automaticamente pe
 @.claude/rules/database.md
 @.claude/rules/security.md
 @.claude/rules/commits.md
+
+## Agent skills
+
+### Issue tracker
+
+Issues ficam no GitHub Issues de `gguip/menu-click`, via CLI `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Os cinco rótulos padrão (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` na raiz. See `docs/agents/domain.md`.
