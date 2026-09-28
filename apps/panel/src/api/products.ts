@@ -27,9 +27,8 @@ export type CreateProductBody = {
 };
 
 /**
- * `categoryId: null` tira da seção (a API usa `nullable`, F12). `photoUrl`
- * não tem como ser apagada — o campo é `format: uri` e não aceita null —, então
- * só vai quando preenchida (pendência de backend).
+ * `categoryId: null` tira da seção e `photoUrl: null` tira a foto (a API usa
+ * `nullable` nos dois, F12).
  */
 export type UpdateProductBody = {
   name: string;
@@ -37,7 +36,7 @@ export type UpdateProductBody = {
   stock: number;
   categoryId: string | null;
   description: string;
-  photoUrl?: string;
+  photoUrl: string | null;
 };
 
 export function getProduct(restaurantId: string, id: string): Promise<Product> {

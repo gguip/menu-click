@@ -60,7 +60,14 @@ describe("formulário de produto", () => {
       stock: 12,
       categoryId: null,
       description: "Massa fina",
+      photoUrl: null,
     });
+  });
+
+  it("foto esvaziada vai como null: é assim que a API tira a foto", () => {
+    const result = validateProductForm({ ...valid, photoUrl: "  " });
+    if (!result.ok) throw new Error("devia validar");
+    expect(toUpdateBody(result.value).photoUrl).toBeNull();
   });
 
   it("carrega um produto existente para edição", () => {

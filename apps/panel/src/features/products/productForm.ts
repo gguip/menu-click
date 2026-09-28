@@ -99,7 +99,8 @@ export function toUpdateBody(value: ValidProduct): UpdateProductBody {
     stock: value.stock,
     categoryId: value.categoryId,
     description: value.description,
-    ...(value.photoUrl !== null ? { photoUrl: value.photoUrl } : {}),
+    // `null` tira a foto — do mesmo jeito que `categoryId: null` tira da seção
+    photoUrl: value.photoUrl,
   };
 }
 

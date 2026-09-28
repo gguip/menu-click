@@ -35,6 +35,11 @@ describe("formulário de dados da loja", () => {
     });
   });
 
+  it("logo esvaziado vai como null: é assim que a API tira o logo", () => {
+    const withLogo = { ...initial, logoUrl: "https://cdn.exemplo/logo.png" };
+    expect(changedPatch({ ...withLogo, logoUrl: " " }, withLogo)).toEqual({ logoUrl: null });
+  });
+
   it("uma mudança no endereço manda o endereço inteiro", () => {
     expect(changedPatch({ ...initial, number: "121" }, initial)).toEqual({
       address: {

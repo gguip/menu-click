@@ -63,9 +63,9 @@ export function changedPatch(form: StoreForm, initial: StoreForm): RestaurantPat
   if (form.cuisineType.trim() !== initial.cuisineType) patch.cuisineType = form.cuisineType.trim();
   if (form.timezone !== initial.timezone) patch.timezone = form.timezone;
   const logoUrl = form.logoUrl.trim();
-  // A API não aceita `photoUrl`/`logoUrl` vazia (é `format: uri`), então o
-  // campo esvaziado não vira uma limpeza — só deixa de ser enviado.
-  if (logoUrl !== "" && logoUrl !== initial.logoUrl) patch.logoUrl = logoUrl;
+  // Esvaziar o campo tira o logo: a API aceita `null` (string vazia seria 400
+  // pelo `format: uri`).
+  if (logoUrl !== initial.logoUrl) patch.logoUrl = logoUrl === "" ? null : logoUrl;
   // `state` é comparado já em maiúsculas: é o valor que de fato vai no PATCH
   // (`toUpperCase()` abaixo). Comparar o cru deixava "rj" ficar para sempre
   // "diferente" de "RJ", mesmo depois de salvar.
