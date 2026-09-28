@@ -6,11 +6,18 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { listAllCategories } from "../../api/categories.ts";
 import { describeError } from "../../api/client.ts";
 import { listAllOptionGroups } from "../../api/optionGroups.ts";
-import { createProduct, getProduct, setProductOptionGroups, updateProduct } from "../../api/products.ts";
+import {
+  createProduct,
+  deleteProduct,
+  getProduct,
+  setProductOptionGroups,
+  updateProduct,
+} from "../../api/products.ts";
 import type { Category, OptionGroup, Product } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { moveItem } from "../../lib/moveItem.ts";
 import buttons from "../../ui/buttons.module.css";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { optionGroupsQueryKey } from "../optionGroups/useOptionGroups.ts";
 import { PRICE_RULES } from "./priceRules.ts";
@@ -90,6 +97,19 @@ function ProductEditor({
       // produto recém-criado: a tela passa a ser a de edição, senão salvar de
       // novo criaria um segundo produto
       else navigate(`/produtos/${cause.productId}`, { replace: true, state: { notice } });
+    },
+  });
+
+  const [removing, setRemoving] = useState(false);
+  const remove = useMutation({
+    mutationFn: (id: string) => deleteProduct(restaurantId, id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
+      navigate("/produtos");
+    },
+    onError: (cause) => {
+      setRemoving(false);
+      setError(describeError(cause));
     },
   });
 
@@ -228,12 +248,46 @@ function ProductEditor({
             )}
           </section>
         </div>
+        {product && (
+          <section className={classes.danger}>
+            <h2 className={classes.dangerTitle}>Remover produto</h2>
+            <p className={classes.dangerBody}>
+              Sai do cardápio e da lista. Para tirar do ar só por um tempo, zere o estoque.
+            </p>
+            <Button
+              className={buttons.danger}
+              disabled={remove.isPending}
+              onClick={() => setRemoving(true)}
+            >
+              Remover produto
+            </Button>
+          </section>
+        )}
         {error && (
           <p role="alert" className={classes.error}>
             {error}
           </p>
         )}
       </div>
+      {/* O handoff não desenha a remoção; a copy é desvio registrado na spec. */}
+      <ConfirmDialog
+        copy={
+          removing && product
+            ? {
+                title: `Remover «${product.name}»?`,
+                body: "O produto sai do cardápio e da lista. Pedidos que já o tiveram continuam com o nome e o preço de quando foram feitos.",
+                warn: "Para tirar do ar só por um tempo, zere o estoque: remover não tem volta pelo painel.",
+                cta: "Remover produto",
+                tone: "danger",
+              }
+            : null
+        }
+        busy={remove.isPending}
+        onClose={() => setRemoving(false)}
+        onConfirm={() => {
+          if (product) remove.mutate(product.id);
+        }}
+      />
       <SaveBar
         dirty={isDirty(form, initial)}
         busy={save.isPending}

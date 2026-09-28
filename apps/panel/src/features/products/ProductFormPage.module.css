@@ -110,3 +110,27 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.danger {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 16px 18px;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-danger-line);
+  border-radius: 10px;
+}
+
+.dangerTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--mc-danger);
+}
+
+.dangerBody {
+  margin: 0;
+  max-width: 78ch;
+  font-size: 13.5px;
+  color: var(--mc-ink2);
+}

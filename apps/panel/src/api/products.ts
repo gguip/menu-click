@@ -52,6 +52,14 @@ export function updateProduct(restaurantId: string, id: string, body: UpdateProd
   return apiRequest<Product>(`/restaurants/${restaurantId}/products/${id}`, { method: "PATCH", body });
 }
 
+/**
+ * Soft delete na API: pedidos antigos guardam cópia do nome e do preço, e os
+ * vínculos com grupos de opções caem junto (na mesma transação).
+ */
+export function deleteProduct(restaurantId: string, id: string): Promise<void> {
+  return apiRequest<void>(`/restaurants/${restaurantId}/products/${id}`, { method: "DELETE" });
+}
+
 /** A ORDEM do array é a ordem em que o cliente vê os grupos. */
 export function setProductOptionGroups(
   restaurantId: string,
