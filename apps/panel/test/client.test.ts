@@ -82,6 +82,19 @@ describe("apiRequest", () => {
     onUnauthorized(null);
   });
 
+  it("401 com sessão e expireOn401: false (senha atual errada) mantém a sessão", async () => {
+    signIn();
+    const handler = vi.fn();
+    onUnauthorized(handler);
+    mockApi([{ method: "POST", path: "/auth/change-password", status: 401, body: { message: "Senha atual incorreta" } }]);
+    await expect(
+      apiRequest("/auth/change-password", { method: "POST", body: {}, expireOn401: false }),
+    ).rejects.toMatchObject({ status: 401, message: "Senha atual incorreta" });
+    expect(readSession()).not.toBeNull();
+    expect(handler).not.toHaveBeenCalled();
+    onUnauthorized(null);
+  });
+
   it("falha de rede vira NetworkError", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new TypeError("Failed to fetch");
