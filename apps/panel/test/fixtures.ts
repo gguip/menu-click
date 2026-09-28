@@ -2,8 +2,8 @@ import type { MockHandler } from "./api-mock.ts";
 import { saveSession } from "../src/api/session.ts";
 import type {
   Category,
+  ListedOptionGroup,
   Me,
-  OptionGroup,
   Order,
   OrderDetail,
   OrdersSummary,
@@ -133,6 +133,15 @@ export function makeSummary(overrides: Partial<OrdersSummary> = {}): OrdersSumma
       completed: 0,
       cancelled: 0,
     },
+    totalsInCents: {
+      pending: 0,
+      confirmed: 0,
+      preparing: 0,
+      ready_for_pickup: 0,
+      out_for_delivery: 0,
+      completed: 0,
+      cancelled: 0,
+    },
     revenueInCents: 0,
     revenueOrderCount: 0,
     averageTicketInCents: 0,
@@ -158,7 +167,8 @@ export function makeProduct(overrides: Partial<Product> = {}): Product {
   };
 }
 
-export function makeOptionGroup(overrides: Partial<OptionGroup> = {}): OptionGroup {
+/** Como a LISTAGEM devolve: com `productCount`, que só ela calcula. */
+export function makeOptionGroup(overrides: Partial<ListedOptionGroup> = {}): ListedOptionGroup {
   return {
     id: "grp-1",
     restaurantId: RESTAURANT_ID,
@@ -167,6 +177,7 @@ export function makeOptionGroup(overrides: Partial<OptionGroup> = {}): OptionGro
     maxOptions: 2,
     priceRule: "highest",
     options: [],
+    productCount: 0,
     ...overrides,
   };
 }

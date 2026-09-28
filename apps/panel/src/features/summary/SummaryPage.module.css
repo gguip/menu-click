@@ -110,7 +110,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) 64px minmax(0, 3fr);
+  grid-template-columns: minmax(0, 1.1fr) 64px minmax(0, 3fr) 130px;
   align-items: center;
   gap: 12px;
 }
@@ -133,6 +133,17 @@
   font-size: 16px;
   font-weight: 700;
   text-align: right;
+}
+
+.amount {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: right;
+  color: var(--mc-ink2);
+}
+
+.lost {
+  color: var(--mc-danger);
 }
 
 .track {

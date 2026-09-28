@@ -5,6 +5,7 @@ import {
   buildTestApp,
   createOption,
   createOptionGroup,
+  createProduct,
   createRestaurant,
 } from "./helpers.ts";
 
@@ -152,6 +153,45 @@ describe("CRUD /restaurants/:restaurantId/option-groups", () => {
       "Adicionais",
       "Sabores",
     ]);
+  });
+
+  // O painel contava isso sozinho, lendo até 20 páginas de produtos. Produto
+  // removido não conta: o vínculo dele cai junto, mas a contagem não pode
+  // depender só disso — ela confere o produto vivo também.
+  it("a listagem conta em quantos produtos vivos cada grupo é usado", async () => {
+    const restaurant = await createRestaurant(app);
+    const sabores = await createOptionGroup(app, restaurant, { name: "Sabores" });
+    const borda = await createOptionGroup(app, restaurant, { name: "Borda" });
+    await createOptionGroup(app, restaurant, { name: "Sem uso" });
+    const grande = await createProduct(app, restaurant, { name: "Pizza Grande" });
+    const media = await createProduct(app, restaurant, { name: "Pizza Média" });
+    const broto = await createProduct(app, restaurant, { name: "Pizza Broto" });
+    const link = (productId: string, optionGroupIds: string[]) =>
+      app.inject({
+        method: "PUT",
+        url: `/restaurants/${restaurant.id}/products/${productId}/option-groups`,
+        headers: restaurant.headers,
+        payload: { optionGroupIds },
+      });
+    await link(grande.id, [sabores.id, borda.id]);
+    await link(media.id, [sabores.id]);
+    await link(broto.id, [sabores.id]);
+    await app.inject({
+      method: "DELETE",
+      url: `/restaurants/${restaurant.id}/products/${broto.id}`,
+      headers: restaurant.headers,
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/restaurants/${restaurant.id}/option-groups`,
+      headers: restaurant.headers,
+    });
+
+    const counts = Object.fromEntries(
+      response.json().data.map((g: { name: string; productCount: number }) => [g.name, g.productCount]),
+    );
+    expect(counts).toEqual({ Borda: 1, Sabores: 2, "Sem uso": 0 });
   });
 
   it("PATCH renomeia e muda os limites", async () => {

@@ -1,7 +1,7 @@
 import { Button } from "@mantine/core";
 import { useState } from "react";
 import { describeError } from "../../api/client.ts";
-import type { OptionGroup } from "../../api/types.ts";
+import type { ListedOptionGroup } from "../../api/types.ts";
 import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import { Notice } from "../../ui/Notice.tsx";
@@ -25,13 +25,9 @@ import { useRemoveOptionGroup, useUpdateOptionGroup } from "./useOptionGroups.ts
 export function GroupCard({
   restaurantId,
   group,
-  usage,
-  truncated,
 }: {
   restaurantId: string;
-  group: OptionGroup;
-  usage: number | undefined;
-  truncated: boolean;
+  group: ListedOptionGroup;
 }) {
   const [editing, setEditing] = useState<GroupForm | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -75,7 +71,7 @@ export function GroupCard({
           <h2 className={classes.groupName}>{group.name}</h2>
           <span className={`${classes.pill} n`}>{rangeLabel(group)}</span>
           <span className={`${classes.pill} ${classes.rulePill}`}>{RULE_NAMES[group.priceRule]}</span>
-          <span className={`${classes.usage} n`}>{usageLabel(usage, truncated)}</span>
+          <span className={`${classes.usage} n`}>{usageLabel(group.productCount)}</span>
           <div className={classes.headActions}>
             <Button
               variant="subtle"
@@ -168,7 +164,7 @@ export function GroupCard({
       </div>
 
       <ConfirmDialog
-        copy={confirming ? removeGroupCopy(group.name, usage, truncated) : null}
+        copy={confirming ? removeGroupCopy(group.name, group.productCount) : null}
         busy={remove.isPending}
         onConfirm={() => void confirmRemove()}
         onClose={() => setConfirming(false)}

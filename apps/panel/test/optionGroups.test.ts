@@ -14,7 +14,6 @@ import {
   setOptionAvailable,
   unreachable,
   unreachableMessage,
-  usageCounts,
   usageLabel,
   validateGroupForm,
   validateOptionForm,
@@ -47,41 +46,24 @@ describe("rótulos", () => {
 });
 
 describe("uso em produtos", () => {
-  it("conta os vínculos pelos optionGroupIds", () => {
-    const counts = usageCounts([
-      { optionGroupIds: ["a", "b"] },
-      { optionGroupIds: ["a"] },
-      { optionGroupIds: [] },
-    ]);
-    expect(counts.get("a")).toBe(2);
-    expect(counts.get("b")).toBe(1);
-    expect(counts.get("c")).toBeUndefined();
-  });
-
-  it("o rótulo diz 'pelo menos' quando a contagem parou antes do fim", () => {
-    expect(usageLabel(undefined, false)).toBe("…");
-    expect(usageLabel(0, false)).toBe("sem produtos");
-    expect(usageLabel(1, false)).toBe("usado em 1 produto");
-    expect(usageLabel(3, false)).toBe("usado em 3 produtos");
-    expect(usageLabel(3, true)).toBe("usado em pelo menos 3 produtos");
-    expect(usageLabel(0, true)).toBe("uso não contado");
+  it("o rótulo diz em quantos produtos o grupo é usado", () => {
+    expect(usageLabel(0)).toBe("sem produtos");
+    expect(usageLabel(1)).toBe("usado em 1 produto");
+    expect(usageLabel(3)).toBe("usado em 3 produtos");
   });
 
   it("a confirmação de remover diz quantos produtos perdem o grupo", () => {
-    expect(removeGroupCopy("Sabores", 3, false)).toEqual({
+    expect(removeGroupCopy("Sabores", 3)).toEqual({
       title: "Remover o grupo Sabores?",
       body: "O grupo sai dos 3 produtos que o usam. Pedidos já feitos não mudam.",
       cta: "Remover grupo",
       tone: "danger",
     });
-    expect(removeGroupCopy("Sabores", 1, false).body).toBe(
+    expect(removeGroupCopy("Sabores", 1).body).toBe(
       "O grupo sai do produto que o usa. Pedidos já feitos não mudam.",
     );
-    expect(removeGroupCopy("Sabores", 0, false).body).toBe(
+    expect(removeGroupCopy("Sabores", 0).body).toBe(
       "Nenhum produto usa este grupo. Pedidos já feitos não mudam.",
-    );
-    expect(removeGroupCopy("Sabores", 3, true).body).toBe(
-      "O grupo sai de todos os produtos que o usam. Pedidos já feitos não mudam.",
     );
   });
 });

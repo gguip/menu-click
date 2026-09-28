@@ -1,5 +1,5 @@
 import type { NewOptionBody, OptionBody, OptionGroupBody } from "../../api/optionGroups.ts";
-import type { Option, OptionGroup, PriceRule, Product } from "../../api/types.ts";
+import type { Option, OptionGroup, PriceRule } from "../../api/types.ts";
 import { centsToInput, parseReaisToCents } from "../../lib/money.ts";
 import type { ConfirmCopy } from "../../ui/confirmCopy.ts";
 
@@ -40,26 +40,12 @@ export function rangeLabel(group: Pick<OptionGroup, "minOptions" | "maxOptions">
     : `escolhe ${group.minOptions} a ${group.maxOptions}`;
 }
 
-/**
- * Em quantos produtos cada grupo é usado. A API não traz essa contagem, mas
- * cada produto traz `optionGroupIds` — a conta é do painel, e é PROVISÓRIA:
- * o lugar dela é um campo calculado no SQL (pendência de API).
- */
-export function usageCounts(products: readonly Pick<Product, "optionGroupIds">[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const product of products) {
-    for (const id of product.optionGroupIds) counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-  return counts;
-}
-
 function produtos(count: number): string {
   return count === 1 ? "1 produto" : `${count} produtos`;
 }
 
-export function usageLabel(count: number | undefined, truncated: boolean): string {
-  if (count === undefined) return "…";
-  if (truncated) return count === 0 ? "uso não contado" : `usado em pelo menos ${produtos(count)}`;
+/** A contagem é o `productCount` da listagem da API: exata, sem "pelo menos". */
+export function usageLabel(count: number): string {
   if (count === 0) return "sem produtos";
   return `usado em ${produtos(count)}`;
 }
@@ -68,11 +54,9 @@ export function usageLabel(count: number | undefined, truncated: boolean): strin
  * A API tira o grupo de todo produto que o usa, na mesma transação e sem
  * avisar. Sem o número, a pessoa não sabe o que está desmontando.
  */
-export function removeGroupCopy(name: string, count: number | undefined, truncated: boolean): ConfirmCopy {
+export function removeGroupCopy(name: string, count: number): ConfirmCopy {
   let body: string;
-  if (count === undefined || truncated) {
-    body = "O grupo sai de todos os produtos que o usam. Pedidos já feitos não mudam.";
-  } else if (count === 0) {
+  if (count === 0) {
     body = "Nenhum produto usa este grupo. Pedidos já feitos não mudam.";
   } else if (count === 1) {
     body = "O grupo sai do produto que o usa. Pedidos já feitos não mudam.";

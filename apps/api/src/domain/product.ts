@@ -32,8 +32,10 @@ export type CreateProductInput = {
  * seção". Sem o `null` explícito, tirar a categoria de um produto não teria
  * como ser dito.
  */
-export type UpdateProductInput = Partial<Omit<CreateProductInput, "categoryId">> & {
+export type UpdateProductInput = Partial<Omit<CreateProductInput, "categoryId" | "photoUrl">> & {
   categoryId?: string | null;
+  /** `null` tira a foto — sem ele, a URL colada não teria volta. */
+  photoUrl?: string | null;
 };
 
 /** Produto completo, como é guardado e devolvido na resposta. */

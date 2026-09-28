@@ -1,20 +1,10 @@
 import { apiRequest } from "./client.ts";
-import { type FetchAllResult, fetchAllPages } from "./pagination.ts";
 import type { OptionGroup, Page, Product } from "./types.ts";
 
 export type ProductListQuery = { search?: string; categoryId?: string; limit: number; offset: number };
 
 export function listProducts(restaurantId: string, query: ProductListQuery): Promise<Page<Product>> {
   return apiRequest<Page<Product>>(`/restaurants/${restaurantId}/products`, { query });
-}
-
-/**
- * Todos os produtos, para a conta que a API não faz: em quantos produtos
- * cada grupo de opções é usado. Até 20 páginas de 100 — acima disso a
- * contagem vem marcada como `truncated`, e a tela diz "pelo menos".
- */
-export function listAllProducts(restaurantId: string): Promise<FetchAllResult<Product>> {
-  return fetchAllPages((offset) => listProducts(restaurantId, { limit: 100, offset }), 20);
 }
 
 export type CreateProductBody = {
@@ -27,9 +17,8 @@ export type CreateProductBody = {
 };
 
 /**
- * `categoryId: null` tira da seção (a API usa `nullable`, F12). `photoUrl`
- * não tem como ser apagada — o campo é `format: uri` e não aceita null —, então
- * só vai quando preenchida (pendência de backend).
+ * `categoryId: null` tira da seção e `photoUrl: null` tira a foto (a API usa
+ * `nullable` nos dois, F12).
  */
 export type UpdateProductBody = {
   name: string;
@@ -37,7 +26,7 @@ export type UpdateProductBody = {
   stock: number;
   categoryId: string | null;
   description: string;
-  photoUrl?: string;
+  photoUrl: string | null;
 };
 
 export function getProduct(restaurantId: string, id: string): Promise<Product> {
@@ -50,6 +39,14 @@ export function createProduct(restaurantId: string, body: CreateProductBody): Pr
 
 export function updateProduct(restaurantId: string, id: string, body: UpdateProductBody): Promise<Product> {
   return apiRequest<Product>(`/restaurants/${restaurantId}/products/${id}`, { method: "PATCH", body });
+}
+
+/**
+ * Soft delete na API: pedidos antigos guardam cópia do nome e do preço, e os
+ * vínculos com grupos de opções caem junto (na mesma transação).
+ */
+export function deleteProduct(restaurantId: string, id: string): Promise<void> {
+  return apiRequest<void>(`/restaurants/${restaurantId}/products/${id}`, { method: "DELETE" });
 }
 
 /** A ORDEM do array é a ordem em que o cliente vê os grupos. */

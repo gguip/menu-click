@@ -232,6 +232,8 @@ A seção do cardápio ("Entradas", "Pratos", "Bebidas") é uma **entidade**, `c
 
 O cardápio ganhou um quarto nível: `Categoria -> Produto -> Grupo de opções -> Opção`. Sem ele o sistema não vende pizza (tamanho, sabor), hambúrguer com adicional nem combo — o produto sozinho só descreve item de preço fixo.
 
+**A listagem de grupos traz `productCount`** — produtos vivos que usam o grupo, contando o vínculo vivo **e** o produto vivo (remover produto já derruba o vínculo, mas a conta não depende de todo caminho de remoção lembrar disso). Só a listagem calcula; criar, editar e ler um grupo sozinho devolvem o grupo sem ele, e por isso o item da lista tem schema próprio.
+
 **O grupo pertence ao RESTAURANTE, não ao produto**, e se liga a cada produto por uma junção (`product_option_groups`), como a `PUT /restaurants/:restaurantId/products/:id/option-groups` deixa explícito. "Sabores" vale para todas as pizzas do cardápio; com grupo por produto, a décima pizza recriaria quatro grupos e vinte opções à mão, e corrigir o preço do bacon viraria editar trinta lugares em vez de um.
 
 **Três regras decidem como o preço das opções escolhidas entra na conta** (`PRICE_RULES` em `domain/option.ts`, e o restaurante escolhe por grupo):
@@ -323,6 +325,8 @@ A validação é construir um `Intl.DateTimeFormat` e ver se ele reclama, **não
 **A listagem de pedidos vem do mais novo primeiro** (mudou: era crescente). O painel existe para ver o pedido que acabou de chegar; quem quer a ordem da cozinha pede `?order=asc`. `?sort=` aceita `createdAt` e `totalInCents`, e é **allowlist** (S3): `order by` não aceita `$n`, então um mapa fixo traduz o campo para a coluna e a direção sai de um ternário, nunca da string recebida.
 
 **`GET /restaurants/:restaurantId/orders/summary`** devolve os contadores por status (todos, zerados ou não), o faturamento, quantos pedidos o compõem e o ticket médio. Rota separada da listagem porque o painel troca de página e de filtro o tempo todo, e porque `total` (da consulta paginada) e os contadores (do período inteiro) são duas noções de "quantos" que não devem morar no mesmo corpo.
+
+**`totalsInCents` é o valor por status, espelho de `counts`, e NÃO é faturamento:** inclui o cancelado, para o painel mostrar quanto se perdeu. Sai do mesmo `tallyByStatus` que alimenta o faturamento, então a soma dos status de `REVENUE_STATUSES` fecha com `revenueInCents` por construção.
 
 **Faturamento é o que o restaurante ACEITOU vender:** de `confirmed` em diante, sem `pending` (ainda não é venda) nem `cancelled` (deixou de ser). Contar só `completed` mostraria quase zero no pico do almoço, que é quando alguém abre o painel. A lista vive em `REVENUE_STATUSES` no domínio, **não no SQL**: o repositório agrupa por status e devolve o cru, e a regra é aplicada no serviço — se estivesse na query, mudá-la sumiria de onde alguém a procura. ⚠️ Status novo na máquina **não** entra ali sozinho.
 
@@ -668,13 +672,18 @@ SPA em Vite + React 19 + Mantine 9 + React Router 8 + TanStack Query 5 — **o p
 - ⚠️ **Cada interruptor tem a sua própria instância de mutação** (`FlagRow` em `features/settings/ModalitiesPage.tsx`): no `@tanstack/query-core` 5, `mutate()` desanexa o observer da mutação anterior, e os callbacks por chamada dela (`onError`, `onSuccess`) deixam de disparar. Com os sete interruptores dividindo uma instância, a falha de um `PATCH` sobreposto a outro sumia sem mensagem nenhuma. Vale para qualquer tela com mais de um controle que salva sozinho.
 - **Entrega salva os bairros ANTES do restaurante** (`features/settings/DeliveryPage.tsx`): trocar para "por bairro" antes de a lista existir faria a loja recusar entrega por um instante. A sujeira é medida contra o cache, então um `PATCH` que falha depois de um `PUT` que deu certo deixa a barra suja só no que faltou.
 - ⚠️ **"Entrega grátis acima de" vazio vai como `null`, nunca 0**: zero seria "grátis acima de R$ 0", sempre grátis. É o `nullable: true` do `PATCH` da API (F12).
-- **"usado em N produtos" é contado no painel** (`features/optionGroups/optionGroups.ts`), percorrendo os `optionGroupIds` de todos os produtos — provisório, até a API ter o campo calculado no SQL. A query mora sob `["products", restaurantId]`, para toda invalidação de produto refazer a contagem.
+- **"usado em N produtos" vem do `productCount` da listagem de grupos** (calculado no SQL da API). ⚠️ Toda mutação de produto que muda vínculos — salvar, trocar grupos, remover — invalida `optionGroupsQueryKey` além de `["products", restaurantId]`: a contagem mora na query dos grupos, e sem isso ela ficaria velha até o cache vencer.
+- **O Resumo mostra o valor de cada status** a partir do `totalsInCents` da API, nunca somando pedidos no painel. Cancelado com valor sai "— R$ …" em `danger`; zero sai neutro.
+- **Esvaziar logo ou foto manda `null`** (a API aceita `nullable` nos dois); string vazia seria 400 pelo `format: uri`.
 - **Confirmação que está salvando não fecha** (`src/ui/ConfirmDialog.tsx`): com `busy`, o modal ignora Esc, clique fora e o X — senão dava para fechar no meio de um `DELETE`, clicar de novo no gatilho e mandar um segundo. O gatilho da ação também fica desabilitado enquanto ela roda.
 - **O Resumo do dia com "Hoje" usa a MESMA query do header** (`usePeriodSummary(id, "today")` = `useTodaySummary`): o handoff exige que os dois saiam do mesmo cálculo — duas fontes divergem, e o operador deixa de confiar nas duas.
 - ⚠️ **O Modo cozinha (`/cozinha`) fica fora da casca e não mostra dinheiro** — nem preço, total, frete, pagamento, telefone ou nome. Ele monta o `useNewOrderAlert` por conta própria (a casca não está lá) e lê dele os pendentes. Os itens de cada pedido vêm do detalhe, buscado **uma vez** sob `["order-items", …]`, fora do prefixo `"orders"`: os itens são congelados na criação, e a chave dentro do prefixo seria refeita a cada ação na bancada.
 - **O QR sai do `qrUrl` que a API monta**, e a impressão é uma folha escondida na própria página (`@media print` + `window.print()`): o painel nunca monta URL de QR, e não há biblioteca de PDF — salvar em PDF é o diálogo do navegador. A seleção é por id e descarta mesa que sumiu da lista (`features/tables/tables.ts`).
 - ⚠️ **Renomear a mesa não invalida o adesivo; "Novo código" invalida.** O `PATCH` da API só muda o rótulo, e a rota `rotate-hash` é separada justamente por isso — a nota do topo da tela promete isso a quem vai imprimir.
 - ⚠️ **O papel de um usuário não se edita:** a API não tem `PATCH .../users/:id` e o e-mail é único, então reconvidar com outro papel também não funciona enquanto a conta existir. A tela diz isso e a troca é remover e convidar de novo. "É você" é decidido pelo **id da sessão**, nunca pelo e-mail.
+- ⚠️ **"Trocar senha" (menu da conta) não trata 401 como sessão expirada.** A API responde 401 para senha atual errada, e o `apiRequest` apagaria a sessão e mandaria para o login: por isso `changePassword()` passa `expireOn401: false`. Se a sessão tiver mesmo vencido, o modal mostra a mensagem e o próximo polling faz o logout. No sucesso a tela avisa que as **outras** sessões caíram (S31).
+- **A `SaveBar` avisa antes de sair de tela suja** (`useBlocker` na troca de rota, `beforeunload` no recarregar), então os quatro formulários herdam o aviso sem código próprio. ⚠️ **Toda navegação que sai de propósito leva `LEAVE_WITHOUT_ASKING` no `state`** (`src/ui/unsavedChanges.ts`): o salvar que navega com a tela ainda suja, o "Cancelar", a sessão expirada, o "Sair" e a remoção da loja. Navegação nova que sai de um formulário sem a marca faz o aviso perguntar sobre o que acabou de ser salvo. O `useBlocker` exige router de dados — teste de `SaveBar` renderiza dentro de `renderRoutes`.
+- **Remover produto mora na edição**, não na listagem (cada linha já é um link inteiro). A API tira o produto dos grupos de opções na mesma transação; o painel só invalida `["products", restaurantId]`, que também refaz o "usado em N produtos".
 
 ### Monorepo
 
@@ -694,3 +703,17 @@ Regras detalhadas ficam em `.claude/rules/` e são carregadas automaticamente pe
 @.claude/rules/database.md
 @.claude/rules/security.md
 @.claude/rules/commits.md
+
+## Agent skills
+
+### Issue tracker
+
+Issues ficam no GitHub Issues de `gguip/menu-click`, via CLI `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Os cinco rótulos padrão (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` na raiz. See `docs/agents/domain.md`.

@@ -49,7 +49,8 @@ const updateProductBodySchema = {
     categoryId: { type: "string", nullable: true },
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
-    photoUrl: { type: "string", format: "uri" },
+    // `null` tira a foto; string vazia continua 400 pelo `format`
+    photoUrl: { type: "string", format: "uri", nullable: true },
     stock: { type: "integer", minimum: 0 },
   },
 };

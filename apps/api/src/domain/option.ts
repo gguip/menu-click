@@ -53,6 +53,13 @@ export type OptionGroup = {
   updatedAt: string;
 };
 
+/**
+ * O grupo na listagem de gestão: com quantos produtos vivos o usam. Só a
+ * listagem calcula — criar, editar e ler um grupo sozinho devolvem o
+ * `OptionGroup` puro, e ninguém lá precisa da contagem.
+ */
+export type OptionGroupWithUsage = OptionGroup & { productCount: number };
+
 export type CreateOptionGroupInput = {
   name: string;
   /** Ausente = 0, grupo opcional. */

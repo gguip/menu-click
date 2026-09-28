@@ -409,6 +409,9 @@ entram na parte 3, e a separação das origens é pendência já registrada.
 | "Salvar e entrar" | "Salvar nova senha" | o reset não devolve sessão e a página não sabe o e-mail |
 | "Aberta · fecha 23:30" no rail | só "Aceitando pedidos" / "Pausada agora" | a rota do restaurante não expõe `isOpen`, e calcular no front duplicaria regra que mora no Postgres |
 | sem logout | "Sair" no menu do rodapé do rail | sem ele, só limpando o navegador |
+| sem troca de senha | "Trocar senha" no mesmo menu, num modal | a senha provisória do convite (parte 3b) promete a troca "no menu da conta"; sem ela, quem foi convidado ficava preso à senha que recebeu |
+| sem remoção de produto | bloco "Remover produto" no fim da edição, com confirmação que diz que pedidos antigos ficam intactos e sugere zerar o estoque para tirar do ar por um tempo | a API tem a rota; a parte 4 desenhou o fluxo seguindo o `DangerZone` de Dados da loja |
+| sem aviso de alteração não salva | "Sair sem salvar?" ao trocar de tela com a barra suja, e o aviso do navegador ao recarregar | sem ele, um clique no rail descartava um horário ou um produto inteiro em silêncio |
 
 ## Pendências de backend que este desenho gera
 

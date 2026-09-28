@@ -55,6 +55,12 @@ export type OrderSummaryTotals = {
   period: { from?: string; to?: string };
   /** Quantos pedidos em cada status. Todos os status aparecem, zerados ou não. */
   counts: Record<OrderStatus, number>;
+  /**
+   * Soma de `totalInCents` em cada status, com o frete embutido, espelho de
+   * `counts`. NÃO é faturamento: o cancelado aparece aqui para a tela mostrar
+   * quanto se perdeu; quem diz o que é venda continua sendo `REVENUE_STATUSES`.
+   */
+  totalsInCents: Record<OrderStatus, number>;
   revenueInCents: number;
   /** Quantos pedidos entraram no faturamento — o denominador do ticket. */
   revenueOrderCount: number;

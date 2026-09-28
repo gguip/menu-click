@@ -265,6 +265,14 @@ const orderSummaryTotalsResponseSchema = {
         ORDER_STATUSES.map((status) => [status, { type: "integer" }]),
       ),
     },
+    // o valor por status, espelho de `counts` — inclui o cancelado, então NÃO
+    // é faturamento; o faturamento é o `revenueInCents` abaixo
+    totalsInCents: {
+      type: "object",
+      properties: Object.fromEntries(
+        ORDER_STATUSES.map((status) => [status, { type: "integer" }]),
+      ),
+    },
     revenueInCents: { type: "integer" },
     revenueOrderCount: { type: "integer" },
     averageTicketInCents: { type: "integer" },

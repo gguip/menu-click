@@ -31,6 +31,11 @@ export type RequestOptions = {
   query?: Query;
   /** `false` nas rotas públicas (login, cadastro...): não manda sessão. */
   auth?: boolean;
+  /**
+   * `false` quando o 401 da rota NÃO é sessão expirada: o change-password
+   * responde 401 para senha atual errada, e isso não pode deslogar ninguém.
+   */
+  expireOn401?: boolean;
 };
 
 let unauthorizedHandler: (() => void) | null = null;
@@ -51,7 +56,7 @@ function toQueryString(query?: Query): string {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = "GET", body, query, auth = true } = options;
+  const { method = "GET", body, query, auth = true, expireOn401 = true } = options;
   const session = auth ? readSession() : null;
   const headers: Record<string, string> = {};
   if (session) headers.Authorization = `Bearer ${session.token}`;
@@ -76,7 +81,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   if (!response.ok) {
     // 401 só é "sessão expirada" quando havia sessão: no login, 401 é senha
     // errada e não pode mandar ninguém para lugar nenhum.
-    if (response.status === 401 && session) {
+    if (response.status === 401 && session && expireOn401) {
       clearSession();
       unauthorizedHandler?.();
     }

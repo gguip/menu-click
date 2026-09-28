@@ -1,9 +1,9 @@
-import { act, screen, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { OptionGroupsPage } from "../src/features/optionGroups/OptionGroupsPage.tsx";
-import type { OptionGroup, Product } from "../src/api/types.ts";
+import type { ListedOptionGroup } from "../src/api/types.ts";
 import { mockApi } from "./api-mock.ts";
-import { makeOptionGroup, makeProduct, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
+import { makeOptionGroup, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
 import { renderInPanel } from "./render.tsx";
 
 const BASE = `/restaurants/${RESTAURANT_ID}`;
@@ -18,11 +18,10 @@ const opt = (id: string, name: string, priceInCents: number, available = true) =
   position: 0,
 });
 
-function groupsSetup(groups: OptionGroup[], products: Product[]) {
+function groupsSetup(groups: ListedOptionGroup[]) {
   signIn();
   const api = mockApi([
     { method: "GET", path: `${BASE}/option-groups`, body: { data: groups, limit: 100, offset: 0, total: groups.length } },
-    { method: "GET", path: `${BASE}/products`, body: { data: products, limit: 100, offset: 0, total: products.length } },
     ...panelHandlers(),
   ]);
   renderInPanel(routes, "/grupos-de-opcoes");
@@ -31,7 +30,7 @@ function groupsSetup(groups: OptionGroup[], products: Product[]) {
 
 describe("OptionGroupsPage (leitura)", () => {
   it("o cartão de regras traz os três exemplos literais", async () => {
-    groupsSetup([], []);
+    groupsSetup([]);
     expect(await screen.findByText("Regra de preço — a escolha que muda o valor final")).toBeTruthy();
     expect(screen.getByText("Bacon R$ 6,00 + Ovo R$ 3,00 = R$ 9,00")).toBeTruthy();
     expect(screen.getByText("Margherita R$ 62 + Calabresa R$ 72 = R$ 72,00")).toBeTruthy();
@@ -48,13 +47,10 @@ describe("OptionGroupsPage (leitura)", () => {
           maxOptions: 2,
           priceRule: "highest",
           options: [opt("o1", "Margherita", 6200), opt("o2", "Calabresa", 7200)],
+          productCount: 2,
         }),
-        makeOptionGroup({ id: "grp-2", name: "Tamanho", minOptions: 1, maxOptions: 1, priceRule: "sum" }),
+        makeOptionGroup({ id: "grp-2", name: "Tamanho", minOptions: 1, maxOptions: 1, priceRule: "sum", productCount: 1 }),
         makeOptionGroup({ id: "grp-3", name: "Borda", minOptions: 0, maxOptions: 1, priceRule: "sum" }),
-      ],
-      [
-        makeProduct({ id: "p1", optionGroupIds: ["grp-1", "grp-2"] }),
-        makeProduct({ id: "p2", optionGroupIds: ["grp-1"] }),
       ],
     );
     const sabores = within(await screen.findByRole("region", { name: "Sabores" }));
@@ -80,7 +76,6 @@ describe("OptionGroupsPage (leitura)", () => {
           options: [opt("o1", "Margherita", 6200), opt("o2", "Calabresa", 7200, false)],
         }),
       ],
-      [],
     );
     expect(
       await screen.findByText(
@@ -89,63 +84,12 @@ describe("OptionGroupsPage (leitura)", () => {
     ).toBeTruthy();
   });
 
-  it("não refaz a varredura de produtos ao remontar a tela (staleTime)", async () => {
-    signIn();
-    const api = mockApi([
-      {
-        method: "GET",
-        path: `${BASE}/option-groups`,
-        body: {
-          data: [makeOptionGroup({ id: "grp-1", name: "Sabores" })],
-          limit: 100,
-          offset: 0,
-          total: 1,
-        },
-      },
-      {
-        method: "GET",
-        path: `${BASE}/products`,
-        body: {
-          data: [makeProduct({ id: "p1", optionGroupIds: ["grp-1"] })],
-          limit: 100,
-          offset: 0,
-          total: 1,
-        },
-      },
-      ...panelHandlers(),
-    ]);
-    const twoRoutes = [
-      { path: "/grupos-de-opcoes", element: <OptionGroupsPage /> },
-      { path: "/pedidos", element: <p>Tela de pedidos</p> },
-    ];
-    const { router } = renderInPanel(twoRoutes, "/grupos-de-opcoes");
-
+  // A contagem vem da API (`productCount`): a tela não varre mais os produtos,
+  // que custava até 20 requisições contra o teto de 100/min por IP.
+  it("não busca produtos para contar o uso", async () => {
+    const api = groupsSetup([makeOptionGroup({ name: "Sabores", productCount: 3 })]);
     const sabores = within(await screen.findByRole("region", { name: "Sabores" }));
-    expect(await sabores.findByText("usado em 1 produto")).toBeTruthy();
-
-    await act(async () => {
-      await router.navigate("/pedidos");
-    });
-    expect(await screen.findByText("Tela de pedidos")).toBeTruthy();
-
-    await act(async () => {
-      await router.navigate("/grupos-de-opcoes");
-    });
-    const saboresDeNovo = within(await screen.findByRole("region", { name: "Sabores" }));
-    expect(await saboresDeNovo.findByText("usado em 1 produto")).toBeTruthy();
-
-    expect(api.calls.filter((call) => call.method === "GET" && call.path === `${BASE}/products`)).toHaveLength(1);
-  });
-
-  it("varredura de uso que falha mostra 'uso não contado', não '…' para sempre", async () => {
-    signIn();
-    mockApi([
-      { method: "GET", path: `${BASE}/option-groups`, body: { data: [makeOptionGroup({ id: "grp-1", name: "Sabores" })], limit: 100, offset: 0, total: 1 } },
-      { method: "GET", path: `${BASE}/products`, status: 500, body: { statusCode: 500, error: "Internal", message: "Falhou" } },
-      ...panelHandlers(),
-    ]);
-    renderInPanel(routes, "/grupos-de-opcoes");
-    const sabores = within(await screen.findByRole("region", { name: "Sabores" }));
-    expect(await sabores.findByText("uso não contado")).toBeTruthy();
+    expect(sabores.getByText("usado em 3 produtos")).toBeTruthy();
+    expect(api.calls.some((call) => call.path === `${BASE}/products`)).toBe(false);
   });
 });

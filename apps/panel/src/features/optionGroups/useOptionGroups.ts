@@ -11,9 +11,8 @@ import {
   updateOption,
   updateOptionGroup,
 } from "../../api/optionGroups.ts";
-import { listAllProducts } from "../../api/products.ts";
 import type { OptionGroup } from "../../api/types.ts";
-import { setOptionAvailable, usageCounts } from "./optionGroups.ts";
+import { setOptionAvailable } from "./optionGroups.ts";
 
 /**
  * A MESMA chave do seletor de grupos do formulário de produto: sem isso, um
@@ -27,27 +26,6 @@ export function useOptionGroups(restaurantId: string) {
   return useQuery({
     queryKey: optionGroupsQueryKey(restaurantId),
     queryFn: () => listAllOptionGroups(restaurantId),
-  });
-}
-
-/**
- * Debaixo do prefixo `["products", restaurantId]`: toda invalidação de
- * produto (criar, editar, trocar grupos) refaz a contagem junto.
- *
- * `staleTime: 60_000`: a varredura custa até 20 requisições
- * (`listAllProducts` pagina até o fim), e sem `staleTime` toda remontagem da
- * tela — sair para outra e voltar — refaria a varredura inteira. A
- * invalidação de produto continua refazendo a conta na hora, porque
- * `invalidateQueries` ignora o `staleTime`.
- */
-export function useOptionGroupUsage(restaurantId: string) {
-  return useQuery({
-    queryKey: ["products", restaurantId, "option-group-usage"],
-    queryFn: async () => {
-      const result = await listAllProducts(restaurantId);
-      return { counts: usageCounts(result.items), truncated: result.truncated };
-    },
-    staleTime: 60_000,
   });
 }
 

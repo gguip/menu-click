@@ -5,7 +5,15 @@ import { PERIODS } from "../orders/orderFilters.ts";
 
 export type StatusTone = "new" | "preparing" | "ready" | "done" | "cancelled";
 
-export type StatusRow = { label: string; count: number; share: number; tone: StatusTone };
+export type StatusRow = {
+  label: string;
+  count: number;
+  share: number;
+  tone: StatusTone;
+  value: string;
+  /** Houve perda (cancelado com valor): a tela pinta em `danger`. */
+  lost: boolean;
+};
 
 /**
  * As cinco linhas do protótipo, agrupadas como as colunas do kanban (mais
@@ -23,11 +31,30 @@ export function arrivedCount(counts: Partial<Record<OrderStatus, number>>): numb
   return Object.values(counts).reduce<number>((total, count) => total + (count ?? 0), 0);
 }
 
-export function statusRows(counts: Partial<Record<OrderStatus, number>>): StatusRow[] {
+/**
+ * O valor vem do `totalsInCents` da API (soma de `totalInCents`, frete
+ * embutido), nunca da soma dos pedidos no painel: somar aqui divergiria do
+ * faturamento que a API calcula. Cancelado com valor sai como "— R$ …", o que
+ * se perdeu; sem cancelado, "R$ 0,00" neutro — não há perda a destacar.
+ */
+export function statusRows(
+  counts: Partial<Record<OrderStatus, number>>,
+  totals: Partial<Record<OrderStatus, number>>,
+): StatusRow[] {
   const total = arrivedCount(counts);
   return ROWS.map((row) => {
     const count = row.statuses.reduce((sum, status) => sum + (counts[status] ?? 0), 0);
-    return { label: row.label, count, share: total === 0 ? 0 : count / total, tone: row.tone };
+    const cents = row.statuses.reduce((sum, status) => sum + (totals[status] ?? 0), 0);
+    const money = formatCents(cents);
+    const lost = row.tone === "cancelled" && cents > 0;
+    return {
+      label: row.label,
+      count,
+      share: total === 0 ? 0 : count / total,
+      tone: row.tone,
+      value: lost ? `— ${money}` : money,
+      lost,
+    };
   });
 }
 

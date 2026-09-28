@@ -112,6 +112,8 @@ export type OrderDetail = Order & { items: OrderItem[] };
 export type OrdersSummary = {
   period: { from: string; to: string };
   counts: Record<OrderStatus, number>;
+  /** Valor por status (frete embutido). Inclui cancelado: NÃO é faturamento. */
+  totalsInCents: Record<OrderStatus, number>;
   revenueInCents: number;
   revenueOrderCount: number;
   averageTicketInCents: number;
@@ -153,6 +155,12 @@ export type OptionGroup = {
   priceRule: PriceRule;
   options: Option[];
 };
+
+/**
+ * O grupo como a LISTAGEM devolve: com `productCount` (produtos vivos que o
+ * usam), calculado no SQL da API. Criar e editar devolvem o grupo sem ele.
+ */
+export type ListedOptionGroup = OptionGroup & { productCount: number };
 
 export type Table = { id: string; restaurantId: string; label: string; hash: string; qrUrl: string };
 

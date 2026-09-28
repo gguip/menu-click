@@ -1,7 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { onUnauthorized } from "../api/client.ts";
+import { LEAVE_WITHOUT_ASKING } from "../ui/unsavedChanges.ts";
 
-type Navigator = { navigate: (to: string) => unknown };
+type Navigator = { navigate: (to: string, options?: { state?: unknown }) => unknown };
 
 /**
  * 401 em qualquer resposta autenticada: o cliente HTTP já limpou a sessão;
@@ -11,7 +12,7 @@ type Navigator = { navigate: (to: string) => unknown };
 export function installSessionExpiry(queryClient: QueryClient, router: Navigator): () => void {
   onUnauthorized(() => {
     queryClient.clear();
-    void router.navigate("/login?motivo=sessao-expirada");
+    void router.navigate("/login?motivo=sessao-expirada", { state: LEAVE_WITHOUT_ASKING });
   });
   return () => onUnauthorized(null);
 }

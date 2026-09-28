@@ -149,7 +149,9 @@ export const updateRestaurantBodySchema = {
   properties: {
     name: { type: "string", minLength: 1 },
     cuisineType: { type: "string", minLength: 1 },
-    logoUrl: { type: "string", format: "uri" },
+    // `null` tira o logo (F12: `nullable`, não `anyOf`); string vazia continua
+    // 400 pelo `format`, então "tirar" tem um jeito só de ser dito
+    logoUrl: { type: "string", format: "uri", nullable: true },
     address: addressSchema,
     isDelivery: { type: "boolean" },
     // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada

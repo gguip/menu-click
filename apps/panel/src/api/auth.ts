@@ -51,3 +51,15 @@ export function resetPassword(token: string, newPassword: string): Promise<Messa
     auth: false,
   });
 }
+
+/**
+ * Responde 204. O 401 aqui é "senha atual incorreta", não sessão expirada:
+ * por isso `expireOn401: false`, senão errar a senha deslogaria a pessoa.
+ */
+export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return apiRequest<void>("/auth/change-password", {
+    method: "POST",
+    body: { currentPassword, newPassword },
+    expireOn401: false,
+  });
+}

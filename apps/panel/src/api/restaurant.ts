@@ -6,12 +6,12 @@ import type { Address, Restaurant } from "./types.ts";
  * não o aceita: é a URL dentro do QR code impresso. `deliveryFeeMode` só
  * aceita os dois modos que a API deixa escolher (`distance` ainda não tem
  * como calcular nada). `freeDeliveryAboveInCents: null` DESLIGA a promoção —
- * zero seria "grátis acima de R$ 0", sempre grátis.
+ * zero seria "grátis acima de R$ 0", sempre grátis. `logoUrl: null` tira o logo.
  */
 export type RestaurantPatch = Partial<{
   name: string;
   cuisineType: string;
-  logoUrl: string;
+  logoUrl: string | null;
   address: Address;
   isDelivery: boolean;
   isTakeaway: boolean;
