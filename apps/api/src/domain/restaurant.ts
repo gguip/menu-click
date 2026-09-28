@@ -93,14 +93,18 @@ export type CreateRestaurantInput = {
  * (ver o comentário dele acima).
  */
 export type UpdateRestaurantInput = Partial<
-  Omit<CreateRestaurantInput, "slug">
+  // os dois nuláveis saem do Omit: numa interseção, `string` do lado de lá com
+  // `string | null` do lado de cá daria só `string`, e o null sumiria do tipo
+  Omit<CreateRestaurantInput, "slug" | "freeDeliveryAboveInCents" | "logoUrl">
 > & {
   /**
-   * `null` DESLIGA a promoção de frete grátis, e é o único campo do PATCH em
+   * `null` DESLIGA a promoção de frete grátis — um dos dois campos do PATCH em
    * que o nulo é intenção e não ausência. Sem ele a promoção seria de mão
    * única: dá para ligar e mudar o limite, nunca para acabar com ela.
    */
   freeDeliveryAboveInCents?: number | null;
+  /** `null` TIRA o logo; mesma razão de mão única do campo acima. */
+  logoUrl?: string | null;
 };
 
 /** Restaurante completo, como é guardado e devolvido na resposta. */

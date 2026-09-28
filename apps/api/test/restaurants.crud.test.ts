@@ -323,6 +323,45 @@ describe("CRUD /restaurants", () => {
       expect(response.json().freeDeliveryAboveInCents).toBeUndefined();
     });
 
+    // Até aqui o logo era de mão única: `format: "uri"` recusava `""` e `null`,
+    // e a loja que colou uma URL não conseguia mais tirar o logo pela API.
+    it("tira o logo com null, e o campo some da resposta", async () => {
+      const restaurant = await createRestaurant(app, { slug: "tira-logo" });
+      await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { logoUrl: "https://example.com/logo.png" },
+      });
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { logoUrl: null },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().logoUrl).toBeUndefined();
+      const reread = await app.inject({
+        method: "GET",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+      });
+      expect(reread.json().logoUrl).toBeUndefined();
+    });
+
+    it("logo vazio continua 400: tirar o logo é null, não string vazia", async () => {
+      const restaurant = await createRestaurant(app, { slug: "logo-vazio" });
+      const response = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}`,
+        headers: restaurant.headers,
+        payload: { logoUrl: "" },
+      });
+      expect(response.statusCode).toBe(400);
+    });
+
     it("recusa null e string nos campos de dinheiro, em vez de coagir", async () => {
       const restaurant = await createRestaurant(app, { slug: "sem-coercao" });
 
