@@ -34,11 +34,15 @@ do pedido), a spec da parte 1 e o contrato em `apps/api/openapi.json`.
 ### API
 
 - Migration: `restaurants.last_order_number integer not null default 0` e
-  `orders.number integer`. A mesma migration numera os pedidos existentes por
-  loja com `row_number() over (partition by restaurant_id order by created_at, id)`,
+  `orders.order_number integer`. ⚠️ **A coluna não pode se chamar `number`:
+  `orders.number` já existe e é o número do endereço de entrega** (o endereço é
+  cópia em colunas planas, D15). Na API o campo é `number`, no topo do pedido —
+  sem ambiguidade com `deliveryAddress.number`, que é aninhado. A mesma migration
+  numera os pedidos existentes por loja com
+  `row_number() over (partition by restaurant_id order by created_at, id)`,
   acerta `last_order_number` com o maior número de cada loja, e só então põe
-  `orders.number` como `not null`.
-- Índice único **parcial** `(restaurant_id, number) where deleted_at is null`
+  `orders.order_number` como `not null`.
+- Índice único **parcial** `(restaurant_id, order_number) where deleted_at is null`
   (D6). Pedido nunca é apagado, mas a regra de soft delete é absoluta.
 - Na criação (`services/orders.ts`, `create`), dentro do `withTransaction` que já
   existe: `update restaurants set last_order_number = last_order_number + 1
@@ -98,8 +102,13 @@ do pedido), a spec da parte 1 e o contrato em `apps/api/openapi.json`.
 
 - `GET /restaurants/:restaurantId` ganha
   `openingStatus: { isOpen: boolean, closesAt?: string, opensAt?: string }`:
-  - aberta: `isOpen: true` e `closesAt`, o fim da faixa em que o instante atual
-    cai (numa faixa que atravessa a meia-noite, é o fechamento na madrugada);
+  - aberta: `isOpen: true` e `closesAt`, o fim do trecho aberto em que o instante
+    atual cai (numa faixa que atravessa a meia-noite, é o fechamento na
+    madrugada). ⚠️ **Faixas encostadas ou sobrepostas se fundem** antes da conta:
+    a grade 24x7 do backfill é `00:00–23:59` + `23:59–00:00`, e sem a fusão o
+    rail diria "fecha 23:59" numa loja que nunca fecha. Se o trecho aberto vai
+    até o fim da janela calculada (7 dias à frente), `closesAt` fica ausente — a
+    loja está aberta "direto", e o rail diz só "Aberta";
   - fechada: `isOpen: false` e `opensAt`, o começo da próxima faixa;
   - sem faixa nenhuma cadastrada: `isOpen: false`, sem `opensAt`.
 - `isOpen` aqui é **só a grade**. A pausa manual (`acceptingOrders`) continua
@@ -109,7 +118,12 @@ do pedido), a spec da parte 1 e o contrato em `apps/api/openapi.json`.
   cada faixa em instantes concretos nos próximos 8 dias
   (`generate_series` sobre as datas locais, `(data + hora) at time zone fuso`),
   tratar a faixa que atravessa a meia-noite como terminando no dia seguinte, e
-  pegar a primeira fronteira depois de `now()`. Instantes em ISO (`timestamptz`).
+  fundir os trechos encostados (gaps-and-islands com janela) e pegar a primeira
+  fronteira depois do instante de referência. Instantes em ISO (`timestamptz`).
+- A função recebe o **instante de referência** (padrão `now()`): é o que deixa o
+  teste fixar o relógio em vez de montar a grade a partir da hora atual.
+- `isOpen` daqui e o `isOpenNow()` existente são a mesma regra calculada de dois
+  jeitos; há teste conferindo que concordam nas mesmas grades.
 - Só o `GET` por id calcula; `PATCH` e `POST` devolvem o restaurante sem o campo
   (o schema de resposta do `GET` é próprio, mesmo padrão do `productCount`).
 - Testes: faixa normal, faixa que atravessa a meia-noite (às 01:00 de terça, a
@@ -126,8 +140,13 @@ do pedido), a spec da parte 1 e o contrato em `apps/api/openapi.json`.
   4. sem horário → "Fechada · sem horário cadastrado", com link para Horário.
 - O painel **formata**, não calcula: recebe instantes e os mostra no fuso da loja
   com `Intl.DateTimeFormat`. Nenhuma regra de faixa no front.
-- A query do restaurante passa a se refazer a cada 60 s, para "Aberta" virar
-  "Fechada" sem recarregar.
+- A query do restaurante já se refaz a cada 30 s (`usePolledRestaurant`), então
+  "Aberta" vira "Fechada" sem recarregar e sem intervalo novo.
+- ⚠️ As respostas de `PATCH` não trazem `openingStatus`, e três telas gravam a
+  resposta do `PATCH` direto no cache do restaurante (pausa, interruptores,
+  formulários). Toda gravação no cache passa a **preservar o `openingStatus`
+  anterior**; sem isso, pausar a loja apagaria o "Aberta · fecha" até o próximo
+  polling.
 
 ## 4. Pagamento
 
@@ -144,7 +163,8 @@ do pedido), a spec da parte 1 e o contrato em `apps/api/openapi.json`.
     original (o primeiro registro é o que vale), desmarcar o não pago não faz nada;
   - pagamento **não** é transição de status e não passa pela máquina de status —
     é outro eixo: pedido pode ser pago antes de sair (pix) ou depois (dinheiro).
-- `paidAt` sai na listagem e no detalhe do painel. **Não** sai no acompanhamento
+- `paidAt` sai na listagem e no detalhe do painel, **sempre presente**: a data, ou
+  `null` quando não foi marcado (F12, o mesmo padrão de `deliveryFeeInCents`). **Não** sai no acompanhamento
   público nesta rodada.
 - Nenhuma das duas rotas é `ownerOnly` (operação de balcão, S32).
 
