@@ -6,9 +6,12 @@ import { addLine, type CartLine, cartStorageKey, loadCart, saveCart, subtotal } 
 import { formatCents } from "@/lib/money.ts";
 import type { Menu, MenuProduct, MenuRestaurant, MenuSection } from "@/lib/types.ts";
 import { SearchIcon, TableIcon } from "./icons.tsx";
+import { CartScreen } from "./CartScreen.tsx";
+import { CheckoutScreen } from "./CheckoutScreen.tsx";
 import { MenuHeader } from "./MenuHeader.tsx";
 import { ProductScreen } from "./ProductScreen.tsx";
 import { ProductGrid, sectionAnchor } from "./ProductGrid.tsx";
+import { SentScreen } from "./SentScreen.tsx";
 import { StoreNotice } from "./StoreNotice.tsx";
 
 export type Screen = "menu" | "product" | "cart" | "checkout" | "sent";
@@ -56,15 +59,26 @@ export function MenuApp({
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const [query, setQuery] = useState("");
   const [activeSection, setActiveSection] = useState(0);
-  const storageKey = cartStorageKey(restaurant.slug, tableHash);
+  // a chave vem do cardápio da página, que não muda: o status ao vivo não mexe nela
+  const storageKey = cartStorageKey(menu.restaurant.slug, tableHash);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [product, setProduct] = useState<MenuProduct | null>(null);
+  // o que foi enviado, para o comprovante — o carrinho já foi limpo
+  const [sentLines, setSentLines] = useState<CartLine[]>([]);
 
   // O cardápio da página tem até 60 s (ISR); horário e pausa são de AGORA.
   useEffect(() => {
     let alive = true;
     void fetchLiveRestaurant(menu.restaurant.slug).then((live) => {
-      if (alive && live) setRestaurant(live);
+      if (!alive || !live) return;
+      // só o que é do MOMENTO; o resto do cardápio é o da página
+      setRestaurant((current) => ({
+        ...current,
+        isOpen: live.isOpen,
+        acceptingOrders: live.acceptingOrders,
+        closesAt: live.closesAt,
+        opensAt: live.opensAt,
+      }));
     });
     return () => {
       alive = false;
@@ -96,7 +110,9 @@ export function MenuApp({
 
   return (
     <div style={brand} className="mx-auto min-h-dvh max-w-[480px] bg-paper text-ink">
-      {tableLabel && (
+      {/* A faixa da mesa acompanha cardápio e produto; carrinho e finalizar
+          dizem a mesa no próprio cabeçalho, e o comprovante, na frase. */}
+      {tableLabel && (screen === "menu" || screen === "product") && (
         <div className="sticky top-0 z-30 flex items-center gap-2 bg-action px-4 py-[11px] text-white">
           <TableIcon size={15} />
           <span className="text-sm font-semibold">{tableLabel}</span>
@@ -177,6 +193,35 @@ export function MenuApp({
             setScreen("menu");
           }}
         />
+      )}
+
+      {screen === "cart" && (
+        <CartScreen
+          lines={lines}
+          context={tableLabel ?? ""}
+          onChange={updateLines}
+          onBack={() => setScreen("menu")}
+          onCheckout={() => setScreen("checkout")}
+        />
+      )}
+
+      {screen === "checkout" && (
+        <CheckoutScreen
+          restaurant={restaurant}
+          lines={lines}
+          tableHash={tableHash}
+          onBack={() => setScreen("cart")}
+          onSent={() => {
+            setSentLines(lines);
+            updateLines([]);
+            setScreen("sent");
+            window.scrollTo?.(0, 0);
+          }}
+        />
+      )}
+
+      {screen === "sent" && (
+        <SentScreen lines={sentLines} tableLabel={tableLabel} onRestart={() => setScreen("menu")} />
       )}
 
       {screen === "menu" && canOrder && count > 0 && (

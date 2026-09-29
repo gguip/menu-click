@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getMenu, resolveTable } from "../src/lib/api.ts";
+import { fetchLiveRestaurant, getMenu, resolveTable } from "../src/lib/api.ts";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -28,5 +28,14 @@ describe("API do cardápio", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => (url.endsWith("/ok") ? json({ label: "Mesa 7" }) : json({}, 404))));
     expect(await resolveTable("cantina", "ok")).toBe("Mesa 7");
     expect(await resolveTable("cantina", "velho")).toBeNull();
+  });
+
+  // resposta 200 sem o status (proxy, página de erro) não pode trocar o
+  // cardápio da página por um objeto qualquer — foi o que escondeu o carrinho
+  it("fetchLiveRestaurant descarta resposta sem isOpen/acceptingOrders", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ id: "o1", number: 42 })));
+    expect(await fetchLiveRestaurant("cantina")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => json({ isOpen: false, acceptingOrders: true })));
+    expect(await fetchLiveRestaurant("cantina")).toMatchObject({ isOpen: false });
   });
 });

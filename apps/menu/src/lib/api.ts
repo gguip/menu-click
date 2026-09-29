@@ -34,7 +34,12 @@ export async function getMenu(slug: string): Promise<Menu | null> {
 export async function fetchLiveRestaurant(slug: string): Promise<MenuRestaurant | null> {
   try {
     const res = await fetch(`${API_URL}/menu/${encodeURIComponent(slug)}`, { cache: "no-store" });
-    return res.ok ? ((await res.json()) as MenuRestaurant) : null;
+    if (!res.ok) return null;
+    const live = (await res.json()) as Partial<MenuRestaurant>;
+    // resposta sem o status (proxy, página de erro com 200) não derruba a tela
+    return typeof live.isOpen === "boolean" && typeof live.acceptingOrders === "boolean"
+      ? (live as MenuRestaurant)
+      : null;
   } catch {
     // sem rede: fica o que veio da página (até 60 s de idade)
     return null;
