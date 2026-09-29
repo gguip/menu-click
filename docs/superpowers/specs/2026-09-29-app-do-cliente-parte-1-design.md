@@ -125,6 +125,11 @@ Abre amanhã às 18h" e a grade da semana.
 - `isOpenNow()` sai desta rota: a mesma `findOpeningStatus()` responde o `isOpen`
   da grade, e há teste de que as duas concordam.
 
+- **O fuso da loja (`timezone`) passa a sair no cardápio público.** Até aqui ele
+  ficava de fora por S10 (nada sai sem decisão); sem ele o app diria "23h" no
+  fuso do celular, não no da loja. Fuso não é dado sensível: é a decisão
+  deliberada que a S10 pede, nos três lugares (`Pick`, mapper, `schema.response`).
+
 ### 2. Capa e cor da marca
 
 - `restaurants.cover_url` e `restaurants.brand_color`, nuláveis, editáveis por
