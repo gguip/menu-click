@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
-import { fetchLiveRestaurant } from "@/lib/api.ts";
+import { fetchLiveRestaurant, type OrderReceipt } from "@/lib/api.ts";
 import { addLine, type CartLine, cartStorageKey, loadCart, saveCart, subtotal } from "@/lib/cart.ts";
 import { formatCents } from "@/lib/money.ts";
 import { orderTableHash, type TableState, tableHashOf, tableLabelOf } from "@/lib/table.ts";
@@ -70,8 +70,8 @@ export function MenuApp({
   const storageKey = cartStorageKey(menu.restaurant.slug, tableHash);
   const [lines, setLines] = useState<CartLine[]>([]);
   const [product, setProduct] = useState<MenuProduct | null>(null);
-  // o que foi enviado, para o comprovante — o carrinho já foi limpo
-  const [sentLines, setSentLines] = useState<CartLine[]>([]);
+  // o que a loja gravou, e o que o aparelho esperava — o carrinho já foi limpo
+  const [sent, setSent] = useState<{ receipt: OrderReceipt; expectedTotal: number } | null>(null);
 
   // O cardápio da página tem até 60 s (ISR); horário e pausa são de AGORA.
   useEffect(() => {
@@ -218,8 +218,8 @@ export function MenuApp({
           lines={lines}
           tableHash={orderTableHash(table)}
           onBack={() => setScreen("cart")}
-          onSent={() => {
-            setSentLines(lines);
+          onSent={(receipt) => {
+            setSent({ receipt, expectedTotal: subtotal(lines) });
             updateLines([]);
             setScreen("sent");
             window.scrollTo?.(0, 0);
@@ -227,8 +227,8 @@ export function MenuApp({
         />
       )}
 
-      {screen === "sent" && (
-        <SentScreen lines={sentLines} tableLabel={tableLabel} onRestart={() => setScreen("menu")} />
+      {screen === "sent" && sent && (
+        <SentScreen receipt={sent.receipt} expectedTotal={sent.expectedTotal} onRestart={() => setScreen("menu")} />
       )}
 
       {screen === "menu" && canOrder && count > 0 && (

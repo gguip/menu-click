@@ -20,7 +20,9 @@ function json(body: unknown, status = 200) {
 
 describe("pedido no salão", () => {
   it("do carrinho ao enviado, com mesa, observação e pagamento", async () => {
-    const fetchMock = vi.fn(async () => json({ id: "o1", number: 42 }, 201));
+    const fetchMock = vi.fn(async () =>
+      json({ id: "o1", number: 42, totalInCents: 10400, table: { id: "t7", label: "Mesa 7" }, items: [{ name: "Margherita", quantity: 2, unitPriceInCents: 5200, options: [], note: "sem cebola" }] }, 201),
+    );
     vi.stubGlobal("fetch", fetchMock);
     withCart();
 
@@ -63,6 +65,45 @@ describe("pedido no salão", () => {
     fireEvent.click(screen.getByRole("button", { name: "Enviar para a cozinha" }));
     expect(await screen.findByText("A loja não está aceitando pedidos no momento")).toBeTruthy();
     await waitFor(() => expect(localStorage.getItem("cart:cantina-do-porto:a7f3")).not.toBeNull());
+  });
+
+  // I2 da revisão final: o comprovante somava o carrinho do aparelho, com
+  // preço de uma página em cache — e o caixa cobra o que o servidor gravou
+  it("o comprovante mostra o que a loja gravou, e avisa quando o total mudou", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({ id: "o1", number: 42, totalInCents: 11600, table: { id: "t7", label: "Mesa 7" }, items: [{ name: "Margherita", quantity: 2, unitPriceInCents: 5800, options: [], note: "sem cebola" }] }, 201),
+      ),
+    );
+    withCart();
+    fireEvent.click(await screen.findByRole("button", { name: /Ver carrinho/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Finalizar pedido" }));
+    fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Ana" } });
+    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "11999990000" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Pix" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar para a cozinha" }));
+    expect(await screen.findByText("Pedido enviado para a cozinha")).toBeTruthy();
+    expect(screen.getAllByText("R$ 116,00").length).toBeGreaterThan(0);
+    expect(screen.queryByText("R$ 104,00")).toBeNull();
+    expect(screen.getByText("O total mudou: a loja atualizou o preço de algum item. Vale o valor acima.")).toBeTruthy();
+  });
+
+  it("pedido que saiu sem mesa pede para avisar o garçom", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({ id: "o1", number: 42, totalInCents: 10400, table: null, items: [{ name: "Margherita", quantity: 2, unitPriceInCents: 5200, options: [], note: "sem cebola" }] }, 201),
+      ),
+    );
+    withCart();
+    fireEvent.click(await screen.findByRole("button", { name: /Ver carrinho/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Finalizar pedido" }));
+    fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Ana" } });
+    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "11999990000" } });
+    fireEvent.click(screen.getByRole("radio", { name: "Pix" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar para a cozinha" }));
+    expect(await screen.findByText("É só aguardar. Avise o garçom em qual mesa você está.")).toBeTruthy();
   });
 
   it("carrinho vazio orienta de volta ao cardápio", async () => {

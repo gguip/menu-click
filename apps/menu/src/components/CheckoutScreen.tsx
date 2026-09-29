@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createDineInOrder, OrderError } from "@/lib/api.ts";
+import { createDineInOrder, OrderError, type OrderReceipt } from "@/lib/api.ts";
 import { type CartLine, subtotal, toOrderItems } from "@/lib/cart.ts";
 import { checkoutBlock, type DineInPayment, dineInPayments } from "@/lib/checkout.ts";
 import { formatCents } from "@/lib/money.ts";
@@ -27,7 +27,7 @@ export function CheckoutScreen({
   lines: CartLine[];
   tableHash: string | null;
   onBack: () => void;
-  onSent: () => void;
+  onSent: (receipt: OrderReceipt) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -43,14 +43,14 @@ export function CheckoutScreen({
     setSending(true);
     setError(null);
     try {
-      await createDineInOrder(restaurant.id, {
+      const receipt = await createDineInOrder(restaurant.id, {
         type: "dine_in",
         customer: { name: name.trim(), phone },
         items: toOrderItems(lines),
         paymentMethod: payment,
         ...(tableHash ? { tableHash } : {}),
       });
-      onSent();
+      onSent(receipt);
     } catch (cause) {
       const failure = cause instanceof OrderError ? cause : new OrderError(0, "Não deu para enviar. Tente de novo.");
       setError({ message: failure.message, staleCart: failure.status === 400 });

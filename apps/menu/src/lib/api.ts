@@ -89,7 +89,20 @@ export class OrderError extends Error {
   }
 }
 
-export async function createDineInOrder(restaurantId: string, body: DineInOrderBody): Promise<{ id: string; number: number }> {
+/**
+ * O que a loja GRAVOU — itens com o preço congelado e o total calculado no
+ * servidor. É isto que o comprovante mostra: o cardápio do aparelho vem de uma
+ * página em cache e de um carrinho guardado, e o caixa cobra o que está aqui.
+ */
+export type OrderReceipt = {
+  id: string;
+  number: number;
+  totalInCents: number;
+  table: { id: string; label: string } | null;
+  items: { name: string; quantity: number; unitPriceInCents: number; note: string | null }[];
+};
+
+export async function createDineInOrder(restaurantId: string, body: DineInOrderBody): Promise<OrderReceipt> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}/restaurants/${restaurantId}/orders`, {
@@ -100,7 +113,13 @@ export async function createDineInOrder(restaurantId: string, body: DineInOrderB
   } catch {
     throw new OrderError(0, "Sem conexão. Seu carrinho continua aqui — tente de novo.");
   }
-  const payload = (await res.json().catch(() => null)) as { message?: string; id?: string; number?: number } | null;
+  const payload = (await res.json().catch(() => null)) as (Partial<OrderReceipt> & { message?: string }) | null;
   if (!res.ok) throw new OrderError(res.status, payload?.message ?? "Não deu para enviar. Tente de novo.");
-  return { id: payload?.id as string, number: payload?.number as number };
+  return {
+    id: payload?.id as string,
+    number: payload?.number as number,
+    totalInCents: payload?.totalInCents ?? 0,
+    table: payload?.table ?? null,
+    items: payload?.items ?? [],
+  };
 }
