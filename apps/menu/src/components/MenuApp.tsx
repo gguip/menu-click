@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchLiveRestaurant, type OrderReceipt } from "@/lib/api.ts";
 import { addLine, type CartLine, cartStorageKey, loadCart, reconcileCart, saveCart, subtotal } from "@/lib/cart.ts";
 import { formatCents } from "@/lib/money.ts";
@@ -17,6 +17,13 @@ import { StoreNotice } from "./StoreNotice.tsx";
 import { useTable } from "./useTable.ts";
 
 export type Screen = "menu" | "product" | "cart" | "checkout" | "sent";
+
+/**
+ * O que cada entrada do histórico guarda. O Next copia o estado interno dele
+ * para dentro do nosso no `pushState` (e trata o `popstate` como a mesma
+ * página), então as telas convivem com o roteador.
+ */
+type HistoryState = { menuScreen?: Screen; productId?: string } | null;
 
 /** Sem acento e sem caixa: "calab" acha "Calabresa", "acai" acha "Açaí". */
 function fold(text: string): string {
@@ -118,11 +125,47 @@ export function MenuApp({
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
   const brand = { "--brand-action": restaurant.brandColor ?? "#1E5AE8" } as CSSProperties;
 
-  const openProduct = (chosen: MenuProduct) => {
-    setProduct(chosen);
-    setScreen("product");
+  // Cada tela é uma entrada do histórico: o voltar do celular (e o da tela,
+  // que chama o mesmo `history.back()`) anda pelas telas em vez de sair do app.
+  const menuScroll = useRef<number | null>(null);
+  const products = useMemo(() => menu.sections.flatMap((section) => section.products), [menu.sections]);
+
+  const show = (next: Screen, productId?: string) => {
+    const chosen = productId ? products.find((p) => p.id === productId) : undefined;
+    if (next === "product" && !chosen) {
+      setScreen("menu");
+      return;
+    }
+    if (chosen) setProduct(chosen);
+    setScreen(next);
+  };
+
+  const go = (next: Screen, productId?: string) => {
+    if (screen === "menu") menuScroll.current = window.scrollY;
+    window.history.pushState({ menuScreen: next, productId } satisfies HistoryState, "");
+    show(next, productId);
     window.scrollTo?.(0, 0);
   };
+
+  const back = () => window.history.back();
+
+  useEffect(() => {
+    const onPop = (event: PopStateEvent) => {
+      const state = event.state as HistoryState;
+      show(state?.menuScreen ?? "menu", state?.productId);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  });
+
+  // de volta ao cardápio, na altura em que a pessoa estava
+  useLayoutEffect(() => {
+    if (screen !== "menu" || menuScroll.current === null) return;
+    window.scrollTo?.(0, menuScroll.current);
+    menuScroll.current = null;
+  }, [screen]);
+
+  const openProduct = (chosen: MenuProduct) => go("product", chosen.id);
 
   return (
     <div style={brand} className="mx-auto min-h-dvh max-w-[480px] bg-paper text-ink">
@@ -208,10 +251,10 @@ export function MenuApp({
           product={product}
           groups={menu.optionGroups}
           canOrder={canOrder}
-          onBack={() => setScreen("menu")}
+          onBack={back}
           onAdd={(line) => {
             updateLines(addLine(lines, line));
-            setScreen("menu");
+            back();
           }}
         />
       )}
@@ -222,8 +265,8 @@ export function MenuApp({
           context={tableLabel ?? ""}
           notice={cartUpdated ? "Atualizamos seu carrinho com o cardápio de agora." : null}
           onChange={updateLines}
-          onBack={() => setScreen("menu")}
-          onCheckout={() => setScreen("checkout")}
+          onBack={back}
+          onCheckout={() => go("checkout")}
         />
       )}
 
@@ -232,10 +275,12 @@ export function MenuApp({
           restaurant={restaurant}
           lines={lines}
           tableHash={orderTableHash(table)}
-          onBack={() => setScreen("cart")}
+          onBack={back}
           onSent={(receipt) => {
             setSent({ receipt, expectedTotal: subtotal(lines) });
             updateLines([]);
+            // o finalizar vira o comprovante: voltar não reabre um pedido enviado
+            window.history.replaceState({ menuScreen: "sent" } satisfies HistoryState, "");
             setScreen("sent");
             window.scrollTo?.(0, 0);
           }}
@@ -243,14 +288,21 @@ export function MenuApp({
       )}
 
       {screen === "sent" && sent && (
-        <SentScreen receipt={sent.receipt} expectedTotal={sent.expectedTotal} onRestart={() => setScreen("menu")} />
+        <SentScreen
+          receipt={sent.receipt}
+          expectedTotal={sent.expectedTotal}
+          onRestart={() => {
+            window.history.replaceState({ menuScreen: "menu" } satisfies HistoryState, "");
+            setScreen("menu");
+          }}
+        />
       )}
 
       {screen === "menu" && canOrder && count > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[480px] bg-gradient-to-b from-white/0 via-white to-white px-4 pb-5 pt-3">
           <button
             type="button"
-            onClick={() => setScreen("cart")}
+            onClick={() => go("cart")}
             className="flex min-h-[52px] w-full items-center gap-3 rounded-field bg-action px-[18px] text-white"
           >
             <span className="rounded-chip bg-white/20 px-2 py-[3px] text-[13px] font-semibold tabular-nums">{count}</span>
