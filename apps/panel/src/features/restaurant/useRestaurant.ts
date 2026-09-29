@@ -58,6 +58,9 @@ export function useUpdateRestaurant(id: string) {
       // resumo de uma vez.
       if (patch.timezone !== undefined) {
         void queryClient.invalidateQueries({ queryKey: ["orders"] });
+        // o `keepOpeningStatus` acima preservou o status calculado no fuso
+        // ANTIGO: o GET refaz as fronteiras no fuso novo
+        void queryClient.invalidateQueries({ queryKey: restaurantQueryKey(id) });
       }
     },
   });
