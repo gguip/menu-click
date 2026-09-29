@@ -77,6 +77,9 @@ const menuRestaurantResponseSchema = {
     name: { type: "string" },
     cuisineType: { type: "string" },
     logoUrl: { type: "string" },
+    coverUrl: { type: "string" },
+    // a cor da ação do app; a API só aceita cor com contraste AA com o branco
+    brandColor: { type: "string" },
     address: { type: "object", properties: addressProperties },
     // o cliente precisa saber o que dá para pedir antes de montar o carrinho
     isDelivery: { type: "boolean" },

@@ -57,6 +57,10 @@ function toMenuRestaurant(
     cuisineType: restaurant.cuisineType,
     // logoUrl é opcional: quando não existe, a chave nem entra na resposta
     ...(restaurant.logoUrl === undefined ? {} : { logoUrl: restaurant.logoUrl }),
+    // a loja no app do cliente: a capa do topo e a cor da ação (S10: entram
+    // por decisão, nos três lugares — Pick, este mapper e o schema da rota)
+    ...(restaurant.coverUrl === undefined ? {} : { coverUrl: restaurant.coverUrl }),
+    ...(restaurant.brandColor === undefined ? {} : { brandColor: restaurant.brandColor }),
     address: restaurant.address,
     isDelivery: restaurant.isDelivery,
     isTakeaway: restaurant.isTakeaway,

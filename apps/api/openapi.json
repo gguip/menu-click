@@ -117,6 +117,12 @@
                           "logoUrl": {
                             "type": "string"
                           },
+                          "coverUrl": {
+                            "type": "string"
+                          },
+                          "brandColor": {
+                            "type": "string"
+                          },
                           "address": {
                             "type": "object",
                             "properties": {
@@ -258,6 +264,12 @@
                       "type": "string"
                     },
                     "logoUrl": {
+                      "type": "string"
+                    },
+                    "coverUrl": {
+                      "type": "string"
+                    },
+                    "brandColor": {
                       "type": "string"
                     },
                     "address": {
@@ -408,6 +420,16 @@
                     "format": "uri",
                     "nullable": true
                   },
+                  "coverUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "nullable": true
+                  },
+                  "brandColor": {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                    "nullable": true
+                  },
                   "address": {
                     "type": "object",
                     "additionalProperties": false,
@@ -539,6 +561,12 @@
                       "type": "string"
                     },
                     "logoUrl": {
+                      "type": "string"
+                    },
+                    "coverUrl": {
+                      "type": "string"
+                    },
+                    "brandColor": {
                       "type": "string"
                     },
                     "address": {
@@ -7467,6 +7495,12 @@
                     "logoUrl": {
                       "type": "string"
                     },
+                    "coverUrl": {
+                      "type": "string"
+                    },
+                    "brandColor": {
+                      "type": "string"
+                    },
                     "address": {
                       "type": "object",
                       "properties": {
@@ -8319,6 +8353,12 @@
                           "type": "string"
                         },
                         "logoUrl": {
+                          "type": "string"
+                        },
+                        "coverUrl": {
+                          "type": "string"
+                        },
+                        "brandColor": {
                           "type": "string"
                         },
                         "address": {

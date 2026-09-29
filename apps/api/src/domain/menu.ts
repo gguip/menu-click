@@ -39,6 +39,8 @@ export type MenuRestaurant = Pick<
   | "name"
   | "cuisineType"
   | "logoUrl"
+  | "coverUrl"
+  | "brandColor"
   | "address"
   | "isDelivery"
   | "isTakeaway"
