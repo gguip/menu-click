@@ -99,7 +99,7 @@ function OrderDetailView({
                 <span className={classes.stepDot} aria-hidden="true" />
                 <span>{step.label}</span>
                 <span className={`${classes.stepTime} n`}>
-                  {step.time ?? (step.state === "future" ? "—" : "")}
+                  {step.time ?? "—"}
                 </span>
               </li>
             ))}

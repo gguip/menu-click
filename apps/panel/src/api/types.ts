@@ -109,7 +109,10 @@ export type OrderItem = {
   options: OrderItemOption[];
 };
 
-export type OrderDetail = Order & { items: OrderItem[] };
+export type OrderStatusEvent = { status: OrderStatus; at: string };
+
+/** O detalhe traz o histórico; pedido anterior ao registro tem só chegada e status atual. */
+export type OrderDetail = Order & { items: OrderItem[]; statusHistory: OrderStatusEvent[] };
 
 export type OrdersSummary = {
   period: { from: string; to: string };

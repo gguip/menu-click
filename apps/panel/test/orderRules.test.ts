@@ -11,7 +11,7 @@ import {
   primaryAction,
   progressSteps,
 } from "../src/features/orders/orderRules.ts";
-import { makeOrder } from "./fixtures.ts";
+import { makeOrder, makeOrderDetail } from "./fixtures.ts";
 
 const ID = "a3f9c2d1-0000-4000-8000-000000000001";
 const TZ = "America/Sao_Paulo";
@@ -149,49 +149,66 @@ describe("aceite", () => {
 });
 
 describe("andamento", () => {
-  it("entrega em preparo: 'Novo' com a hora da chegada, a etapa atual com a última mudança", () => {
-    const order = makeOrder({
+  const at = (status: OrderStatus, iso: string) => ({ status, at: iso });
+
+  it("cada etapa leva a hora do primeiro status dela; as futuras, sem hora", () => {
+    const order = makeOrderDetail({
       type: "delivery",
       status: "preparing",
-      createdAt: "2026-09-19T22:58:00.000Z",
-      updatedAt: "2026-09-19T23:04:00.000Z",
+      statusHistory: [
+        at("pending", "2026-09-19T22:58:00.000Z"),
+        at("confirmed", "2026-09-19T23:01:00.000Z"),
+        at("preparing", "2026-09-19T23:02:00.000Z"),
+      ],
     });
     expect(progressSteps(order, TZ)).toEqual([
       { label: "Novo", state: "done", time: "19:58" },
-      { label: "Em preparo", state: "current", time: "20:04" },
+      { label: "Em preparo", state: "current", time: "20:01" },
       { label: "Saiu para entrega", state: "future", time: null },
       { label: "Concluído", state: "future", time: null },
     ]);
   });
 
-  it("salão pula direto para concluído", () => {
-    const order = makeOrder({ type: "dine_in", status: "completed", updatedAt: "2026-09-19T23:10:00.000Z" });
-    expect(progressSteps(order, TZ).map((step) => [step.label, step.state])).toEqual([
-      ["Novo", "done"],
-      ["Em preparo", "done"],
-      ["Concluído", "current"],
+  it("pedido antigo sem as etapas do meio: sem hora, nunca inventada", () => {
+    const order = makeOrderDetail({
+      type: "dine_in",
+      status: "completed",
+      statusHistory: [at("pending", "2026-09-19T22:58:00.000Z"), at("completed", "2026-09-19T23:40:00.000Z")],
+    });
+    expect(progressSteps(order, TZ)).toEqual([
+      { label: "Novo", state: "done", time: "19:58" },
+      { label: "Em preparo", state: "done", time: null },
+      { label: "Concluído", state: "current", time: "20:40" },
     ]);
   });
 
   it("retirada tem 'Pronto para retirada'", () => {
-    const order = makeOrder({ type: "takeaway", status: "ready_for_pickup" });
+    const order = makeOrderDetail({ type: "takeaway", status: "ready_for_pickup" });
     expect(progressSteps(order, TZ)[2]).toMatchObject({ label: "Pronto para retirada", state: "current" });
   });
 
   it("cancelado mostra quando entrou e quando foi cancelado", () => {
-    const order = makeOrder({ status: "cancelled", updatedAt: "2026-09-19T23:10:00.000Z" });
+    const order = makeOrderDetail({
+      status: "cancelled",
+      statusHistory: [at("pending", "2026-09-19T22:58:00.000Z"), at("cancelled", "2026-09-19T23:10:00.000Z")],
+    });
     expect(progressSteps(order, TZ)).toEqual([
       { label: "Novo", state: "done", time: "19:58" },
       { label: "Cancelado", state: "current", time: "20:10" },
     ]);
   });
 
-  it("pedido encerrado diz que não há ação", () => {
-    const completed = makeOrder({ status: "completed", updatedAt: "2026-09-19T23:10:00.000Z" });
-    expect(closedMessage(completed, TZ)).toBe("Pedido concluído às 20:10. Não há mais ação possível.");
-    expect(closedMessage(makeOrder({ status: "cancelled" }), TZ)).toBe(
-      "Pedido cancelado. Não há mais ação possível.",
-    );
-    expect(closedMessage(makeOrder({ status: "preparing" }), TZ)).toBeNull();
+  it("concluído e cancelado dizem a hora do evento; em andamento, nada", () => {
+    const done = makeOrderDetail({
+      status: "completed",
+      statusHistory: [at("pending", "2026-09-19T22:58:00.000Z"), at("completed", "2026-09-19T23:10:00.000Z")],
+    });
+    const cancelled = makeOrderDetail({
+      status: "cancelled",
+      statusHistory: [at("pending", "2026-09-19T22:58:00.000Z"), at("cancelled", "2026-09-19T23:05:00.000Z")],
+    });
+    expect(closedMessage(done, TZ)).toBe("Pedido concluído às 20:10. Não há mais ação possível.");
+    expect(closedMessage(cancelled, TZ)).toBe("Pedido cancelado às 20:05. Não há mais ação possível.");
+    expect(closedMessage(makeOrderDetail({ status: "preparing" }), TZ)).toBeNull();
   });
 });

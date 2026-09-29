@@ -118,6 +118,7 @@ export function makeOrderDetail(overrides: Partial<OrderDetail> = {}): OrderDeta
         options: [],
       },
     ],
+    statusHistory: [{ status: "pending", at: "2026-09-19T22:58:00.000Z" }],
     ...overrides,
   };
 }

@@ -1,4 +1,4 @@
-import type { Order, OrderStatus, OrderTransition, OrderType } from "../../api/types.ts";
+import type { Order, OrderDetail, OrderStatus, OrderTransition, OrderType } from "../../api/types.ts";
 import { formatCents } from "../../lib/money.ts";
 import { orderNumber } from "../../lib/orderNumber.ts";
 import { formatClock } from "../../lib/time.ts";
@@ -205,8 +205,8 @@ const STEP_LABELS: Record<OrderType, readonly string[]> = {
   dine_in: ["Novo", "Em preparo", "Concluído"],
 };
 
-function stepIndex(order: Pick<Order, "type" | "status">): number {
-  switch (order.status) {
+function stepOf(type: OrderType, status: OrderStatus): number {
+  switch (status) {
     case "pending":
       return 0;
     case "confirmed":
@@ -216,39 +216,50 @@ function stepIndex(order: Pick<Order, "type" | "status">): number {
     case "ready_for_pickup":
       return 2;
     default:
-      return STEP_LABELS[order.type].length - 1;
+      return STEP_LABELS[type].length - 1;
   }
+}
+
+/** A hora do PRIMEIRO evento que cai na etapa; `null` se nenhum foi registrado. */
+function stepTime(order: OrderDetail, index: number, timeZone?: string): string | null {
+  const event = order.statusHistory.find(
+    (item) => item.status !== "cancelled" && stepOf(order.type, item.status) === index,
+  );
+  return event ? formatClock(event.at, timeZone) : null;
+}
+
+function eventClock(order: OrderDetail, status: OrderStatus, timeZone?: string): string {
+  const event = order.statusHistory.find((item) => item.status === status);
+  // pedido sem o evento (não deveria existir depois da migration): cai no updatedAt
+  return formatClock(event?.at ?? order.updatedAt, timeZone);
 }
 
 /**
- * A API só guarda `createdAt` e `updatedAt`: "Novo" leva a hora da chegada,
- * a etapa atual leva a da última mudança, e as cumpridas no meio ficam sem
- * hora (horário por etapa é pendência de backend da spec).
+ * A hora de cada etapa sai do histórico da API. Pedido de antes do registro
+ * tem só a chegada e o status atual: as etapas do meio ficam sem hora, em vez
+ * de uma hora inventada exibida como fato.
  */
-export function progressSteps(order: Order, timeZone?: string): Step[] {
+export function progressSteps(order: OrderDetail, timeZone?: string): Step[] {
   if (order.status === "cancelled") {
     return [
-      { label: "Novo", state: "done", time: formatClock(order.createdAt, timeZone) },
-      { label: "Cancelado", state: "current", time: formatClock(order.updatedAt, timeZone) },
+      { label: "Novo", state: "done", time: stepTime(order, 0, timeZone) },
+      { label: "Cancelado", state: "current", time: eventClock(order, "cancelled", timeZone) },
     ];
   }
-  const current = stepIndex(order);
+  const current = stepOf(order.type, order.status);
   return STEP_LABELS[order.type].map((label, index) => ({
     label,
     state: index < current ? "done" : index === current ? "current" : "future",
-    time:
-      index === 0
-        ? formatClock(order.createdAt, timeZone)
-        : index === current
-          ? formatClock(order.updatedAt, timeZone)
-          : null,
+    time: index <= current ? stepTime(order, index, timeZone) : null,
   }));
 }
 
-export function closedMessage(order: Order, timeZone?: string): string | null {
+export function closedMessage(order: OrderDetail, timeZone?: string): string | null {
   if (order.status === "completed") {
-    return `Pedido concluído às ${formatClock(order.updatedAt, timeZone)}. Não há mais ação possível.`;
+    return `Pedido concluído às ${eventClock(order, "completed", timeZone)}. Não há mais ação possível.`;
   }
-  if (order.status === "cancelled") return "Pedido cancelado. Não há mais ação possível.";
+  if (order.status === "cancelled") {
+    return `Pedido cancelado às ${eventClock(order, "cancelled", timeZone)}. Não há mais ação possível.`;
+  }
   return null;
 }
