@@ -32,8 +32,13 @@ export async function getMenu(slug: string): Promise<Menu | null> {
 
 /** Horário e pausa AGORA, no navegador e sem cache: o da página tem até 60 s. */
 export async function fetchLiveRestaurant(slug: string): Promise<MenuRestaurant | null> {
-  const res = await fetch(`${API_URL}/menu/${encodeURIComponent(slug)}`, { cache: "no-store" });
-  return res.ok ? ((await res.json()) as MenuRestaurant) : null;
+  try {
+    const res = await fetch(`${API_URL}/menu/${encodeURIComponent(slug)}`, { cache: "no-store" });
+    return res.ok ? ((await res.json()) as MenuRestaurant) : null;
+  } catch {
+    // sem rede: fica o que veio da página (até 60 s de idade)
+    return null;
+  }
 }
 
 /** O rótulo da mesa do QR, ou `null` (adesivo velho, mesa removida, hash girado). */
