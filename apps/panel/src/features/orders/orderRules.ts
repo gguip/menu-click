@@ -1,6 +1,6 @@
 import type { Order, OrderStatus, OrderTransition, OrderType } from "../../api/types.ts";
 import { formatCents } from "../../lib/money.ts";
-import { orderCode } from "../../lib/orderCode.ts";
+import { orderNumber } from "../../lib/orderNumber.ts";
 import { formatClock } from "../../lib/time.ts";
 import type { ConfirmCopy } from "../../ui/confirmCopy.ts";
 
@@ -137,7 +137,7 @@ export function displayName(order: Pick<Order, "type" | "table" | "customer">): 
 
 export function acceptCopy(order: Order): ConfirmCopy {
   return {
-    title: `Aceitar o pedido ${orderCode(order.id)}?`,
+    title: `Aceitar o pedido ${orderNumber(order)}?`,
     body: `${displayName(order)} · ${formatCents(order.totalInCents)}. Aceitar manda o pedido para a cozinha e baixa o estoque dos itens.`,
     warn: "Não existe desconfirmar. Depois de aceito, só cabe cancelar.",
     cta: "Aceitar pedido",
@@ -152,9 +152,9 @@ export function acceptCopy(order: Order): ConfirmCopy {
  * `kitchen.ts` reexporta para os testes e imports existentes continuarem
  * valendo.
  */
-export function kitchenAcceptCopy(order: Pick<Order, "id">): ConfirmCopy {
+export function kitchenAcceptCopy(order: Pick<Order, "number">): ConfirmCopy {
   return {
-    title: `Aceitar o pedido ${orderCode(order.id)}?`,
+    title: `Aceitar o pedido ${orderNumber(order)}?`,
     body: "Aceitar manda o pedido para a cozinha e baixa o estoque dos itens.",
     warn: "Não existe desconfirmar. Depois de aceito, só cabe cancelar, na tela de Pedidos.",
     cta: "Aceitar pedido",
@@ -168,7 +168,7 @@ export function kitchenAcceptCopy(order: Pick<Order, "id">): ConfirmCopy {
  * afirmar algo falso sobre o estoque é o erro mais caro do fluxo.
  */
 export function cancelCopy(order: Order): ConfirmCopy | null {
-  const code = orderCode(order.id);
+  const code = orderNumber(order);
   switch (cancelKind(order.status)) {
     case "refuse":
       return {

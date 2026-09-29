@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Order } from "../src/api/types.ts";
 import { OrdersPage } from "../src/features/orders/OrdersPage.tsx";
-import { orderCode } from "../src/lib/orderCode.ts";
+import { orderNumber } from "../src/lib/orderNumber.ts";
 import { type MockHandler, mockApi } from "./api-mock.ts";
 import { makeOrder, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
 import { LocationProbe, renderInPanel } from "./render.tsx";
@@ -28,7 +28,7 @@ const routes = [
 ];
 
 function card(order: Order) {
-  return screen.getByRole("article", { name: `Pedido ${orderCode(order.id)}` });
+  return screen.getByRole("article", { name: `Pedido ${orderNumber(order)}` });
 }
 
 describe("OrdersPage", () => {
@@ -42,17 +42,17 @@ describe("OrdersPage", () => {
     renderInPanel(routes, "/pedidos");
 
     const novos = await screen.findByRole("region", { name: "Novos" });
-    expect(within(novos).getByRole("article", { name: `Pedido ${orderCode(pending.id)}` })).toBeTruthy();
+    expect(within(novos).getByRole("article", { name: `Pedido ${orderNumber(pending)}` })).toBeTruthy();
     expect(
       within(screen.getByRole("region", { name: "Em preparo" })).getByRole("article", {
-        name: `Pedido ${orderCode(preparing.id)}`,
+        name: `Pedido ${orderNumber(preparing)}`,
       }),
     ).toBeTruthy();
     const prontos = screen.getByRole("region", { name: "Prontos" });
     expect(within(prontos).getByText("Entrega · Saiu para entrega")).toBeTruthy();
     expect(
       within(screen.getByRole("region", { name: "Finalizados" })).getByRole("article", {
-        name: `Pedido ${orderCode(cancelled.id)}`,
+        name: `Pedido ${orderNumber(cancelled)}`,
       }),
     ).toBeTruthy();
     expect(within(card(pending)).getByText("R$ 101,00")).toBeTruthy();
@@ -102,7 +102,7 @@ describe("OrdersPage", () => {
     const { queryClient } = renderInPanel(routes, "/pedidos");
 
     // primeira carga: sucesso, o cartão aparece
-    expect(await screen.findByRole("article", { name: `Pedido ${orderCode(order.id)}` })).toBeTruthy();
+    expect(await screen.findByRole("article", { name: `Pedido ${orderNumber(order)}` })).toBeTruthy();
 
     // um poll seguinte falha (429/500/403) — troca o handler e força o refetch,
     // como o refetchInterval faria em segundo plano
@@ -118,7 +118,7 @@ describe("OrdersPage", () => {
     // um poll ruim não pode apagar um kanban bom que um segundo antes estava
     // certo (a mesma degradação que o OfflineNotice já fazia para NetworkError)
     expect(await screen.findByText("Não foi possível carregar os pedidos")).toBeTruthy();
-    expect(screen.getByRole("article", { name: `Pedido ${orderCode(order.id)}` })).toBeTruthy();
+    expect(screen.getByRole("article", { name: `Pedido ${orderNumber(order)}` })).toBeTruthy();
   });
 
   it("teto de 1000 pedidos avisa em vez de sumir os mais antigos calado", async () => {
@@ -173,7 +173,7 @@ describe("OrdersPage", () => {
     const order = makeOrder({ status: "completed" });
     mockApi([listHandler([order]), noTables, ...panelHandlers()]);
     renderInPanel(routes, "/pedidos?period=yesterday");
-    fireEvent.click(await screen.findByRole("article", { name: `Pedido ${orderCode(order.id)}` }));
+    fireEvent.click(await screen.findByRole("article", { name: `Pedido ${orderNumber(order)}` }));
     expect((await screen.findByTestId("location")).textContent).toBe(`/pedidos/${order.id}?period=yesterday`);
   });
 

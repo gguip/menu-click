@@ -41,7 +41,7 @@ describe("OrderActionProvider em modo cozinha", () => {
   it("a confirmação de aceite não mostra nome nem total", async () => {
     signIn();
     mockApi(panelHandlers());
-    const order = makeOrder({ id: ID, status: "pending", totalInCents: 10100 });
+    const order = makeOrder({ id: ID, number: 1041, status: "pending", totalInCents: 10100 });
     renderInPanel(
       [
         {
@@ -56,7 +56,7 @@ describe("OrderActionProvider em modo cozinha", () => {
       "/cozinha",
     );
     fireEvent.click(await screen.findByRole("button", { name: "aceitar" }));
-    const dialog = await screen.findByRole("dialog", { name: "Aceitar o pedido #A3F9?" });
+    const dialog = await screen.findByRole("dialog", { name: "Aceitar o pedido #1041?" });
     expect(within(dialog).getByText("Aceitar manda o pedido para a cozinha e baixa o estoque dos itens.")).toBeTruthy();
     expect(dialog.textContent).not.toMatch(/R\$/);
     expect(dialog.textContent).not.toContain("Marcela");
@@ -65,7 +65,7 @@ describe("OrderActionProvider em modo cozinha", () => {
   it("no painel, a confirmação continua com nome e total", async () => {
     signIn();
     mockApi(panelHandlers());
-    const order = makeOrder({ id: ID, status: "pending", totalInCents: 10100 });
+    const order = makeOrder({ id: ID, number: 1041, status: "pending", totalInCents: 10100 });
     renderInPanel(
       [
         {
@@ -80,7 +80,7 @@ describe("OrderActionProvider em modo cozinha", () => {
       "/pedidos",
     );
     fireEvent.click(await screen.findByRole("button", { name: "aceitar" }));
-    const dialog = await screen.findByRole("dialog", { name: "Aceitar o pedido #A3F9?" });
+    const dialog = await screen.findByRole("dialog", { name: "Aceitar o pedido #1041?" });
     expect(dialog.textContent).toMatch(/R\$/);
   });
 
@@ -95,7 +95,7 @@ describe("OrderActionProvider em modo cozinha", () => {
       },
       ...panelHandlers(),
     ]);
-    const order = makeOrder({ id: ID, status: "pending" });
+    const order = makeOrder({ id: ID, number: 1041, status: "pending" });
     renderInPanel(
       [
         {
@@ -110,7 +110,7 @@ describe("OrderActionProvider em modo cozinha", () => {
       "/cozinha",
     );
     fireEvent.click(await screen.findByRole("button", { name: "aceitar" }));
-    const confirm = await screen.findByRole("dialog", { name: "Aceitar o pedido #A3F9?" });
+    const confirm = await screen.findByRole("dialog", { name: "Aceitar o pedido #1041?" });
     fireEvent.click(within(confirm).getByRole("button", { name: "Aceitar pedido" }));
     const failure = await screen.findByRole("dialog", { name: "Estoque acabou ao aceitar" });
     expect(within(failure).getByRole("button", { name: "Fechar" })).toBeTruthy();

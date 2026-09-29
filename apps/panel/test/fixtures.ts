@@ -69,6 +69,7 @@ export function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: `${head}f00d-0000-4000-8000-000000000000`,
     restaurantId: RESTAURANT_ID,
+    number: orderSeq,
     customer: { id: "c1", name: "Marcela Andrade", phone: "11987654321" },
     type: "delivery",
     status: "pending",

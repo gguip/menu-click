@@ -74,6 +74,8 @@ export type Customer = { id: string; name: string; phone: string };
 export type Order = {
   id: string;
   restaurantId: string;
+  /** Contínuo por loja: é o `#1042` do balcão. */
+  number: number;
   customer: Customer;
   type: OrderType;
   status: OrderStatus;

@@ -32,7 +32,7 @@ async function drawer() {
 
 describe("OrderDrawer", () => {
   it("a conta fecha: itens + frete = total", async () => {
-    setup(makeOrderDetail({ id: ID, totalInCents: 10100, deliveryFeeInCents: 900, paymentMethod: "cash", changeForInCents: 15000 }));
+    setup(makeOrderDetail({ id: ID, number: 1041, totalInCents: 10100, deliveryFeeInCents: 900, paymentMethod: "cash", changeForInCents: 15000 }));
     const view = await drawer();
     expect(await within(view).findByText("Pizza Grande")).toBeTruthy();
     expect(within(view).getByText("Sabores: Calabresa, Portuguesa")).toBeTruthy();
@@ -46,43 +46,43 @@ describe("OrderDrawer", () => {
   });
 
   it("frete grátis e a combinar têm textos próprios", async () => {
-    setup(makeOrderDetail({ id: ID, deliveryFeeInCents: 0 }));
+    setup(makeOrderDetail({ id: ID, number: 1041, deliveryFeeInCents: 0 }));
     expect(await within(await drawer()).findByText("Entrega grátis")).toBeTruthy();
   });
 
   it("frete a combinar", async () => {
-    setup(makeOrderDetail({ id: ID, deliveryFeeInCents: null }));
+    setup(makeOrderDetail({ id: ID, number: 1041, deliveryFeeInCents: null }));
     expect(await within(await drawer()).findByText("Frete a combinar")).toBeTruthy();
   });
 
   it("salão sem mesa (adesivo antigo) diz isso", async () => {
-    setup(makeOrderDetail({ id: ID, type: "dine_in", deliveryAddress: null, deliveryFeeInCents: null, table: null }));
+    setup(makeOrderDetail({ id: ID, number: 1041, type: "dine_in", deliveryAddress: null, deliveryFeeInCents: null, table: null }));
     expect(await within(await drawer()).findByText(/Salão · sem mesa/)).toBeTruthy();
   });
 
   it("em preparo, cancelar devolve o estoque — e o texto diz isso", async () => {
-    setup(makeOrderDetail({ id: ID, status: "preparing" }));
+    setup(makeOrderDetail({ id: ID, number: 1041, status: "preparing" }));
     fireEvent.click(await within(await drawer()).findByRole("button", { name: "Cancelar pedido" }));
-    const dialog = await screen.findByRole("dialog", { name: "Cancelar o pedido #A3F9?" });
+    const dialog = await screen.findByRole("dialog", { name: "Cancelar o pedido #1041?" });
     expect(within(dialog).getByRole("button", { name: "Cancelar e devolver estoque" })).toBeTruthy();
   });
 
   it("depois de pronto, cancelar NÃO devolve — e o texto avisa", async () => {
-    setup(makeOrderDetail({ id: ID, status: "ready_for_pickup", type: "takeaway", deliveryAddress: null, deliveryFeeInCents: null }));
+    setup(makeOrderDetail({ id: ID, number: 1041, status: "ready_for_pickup", type: "takeaway", deliveryAddress: null, deliveryFeeInCents: null }));
     fireEvent.click(await within(await drawer()).findByRole("button", { name: "Cancelar (sem devolver estoque)" }));
     const dialog = await screen.findByRole("dialog", { name: "Cancelar sem devolver o estoque?" });
     expect(within(dialog).getByText("O estoque NÃO será devolvido.")).toBeTruthy();
   });
 
   it("pedido encerrado não oferece ação impossível", async () => {
-    setup(makeOrderDetail({ id: ID, status: "completed", updatedAt: "2026-09-19T23:10:00.000Z" }));
+    setup(makeOrderDetail({ id: ID, number: 1041, status: "completed", updatedAt: "2026-09-19T23:10:00.000Z" }));
     const view = await drawer();
     expect(await within(view).findByText("Pedido concluído às 20:10. Não há mais ação possível.")).toBeTruthy();
     expect(within(view).queryByRole("button", { name: /Cancelar|Concluir|Aceitar/ })).toBeNull();
   });
 
   it("andamento mostra a hora de chegada e '—' no futuro", async () => {
-    setup(makeOrderDetail({ id: ID, status: "pending" }));
+    setup(makeOrderDetail({ id: ID, number: 1041, status: "pending" }));
     const view = await drawer();
     // findBy: a hora sai no fuso da loja, que chega com o restaurante
     expect(await within(view).findByText("19:58")).toBeTruthy();

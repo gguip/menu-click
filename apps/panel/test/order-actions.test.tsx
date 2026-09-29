@@ -32,14 +32,14 @@ describe("ações do pedido", () => {
   it("recusar pedido novo pede confirmação com o texto de recusa, e não abre o detalhe", async () => {
     signIn();
     const api = mockApi([
-      { method: "POST", path: `${LIST}/${ID}/cancel`, body: makeOrderDetail({ id: ID, status: "cancelled" }) },
-      listHandler([makeOrder({ id: ID, status: "pending" })]),
+      { method: "POST", path: `${LIST}/${ID}/cancel`, body: makeOrderDetail({ id: ID, number: 1042, status: "cancelled" }) },
+      listHandler([makeOrder({ id: ID, number: 1042, status: "pending" })]),
       noTables,
       ...panelHandlers(),
     ]);
     renderInPanel(routes, "/pedidos");
-    fireEvent.click(within(await cardOf("#A3F9")).getByRole("button", { name: "Recusar" }));
-    const dialog = await screen.findByRole("dialog", { name: "Recusar o pedido #A3F9?" });
+    fireEvent.click(within(await cardOf("#1042")).getByRole("button", { name: "Recusar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Recusar o pedido #1042?" });
     expect(
       within(dialog).getByText("O pedido sai da lista. O estoque não tinha sido baixado, então nada muda nele."),
     ).toBeTruthy();
@@ -51,16 +51,16 @@ describe("ações do pedido", () => {
   it("aceitar confirma e encadeia o preparo; se o preparo falhar, 'Começar preparo' é a rede", async () => {
     signIn();
     const api = mockApi([
-      { method: "POST", path: `${LIST}/${ID}/confirm`, body: makeOrderDetail({ id: ID, status: "confirmed" }) },
+      { method: "POST", path: `${LIST}/${ID}/confirm`, body: makeOrderDetail({ id: ID, number: 1042, status: "confirmed" }) },
       { method: "POST", path: `${LIST}/${ID}/start-preparing`, status: 409, body: { message: "Transição inválida" } },
-      listHandler([makeOrder({ id: ID, status: "pending" })], true),
-      listHandler([makeOrder({ id: ID, status: "confirmed" })]),
+      listHandler([makeOrder({ id: ID, number: 1042, status: "pending" })], true),
+      listHandler([makeOrder({ id: ID, number: 1042, status: "confirmed" })]),
       noTables,
       ...panelHandlers(),
     ]);
     renderInPanel(routes, "/pedidos");
-    fireEvent.click(within(await cardOf("#A3F9")).getByRole("button", { name: "Aceitar" }));
-    const dialog = await screen.findByRole("dialog", { name: "Aceitar o pedido #A3F9?" });
+    fireEvent.click(within(await cardOf("#1042")).getByRole("button", { name: "Aceitar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Aceitar o pedido #1042?" });
     expect(within(dialog).getByText("Não existe desconfirmar. Depois de aceito, só cabe cancelar.")).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Aceitar pedido" }));
 
@@ -80,12 +80,12 @@ describe("ações do pedido", () => {
         status: 409,
         body: { message: 'Estoque insuficiente de "Pizza Grande": 3 pedidos, 2 disponíveis' },
       },
-      listHandler([makeOrder({ id: ID, status: "pending" })]),
+      listHandler([makeOrder({ id: ID, number: 1042, status: "pending" })]),
       noTables,
       ...panelHandlers(),
     ]);
     renderInPanel(routes, "/pedidos");
-    fireEvent.click(within(await cardOf("#A3F9")).getByRole("button", { name: "Aceitar" }));
+    fireEvent.click(within(await cardOf("#1042")).getByRole("button", { name: "Aceitar" }));
     fireEvent.click(await screen.findByRole("button", { name: "Aceitar pedido" }));
     const dialog = await screen.findByRole("dialog", { name: "Estoque acabou ao aceitar" });
     expect(
@@ -94,19 +94,19 @@ describe("ações do pedido", () => {
       ),
     ).toBeTruthy();
     fireEvent.click(within(dialog).getByRole("button", { name: "Recusar pedido" }));
-    expect(await screen.findByRole("dialog", { name: "Recusar o pedido #A3F9?" })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "Recusar o pedido #1042?" })).toBeTruthy();
   });
 
   it("despachar não pede confirmação", async () => {
     signIn();
     const api = mockApi([
-      { method: "POST", path: `${LIST}/${ID}/dispatch`, body: makeOrderDetail({ id: ID, status: "out_for_delivery" }) },
-      listHandler([makeOrder({ id: ID, status: "preparing", type: "delivery" })]),
+      { method: "POST", path: `${LIST}/${ID}/dispatch`, body: makeOrderDetail({ id: ID, number: 1042, status: "out_for_delivery" }) },
+      listHandler([makeOrder({ id: ID, number: 1042, status: "preparing", type: "delivery" })]),
       noTables,
       ...panelHandlers(),
     ]);
     renderInPanel(routes, "/pedidos");
-    fireEvent.click(within(await cardOf("#A3F9")).getByRole("button", { name: "Despachar" }));
+    fireEvent.click(within(await cardOf("#1042")).getByRole("button", { name: "Despachar" }));
     await waitFor(() => expect(api.calls.some((call) => call.path === `${LIST}/${ID}/dispatch`)).toBe(true));
     expect(screen.queryByRole("dialog")).toBeNull();
   });
@@ -114,9 +114,9 @@ describe("ações do pedido", () => {
   it("sem internet, as ações ficam travadas", async () => {
     signIn();
     vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
-    mockApi([listHandler([makeOrder({ id: ID, status: "pending" })]), noTables, ...panelHandlers()]);
+    mockApi([listHandler([makeOrder({ id: ID, number: 1042, status: "pending" })]), noTables, ...panelHandlers()]);
     renderInPanel(routes, "/pedidos");
-    const accept = within(await cardOf("#A3F9")).getByRole("button", { name: "Aceitar" });
+    const accept = within(await cardOf("#1042")).getByRole("button", { name: "Aceitar" });
     expect((accept as HTMLButtonElement).disabled).toBe(true);
   });
 });

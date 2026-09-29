@@ -5,7 +5,7 @@ import { ApiError, describeError } from "../../api/client.ts";
 import type { OrderDetail } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { formatCents } from "../../lib/money.ts";
-import { orderCode } from "../../lib/orderCode.ts";
+import { orderNumber } from "../../lib/orderNumber.ts";
 import { formatElapsed } from "../../lib/time.ts";
 import { useNow } from "../../lib/useNow.ts";
 import buttons from "../../ui/buttons.module.css";
@@ -39,7 +39,7 @@ function OrderDetailView({
     <div className={classes.drawer}>
       <header className={classes.header}>
         <div className={classes.headTop}>
-          <span className={`${classes.code} n`}>{orderCode(order.id)}</span>
+          <span className={`${classes.code} n`}>{orderNumber(order)}</span>
           <TypePill order={order} />
           <span className="n">{formatElapsed(order.createdAt, now)}</span>
           <button type="button" className={classes.close} aria-label="Fechar" onClick={onClose}>

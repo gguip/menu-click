@@ -86,10 +86,10 @@ describe("ação principal", () => {
 
 describe("cancelamento — três textos, porque errar sobre o estoque é o erro mais caro", () => {
   it("pedido novo é recusa: o estoque nunca foi baixado", () => {
-    const order = makeOrder({ id: ID, status: "pending" });
+    const order = makeOrder({ id: ID, number: 1042, status: "pending" });
     expect(cancelKind("pending")).toBe("refuse");
     expect(cancelCopy(order)).toEqual({
-      title: "Recusar o pedido #A3F9?",
+      title: "Recusar o pedido #1042?",
       body: "O pedido sai da lista. O estoque não tinha sido baixado, então nada muda nele.",
       cta: "Recusar pedido",
       tone: "danger",
@@ -97,10 +97,10 @@ describe("cancelamento — três textos, porque errar sobre o estoque é o erro 
   });
 
   it("antes de pronto devolve o estoque", () => {
-    const order = makeOrder({ id: ID, status: "preparing" });
+    const order = makeOrder({ id: ID, number: 1042, status: "preparing" });
     expect(cancelCopy(order)).toEqual({
-      title: "Cancelar o pedido #A3F9?",
-      body: "O pedido #A3F9 sai da lista e as unidades voltam para o estoque.",
+      title: "Cancelar o pedido #1042?",
+      body: "O pedido #1042 sai da lista e as unidades voltam para o estoque.",
       cta: "Cancelar e devolver estoque",
       tone: "danger",
     });
@@ -108,9 +108,9 @@ describe("cancelamento — três textos, porque errar sobre o estoque é o erro 
 
   it("depois de pronto NÃO devolve", () => {
     for (const status of ["out_for_delivery", "ready_for_pickup"] as const) {
-      expect(cancelCopy(makeOrder({ id: ID, status }))).toEqual({
+      expect(cancelCopy(makeOrder({ id: ID, number: 1042, status }))).toEqual({
         title: "Cancelar sem devolver o estoque?",
-        body: "A comida do pedido #A3F9 já ficou pronta. As unidades usadas não voltam para o estoque — só o pedido sai da lista.",
+        body: "A comida do pedido #1042 já ficou pronta. As unidades usadas não voltam para o estoque — só o pedido sai da lista.",
         warn: "O estoque NÃO será devolvido.",
         cta: "Cancelar sem devolver",
         tone: "danger",
@@ -132,9 +132,9 @@ describe("cancelamento — três textos, porque errar sobre o estoque é o erro 
 
 describe("aceite", () => {
   it("avisa que não existe desconfirmar", () => {
-    const order = makeOrder({ id: ID, totalInCents: 10100 });
+    const order = makeOrder({ id: ID, number: 1042, totalInCents: 10100 });
     expect(acceptCopy(order)).toEqual({
-      title: "Aceitar o pedido #A3F9?",
+      title: "Aceitar o pedido #1042?",
       body: "Marcela Andrade · R$ 101,00. Aceitar manda o pedido para a cozinha e baixa o estoque dos itens.",
       warn: "Não existe desconfirmar. Depois de aceito, só cabe cancelar.",
       cta: "Aceitar pedido",
@@ -143,7 +143,7 @@ describe("aceite", () => {
   });
 
   it("pedido de mesa se identifica pela mesa", () => {
-    const order = makeOrder({ id: ID, type: "dine_in", table: { id: "t7", label: "Mesa 7" } });
+    const order = makeOrder({ id: ID, number: 1042, type: "dine_in", table: { id: "t7", label: "Mesa 7" } });
     expect(acceptCopy(order).body.startsWith("Mesa 7 · ")).toBe(true);
   });
 });

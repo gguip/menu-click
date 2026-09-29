@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { describeError, NetworkError } from "../../api/client.ts";
 import type { Order } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
-import { orderCode } from "../../lib/orderCode.ts";
+import { orderNumber } from "../../lib/orderNumber.ts";
 import { formatElapsed } from "../../lib/time.ts";
 import { useNow } from "../../lib/useNow.ts";
 import { useOnline } from "../../lib/useOnline.ts";
@@ -34,7 +34,7 @@ function KitchenCard({
   const items = useOrderItems(restaurantId, order.id);
   const action = kitchenAction(order);
   const { request, busyOrderId, disabled } = useOrderAction();
-  const code = orderCode(order.id);
+  const code = orderNumber(order);
   const where = order.type === "dine_in" && order.table !== null ? ` · ${order.table.label}` : "";
 
   return (
