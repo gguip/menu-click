@@ -3,7 +3,7 @@ import {
   groupContribution,
   divideRounded,
   unitPrice,
-} from "../src/domain/option.ts";
+} from "../src/index.ts";
 
 /**
  * A aritmética de dinheiro do cardápio.
