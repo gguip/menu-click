@@ -10,7 +10,7 @@ import type { OptionGroup } from "../domain/option.ts";
 import { acceptedPaymentMethods } from "../domain/payment.ts";
 import type { Product } from "../domain/product.ts";
 import type { Restaurant } from "../domain/restaurant.ts";
-import type { OpeningHour } from "../domain/opening-hours.ts";
+import type { OpeningHour, OpeningStatus } from "../domain/opening-hours.ts";
 import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as categoriesService from "./categories.ts";
@@ -48,6 +48,7 @@ function toMenuRestaurant(
   restaurant: Restaurant,
   isOpen: boolean,
   openingHours: OpeningHour[],
+  status: OpeningStatus,
 ): MenuRestaurant {
   return {
     id: restaurant.id,
@@ -68,7 +69,11 @@ function toMenuRestaurant(
       : { freeDeliveryAboveInCents: restaurant.freeDeliveryAboveInCents }),
     // para a tela avisar do mínimo antes de a pessoa montar o carrinho
     minimumOrderInCents: restaurant.minimumOrderInCents,
+    timezone: restaurant.timezone,
     isOpen,
+    // os horários falam só da GRADE: a tela decide pausa > aberta > fechada
+    ...(status.closesAt === undefined ? {} : { closesAt: status.closesAt }),
+    ...(status.opensAt === undefined ? {} : { opensAt: status.opensAt }),
     acceptingOrders: restaurant.acceptingOrders,
     openingHours: openingHours.map(({ weekday, opensAt, closesAt }) => ({
       weekday,
@@ -151,16 +156,18 @@ function toMenuProduct(
 export async function getRestaurant(slug: string): Promise<MenuRestaurant> {
   const restaurant = await restaurantsService.getBySlug(slug);
 
-  const [dentroDaGrade, grade] = await Promise.all([
-    openingHoursRepository.isOpenNow(restaurant.id, restaurant.timezone),
+  const [status, grade] = await Promise.all([
+    openingHoursRepository.findOpeningStatus(restaurant.id, restaurant.timezone),
     openingHoursRepository.findByRestaurant(restaurant.id),
   ]);
 
-  // a loja só está aberta se a grade permite E ninguém pausou
+  // a loja só está aberta se a grade permite E ninguém pausou; a mesma conta
+  // do painel (`findOpeningStatus`, com a fusão das faixas encostadas)
   return toMenuRestaurant(
     restaurant,
-    dentroDaGrade && restaurant.acceptingOrders,
+    status.isOpen && restaurant.acceptingOrders,
     grade,
+    status,
   );
 }
 

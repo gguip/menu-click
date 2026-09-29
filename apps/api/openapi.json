@@ -7517,6 +7517,12 @@
                     "isOpen": {
                       "type": "boolean"
                     },
+                    "closesAt": {
+                      "type": "string"
+                    },
+                    "opensAt": {
+                      "type": "string"
+                    },
                     "acceptingOrders": {
                       "type": "boolean"
                     },
@@ -7542,6 +7548,9 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "timezone": {
+                      "type": "string"
                     }
                   }
                 }

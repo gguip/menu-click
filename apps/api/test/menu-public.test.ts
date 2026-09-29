@@ -129,7 +129,7 @@ describe("cardápio público", () => {
       expect(body.freeDeliveryAboveInCents).toBeUndefined();
     });
 
-    it("NÃO vaza a configuração crua de frete nem o timezone", async () => {
+    it("NÃO vaza a configuração crua de frete", async () => {
       const restaurant = await createRestaurant(app, { slug: "sem-vazamento" });
       await setDeliveryFeeConfig(app, restaurant, {
         deliveryFeeMode: "fixed",
@@ -149,7 +149,8 @@ describe("cardápio público", () => {
       // cotação, não para expor a configuração interna da loja (S10)
       expect(body.deliveryFixedFeeInCents).toBeUndefined();
       expect(body.deliveryFeeToArrange).toBeUndefined();
-      expect(body.timezone).toBeUndefined();
+      // o `timezone` SAI desde o app do cliente, por decisão (ver
+      // test/menu-opening.test.ts): sem ele o app diria a hora no fuso errado
     });
   });
 

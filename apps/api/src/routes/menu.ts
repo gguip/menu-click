@@ -91,6 +91,11 @@ const menuRestaurantResponseSchema = {
     minimumOrderInCents: { type: "integer" },
     // a grade E a pausa, juntas: é o que decide se a tela mostra o botão
     isOpen: { type: "boolean" },
+    // só a GRADE (a pausa está em `acceptingOrders`): "Aberto até 23h" usa
+    // closesAt; "Abre amanhã às 18h" usa opensAt. Ausentes quando não há o
+    // que dizer (aberta direto / sem grade).
+    closesAt: { type: "string" },
+    opensAt: { type: "string" },
     // a pausa sozinha, para separar "fechado agora" de "a loja pausou"
     acceptingOrders: { type: "boolean" },
     // para a tela dizer QUANDO abre, em vez de só "fechado"
@@ -108,8 +113,9 @@ const menuRestaurantResponseSchema = {
     // a lista pronta, não as quatro flags: o cliente escolhe entre opções,
     // não lê booleanos. `acceptsCash` e companhia NÃO entram aqui.
     paymentMethods: { type: "array", items: { type: "string" } },
-    // `timezone` NÃO entra: é operação do restaurante, não do cliente. O que
-    // o fuso decide já chegou traduzido no `isOpen`.
+    // o fuso da loja: o app formata "23h" nele, não no fuso do celular.
+    // Entrou por decisão (S10), no app do cliente — não é dado sensível.
+    timezone: { type: "string" },
   },
 };
 
