@@ -8,6 +8,7 @@ import type {
   CreatedOrder,
   CreateOrderInput,
   Order,
+  OrderDetail,
   OrderItemOption,
   OrderStatus,
   OrderSummary,
@@ -537,6 +538,7 @@ export async function create(
       },
       client,
     );
+    await ordersRepository.insertStatusEvent(orderId, "pending", client);
     const itemIds = await ordersRepository.insertItems(orderId, items, client);
 
     // Guarda contra o único jeito realista de o mapeamento por posição
@@ -763,16 +765,17 @@ export async function getByTrackingToken(
   return order;
 }
 
+/** O detalhe do painel: o pedido com o histórico de status (`OrderDetail`). */
 export async function getById(
   restaurantId: string,
   orderId: string,
-): Promise<Order> {
+): Promise<OrderDetail> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(orderId)) throw orderNotFound(orderId);
 
   const order = await ordersRepository.findById(restaurantId, orderId);
   if (order === null) throw orderNotFound(orderId);
-  return order;
+  return { ...order, statusHistory: await ordersRepository.findStatusHistory(orderId) };
 }
 
 /**

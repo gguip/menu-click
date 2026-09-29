@@ -11,6 +11,7 @@ import type {
   OrderItem,
   OrderItemOption,
   OrderStatus,
+  OrderStatusEvent,
   OrderSummary,
   OrderType,
 } from "../domain/order.ts";
@@ -479,6 +480,34 @@ export async function updateStatus(
       where id = $2 and deleted_at is null`,
     [status, orderId],
   );
+  // o evento vai na mesma transação da mudança: rollback desfaz os dois
+  await insertStatusEvent(orderId, status, client);
+}
+
+/** Registra que o pedido entrou em `status`. Só a criação e `updateStatus` chamam. */
+export async function insertStatusEvent(
+  orderId: string,
+  status: OrderStatus,
+  client: PoolClient,
+): Promise<void> {
+  await client.query(
+    `insert into order_status_events (order_id, status) values ($1, $2)`,
+    [orderId, status],
+  );
+}
+
+/** Os status pelos quais o pedido passou, em ordem (D11). */
+export async function findStatusHistory(
+  orderId: string,
+  db: Queryable = pool,
+): Promise<OrderStatusEvent[]> {
+  const { rows } = await db.query<{ status: OrderStatus; occurred_at: Date }>(
+    `select status, occurred_at from order_status_events
+      where order_id = $1 and deleted_at is null
+      order by occurred_at, id`,
+    [orderId],
+  );
+  return rows.map((row) => ({ status: row.status, at: row.occurred_at.toISOString() }));
 }
 
 /**

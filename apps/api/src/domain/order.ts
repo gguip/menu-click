@@ -305,6 +305,16 @@ export type Order = OrderSummary & {
   items: OrderItem[];
 };
 
+/** Um status pelo qual o pedido passou, e quando. */
+export type OrderStatusEvent = { status: OrderStatus; at: string };
+
+/**
+ * O pedido como o DETALHE do painel devolve: com o histórico de status. Só o
+ * detalhe carrega — a listagem é polled a cada 10 s e nenhum cartão mostra o
+ * andamento; o acompanhamento público fica com o app do cliente decidir.
+ */
+export type OrderDetail = Order & { statusHistory: OrderStatusEvent[] };
+
 /**
  * O que a criação devolve: o pedido mais o token de acompanhamento.
  *

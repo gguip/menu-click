@@ -6699,7 +6699,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual.",
+        "description": "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual. Traz `statusHistory`, o horário em que o pedido entrou em cada status; pedidos anteriores ao registro têm só a chegada e o status atual.",
         "parameters": [
           {
             "schema": {
@@ -6872,6 +6872,20 @@
                                 }
                               }
                             }
+                          }
+                        }
+                      }
+                    },
+                    "statusHistory": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
                           }
                         }
                       }

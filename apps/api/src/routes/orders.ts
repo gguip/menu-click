@@ -192,6 +192,21 @@ const orderResponseSchema = {
   },
 };
 
+/** Só o detalhe leva o histórico — ver `OrderDetail`. */
+const orderDetailResponseSchema = {
+  type: "object",
+  properties: {
+    ...orderResponseSchema.properties,
+    statusHistory: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { status: { type: "string" }, at: { type: "string" } },
+      },
+    },
+  },
+};
+
 /**
  * A resposta da CRIAÇÃO, e só dela, carrega o token de acompanhamento.
  *
@@ -559,9 +574,9 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "getOrder",
         summary: "Detalhe do pedido, com os itens",
         description:
-          "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual.",
+          "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual. Traz `statusHistory`, o horário em que o pedido entrou em cada status; pedidos anteriores ao registro têm só a chegada e o status atual.",
         params: orderParamsSchema,
-        response: { 200: orderResponseSchema, 404: errorResponseSchema },
+        response: { 200: orderDetailResponseSchema, 404: errorResponseSchema },
       },
     },
     async (request) => {
