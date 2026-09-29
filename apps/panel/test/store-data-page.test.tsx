@@ -124,4 +124,22 @@ describe("StoreDataPage", () => {
       ).toBeGreaterThan(summaryCallsBefore),
     );
   });
+
+  it("trocar o fuso refaz o restaurante: o 'fecha 23:30' do rail muda de fuso", async () => {
+    signIn();
+    const api = mockApi([
+      { method: "PATCH", path: `/restaurants/${RESTAURANT_ID}`, body: makeRestaurant({ timezone: "America/Bahia" }) },
+      ...panelHandlers(),
+    ]);
+    renderInPanel([{ path: "/dados-da-loja", element: <StoreDataPage /> }], "/dados-da-loja");
+    const timezone = await screen.findByLabelText("Fuso horário");
+    const restaurantGets = () =>
+      api.calls.filter((call) => call.method === "GET" && call.path === `/restaurants/${RESTAURANT_ID}`).length;
+    const before = restaurantGets();
+
+    fireEvent.change(timezone, { target: { value: "America/Bahia" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar dados" }));
+
+    await waitFor(() => expect(restaurantGets()).toBeGreaterThan(before));
+  });
 });

@@ -112,3 +112,13 @@ export function listOrdersByStatus(restaurantId: string, status: OrderStatus): P
     }),
   ).then((result) => result.items);
 }
+
+/** Não é transição de status: é a loja dizendo que recebeu. */
+export function markOrderPaid(restaurantId: string, orderId: string): Promise<OrderDetail> {
+  return apiRequest<OrderDetail>(`/restaurants/${restaurantId}/orders/${orderId}/mark-paid`, { method: "POST" });
+}
+
+/** Desfaz um "pago" marcado por engano. */
+export function markOrderUnpaid(restaurantId: string, orderId: string): Promise<OrderDetail> {
+  return apiRequest<OrderDetail>(`/restaurants/${restaurantId}/orders/${orderId}/mark-unpaid`, { method: "POST" });
+}

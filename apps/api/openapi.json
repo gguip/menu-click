@@ -221,7 +221,7 @@
         "tags": [
           "Restaurantes"
         ],
-        "description": "Pedir um restaurante que não é o da sessão responde 404, e não 403: 'proibido' confirmaria que ele existe.",
+        "description": "Pedir um restaurante que não é o da sessão responde 404, e não 403: 'proibido' confirmaria que ele existe. Traz `openingStatus`: se a loja está dentro da grade de horário agora, com `closesAt` (aberta) ou `opensAt` (fechada); sem `closesAt`, está aberta direto pelos próximos 7 dias, e sem `opensAt`, não tem nenhuma faixa cadastrada. A pausa manual não entra nele — está em `acceptingOrders`.",
         "parameters": [
           {
             "schema": {
@@ -336,6 +336,20 @@
                     },
                     "updatedAt": {
                       "type": "string"
+                    },
+                    "openingStatus": {
+                      "type": "object",
+                      "properties": {
+                        "isOpen": {
+                          "type": "boolean"
+                        },
+                        "closesAt": {
+                          "type": "string"
+                        },
+                        "opensAt": {
+                          "type": "string"
+                        }
+                      }
                     }
                   }
                 }
@@ -4615,6 +4629,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -4683,6 +4700,10 @@
                     },
                     "changeForInCents": {
                       "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "table": {
                       "type": "object",
@@ -4969,6 +4990,9 @@
                           "restaurantId": {
                             "type": "string"
                           },
+                          "number": {
+                            "type": "integer"
+                          },
                           "customer": {
                             "type": "object",
                             "properties": {
@@ -5037,6 +5061,10 @@
                           },
                           "changeForInCents": {
                             "type": "integer"
+                          },
+                          "paidAt": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "table": {
                             "type": "object",
@@ -5327,6 +5355,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -5395,6 +5426,10 @@
                     },
                     "changeForInCents": {
                       "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "table": {
                       "type": "object",
@@ -5558,6 +5593,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -5626,6 +5664,10 @@
                     },
                     "changeForInCents": {
                       "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "table": {
                       "type": "object",
@@ -5789,6 +5831,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -5857,6 +5902,10 @@
                     },
                     "changeForInCents": {
                       "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "table": {
                       "type": "object",
@@ -6020,6 +6069,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -6088,6 +6140,10 @@
                     },
                     "changeForInCents": {
                       "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "table": {
                       "type": "object",
@@ -6251,6 +6307,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -6319,6 +6378,10 @@
                     },
                     "changeForInCents": {
                       "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "table": {
                       "type": "object",
@@ -6482,6 +6545,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -6550,6 +6616,10 @@
                     },
                     "changeForInCents": {
                       "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "table": {
                       "type": "object",
@@ -6668,14 +6738,14 @@
         }
       }
     },
-    "/restaurants/{restaurantId}/orders/{orderId}": {
-      "get": {
-        "operationId": "getOrder",
-        "summary": "Detalhe do pedido, com os itens",
+    "/restaurants/{restaurantId}/orders/{orderId}/mark-paid": {
+      "post": {
+        "operationId": "markOrderPaid",
+        "summary": "Marca o pedido como pago",
         "tags": [
           "Pedidos"
         ],
-        "description": "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual.",
+        "description": "Não há pagamento online: quem registra que o pedido foi pago é a loja. Vale em qualquer forma de pagamento. Marcar de novo mantém a hora da primeira marcação. Pedido cancelado é 409. Não muda o status.",
         "parameters": [
           {
             "schema": {
@@ -6712,6 +6782,9 @@
                     },
                     "restaurantId": {
                       "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
                     },
                     "customer": {
                       "type": "object",
@@ -6782,6 +6855,10 @@
                     "changeForInCents": {
                       "type": "integer"
                     },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "table": {
                       "type": "object",
                       "nullable": true,
@@ -6845,6 +6922,475 @@
                                 }
                               }
                             }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/orders/{orderId}/mark-unpaid": {
+      "post": {
+        "operationId": "markOrderUnpaid",
+        "summary": "Desfaz o pago",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "Existe para corrigir um clique errado; vale em qualquer status, inclusive cancelado.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "orderId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "totalInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "deliveryAddress": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "street": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "neighborhood": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "city": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "zipCode": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "table": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "productId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/orders/{orderId}": {
+      "get": {
+        "operationId": "getOrder",
+        "summary": "Detalhe do pedido, com os itens",
+        "tags": [
+          "Pedidos"
+        ],
+        "description": "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual. Traz `statusHistory`, o horário em que o pedido entrou em cada status; pedidos anteriores ao registro têm só a chegada e o status atual.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "orderId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "restaurantId": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
+                    },
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "totalInCents": {
+                      "type": "integer"
+                    },
+                    "deliveryFeeInCents": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "deliveryAddress": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "street": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "number": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "neighborhood": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "city": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "state": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "zipCode": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "paymentMethod": {
+                      "type": "string"
+                    },
+                    "changeForInCents": {
+                      "type": "integer"
+                    },
+                    "paidAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "table": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "productId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "priceInCents": {
+                            "type": "integer"
+                          },
+                          "unitPriceInCents": {
+                            "type": "integer"
+                          },
+                          "quantity": {
+                            "type": "integer"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string"
+                                },
+                                "groupName": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "priceInCents": {
+                                  "type": "integer"
+                                },
+                                "quantity": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "statusHistory": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
                           }
                         }
                       }
@@ -7443,6 +7989,9 @@
                   "properties": {
                     "id": {
                       "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
                     },
                     "type": {
                       "type": "string"

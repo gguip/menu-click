@@ -262,6 +262,11 @@ export type OrderItem = {
 export type OrderSummary = {
   id: string;
   restaurantId: string;
+  /**
+   * O número do pedido na loja (`#1042`), contínuo e sem buraco. Na coluna é
+   * `order_number`: `orders.number` é o número do endereço de entrega.
+   */
+  number: number;
   customer: Customer;
   type: OrderType;
   status: OrderStatus;
@@ -281,6 +286,8 @@ export type OrderSummary = {
   paymentMethod: PaymentMethod;
   /** Ausente = "tenho o valor certo". Só faz sentido junto de `paymentMethod: "cash"`. */
   changeForInCents?: number;
+  /** Quando a loja marcou como pago; `null` = não marcado. Sempre presente (F12). */
+  paidAt: string | null;
   /**
    * A mesa de onde o pedido veio, com o rótulo **congelado** na criação —
    * nunca lido de `tables`. Renomear a mesa não reescreve pedido antigo, e
@@ -299,6 +306,16 @@ export type OrderSummary = {
 export type Order = OrderSummary & {
   items: OrderItem[];
 };
+
+/** Um status pelo qual o pedido passou, e quando. */
+export type OrderStatusEvent = { status: OrderStatus; at: string };
+
+/**
+ * O pedido como o DETALHE do painel devolve: com o histórico de status. Só o
+ * detalhe carrega — a listagem é polled a cada 10 s e nenhum cartão mostra o
+ * andamento; o acompanhamento público fica com o app do cliente decidir.
+ */
+export type OrderDetail = Order & { statusHistory: OrderStatusEvent[] };
 
 /**
  * O que a criação devolve: o pedido mais o token de acompanhamento.

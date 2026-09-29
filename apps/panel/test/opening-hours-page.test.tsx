@@ -77,6 +77,21 @@ describe("OpeningHoursPage", () => {
     });
   });
 
+  // O rail diz "Aberta · fecha …" a partir do GET do restaurante: salvar a
+  // grade sem refazê-lo deixaria o rail (e o link "sem horário cadastrado"
+  // que traz a pessoa até aqui) velho até o próximo polling.
+  it("salvar a grade refaz o restaurante, para o rail refletir na hora", async () => {
+    const api = setup([{ method: "PUT", path: HOURS, body: { openingHours: SEGUNDA_E_SABADO } }]);
+    fireEvent.click(await screen.findByRole("button", { name: "Adicionar faixa em quarta" }));
+    fireEvent.change(screen.getByLabelText("Quarta: abre (faixa 1)"), { target: { value: "18:00" } });
+    fireEvent.change(screen.getByLabelText("Quarta: fecha (faixa 1)"), { target: { value: "23:00" } });
+    const restaurantGets = () =>
+      api.calls.filter((call) => call.method === "GET" && call.path === `/restaurants/${RESTAURANT_ID}`).length;
+    const before = restaurantGets();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar horário" }));
+    await waitFor(() => expect(restaurantGets()).toBeGreaterThan(before));
+  });
+
   it("dia esvaziado sai do corpo", async () => {
     const api = setup([{ method: "PUT", path: HOURS, body: { openingHours: [] } }]);
     fireEvent.click(await screen.findByRole("button", { name: "Remover faixa 1 de sábado" }));

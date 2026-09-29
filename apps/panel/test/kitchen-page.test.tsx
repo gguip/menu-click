@@ -45,25 +45,25 @@ describe("KitchenPage", () => {
     signIn();
     mockApi(
       kitchenHandlers(
-        [makeOrder({ id: NEW_ID, status: "pending" })],
+        [makeOrder({ id: NEW_ID, number: 1041, status: "pending" })],
         [],
-        [makeOrder({ id: DOING_ID, status: "preparing", type: "delivery" })],
+        [makeOrder({ id: DOING_ID, number: 1042, status: "preparing", type: "delivery" })],
       ),
     );
     renderInPanel(routes, "/cozinha");
     const novos = await screen.findByRole("region", { name: "Entraram agora" });
     const fazendo = screen.getByRole("region", { name: "Fazendo" });
-    expect(await within(novos).findByText("#A3F9")).toBeTruthy();
-    expect(await within(fazendo).findByText("#B7E1")).toBeTruthy();
+    expect(await within(novos).findByText("#1041")).toBeTruthy();
+    expect(await within(fazendo).findByText("#1042")).toBeTruthy();
   });
 
   it("nenhum dinheiro na tela", async () => {
     signIn();
     mockApi(
       kitchenHandlers(
-        [makeOrder({ id: NEW_ID, status: "pending" })],
+        [makeOrder({ id: NEW_ID, number: 1041, status: "pending" })],
         [],
-        [makeOrder({ id: DOING_ID, status: "preparing" })],
+        [makeOrder({ id: DOING_ID, number: 1042, status: "preparing" })],
       ),
     );
     renderInPanel(routes, "/cozinha");
@@ -76,17 +76,17 @@ describe("KitchenPage", () => {
   it("'Aceitar e começar' confirma e manda confirm + start-preparing", async () => {
     signIn();
     const api = mockApi([
-      { method: "POST", path: `${LIST}/${NEW_ID}/confirm`, body: makeOrderDetail({ id: NEW_ID, status: "confirmed" }) },
+      { method: "POST", path: `${LIST}/${NEW_ID}/confirm`, body: makeOrderDetail({ id: NEW_ID, number: 1041, status: "confirmed" }) },
       {
         method: "POST",
         path: `${LIST}/${NEW_ID}/start-preparing`,
-        body: makeOrderDetail({ id: NEW_ID, status: "preparing" }),
+        body: makeOrderDetail({ id: NEW_ID, number: 1041, status: "preparing" }),
       },
-      ...kitchenHandlers([makeOrder({ id: NEW_ID, status: "pending" })], [], []),
+      ...kitchenHandlers([makeOrder({ id: NEW_ID, number: 1041, status: "pending" })], [], []),
     ]);
     renderInPanel(routes, "/cozinha");
     fireEvent.click(await screen.findByRole("button", { name: "Aceitar e começar" }));
-    const dialog = await screen.findByRole("dialog", { name: "Aceitar o pedido #A3F9?" });
+    const dialog = await screen.findByRole("dialog", { name: "Aceitar o pedido #1041?" });
     expect(dialog.textContent).not.toMatch(/R\$/);
     fireEvent.click(within(dialog).getByRole("button", { name: "Aceitar pedido" }));
     await waitFor(() =>
@@ -103,9 +103,9 @@ describe("KitchenPage", () => {
       {
         method: "POST",
         path: `${LIST}/${DOING_ID}/dispatch`,
-        body: makeOrderDetail({ id: DOING_ID, status: "out_for_delivery" }),
+        body: makeOrderDetail({ id: DOING_ID, number: 1042, status: "out_for_delivery" }),
       },
-      ...kitchenHandlers([], [], [makeOrder({ id: DOING_ID, status: "preparing", type: "delivery" })]),
+      ...kitchenHandlers([], [], [makeOrder({ id: DOING_ID, number: 1042, status: "preparing", type: "delivery" })]),
     ]);
     renderInPanel(routes, "/cozinha");
     fireEvent.click(await screen.findByRole("button", { name: "Pronto — despachar" }));
@@ -115,7 +115,7 @@ describe("KitchenPage", () => {
   it("o detalhe de cada pedido é buscado uma vez só, mesmo com as listas atualizando", async () => {
     signIn();
     const api = mockApi(
-      kitchenHandlers([], [], [makeOrder({ id: DOING_ID, status: "preparing" })]),
+      kitchenHandlers([], [], [makeOrder({ id: DOING_ID, number: 1042, status: "preparing" })]),
     );
     const { queryClient } = renderInPanel(routes, "/cozinha");
     expect((await screen.findAllByText("Pizza Grande")).length).toBeGreaterThan(0);
@@ -128,7 +128,7 @@ describe("KitchenPage", () => {
 
   it("itens com erro no detalhe deixam 'Tentar de novo', que traz os itens", async () => {
     signIn();
-    const order = makeOrder({ id: DOING_ID, status: "preparing" });
+    const order = makeOrder({ id: DOING_ID, number: 1042, status: "preparing" });
     mockApi([
       { method: "GET", path: `${LIST}/${DOING_ID}`, status: 500, once: true },
       ...kitchenHandlers([], [], [order]),
@@ -141,12 +141,12 @@ describe("KitchenPage", () => {
 
   it("'Fazendo' mostra o que chegou mesmo quando uma das duas listas falha", async () => {
     signIn();
-    const order = makeOrder({ id: DOING_ID, status: "confirmed" });
+    const order = makeOrder({ id: DOING_ID, number: 1042, status: "confirmed" });
     mockApi([
       {
         method: "GET",
         path: `${LIST}/${DOING_ID}`,
-        body: makeOrderDetail({ id: DOING_ID, status: "confirmed" }),
+        body: makeOrderDetail({ id: DOING_ID, number: 1042, status: "confirmed" }),
       },
       { method: "GET", path: LIST, query: { status: "confirmed" }, body: page([order]) },
       { method: "GET", path: LIST, query: { status: "preparing" }, status: 500 },
@@ -154,7 +154,7 @@ describe("KitchenPage", () => {
     ]);
     renderInPanel(routes, "/cozinha");
     const fazendo = await screen.findByRole("region", { name: "Fazendo" });
-    expect(await within(fazendo).findByText("#B7E1")).toBeTruthy();
+    expect(await within(fazendo).findByText("#1042")).toBeTruthy();
     expect(within(fazendo).getByText(/Parte da lista não carregou/)).toBeTruthy();
   });
 

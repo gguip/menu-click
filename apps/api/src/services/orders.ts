@@ -8,6 +8,7 @@ import type {
   CreatedOrder,
   CreateOrderInput,
   Order,
+  OrderDetail,
   OrderItemOption,
   OrderStatus,
   OrderSummary,
@@ -513,9 +514,15 @@ export async function create(
       client,
     );
 
+    // depois de toda validação que pode recusar o pedido: um número reservado
+    // e desfeito pelo rollback não aparece, mas reservá-lo por último encurta
+    // o tempo em que a linha do restaurante fica travada
+    const orderNumber = await ordersRepository.nextOrderNumber(restaurantId, client);
+
     const orderId = await ordersRepository.insertOrder(
       restaurantId,
       {
+        orderNumber,
         customerId: customer.id,
         type: input.type,
         totalInCents,
@@ -531,6 +538,7 @@ export async function create(
       },
       client,
     );
+    await ordersRepository.insertStatusEvent(orderId, "pending", client);
     const itemIds = await ordersRepository.insertItems(orderId, items, client);
 
     // Guarda contra o único jeito realista de o mapeamento por posição
@@ -757,16 +765,17 @@ export async function getByTrackingToken(
   return order;
 }
 
+/** O detalhe do painel: o pedido com o histórico de status (`OrderDetail`). */
 export async function getById(
   restaurantId: string,
   orderId: string,
-): Promise<Order> {
+): Promise<OrderDetail> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(orderId)) throw orderNotFound(orderId);
 
   const order = await ordersRepository.findById(restaurantId, orderId);
   if (order === null) throw orderNotFound(orderId);
-  return order;
+  return { ...order, statusHistory: await ordersRepository.findStatusHistory(orderId) };
 }
 
 /**
@@ -988,4 +997,39 @@ export async function cancel(
   orderId: string,
 ): Promise<Order> {
   return transitionAndPublish(restaurantId, orderId, "cancelled");
+}
+
+/**
+ * Marca ou desmarca o pagamento. NÃO é transição de status: não passa pelo
+ * mapa de `TRANSITIONS` nem publica no acompanhamento (que não mostra
+ * pagamento). O lock no pedido é o mesmo das transições, pelo mesmo motivo:
+ * sem ele, marcar enquanto outro aparelho cancela veria o status antigo.
+ */
+async function setPaid(
+  restaurantId: string,
+  orderId: string,
+  paid: boolean,
+): Promise<Order> {
+  await restaurantsService.ensureExists(restaurantId);
+  if (!isUuid(orderId)) throw orderNotFound(orderId);
+
+  return withTransaction(async (client) => {
+    const atual = await ordersRepository.selectForUpdate(restaurantId, orderId, client);
+    if (atual === null) throw orderNotFound(orderId);
+    if (paid && atual.status === "cancelled") {
+      throw new ConflictError("Pedido cancelado não recebe pagamento");
+    }
+    await ordersRepository.setPaid(orderId, paid, client);
+    return (await ordersRepository.findById(restaurantId, orderId, client)) as Order;
+  });
+}
+
+/** A loja diz que recebeu. Vale em qualquer forma de pagamento. */
+export async function markPaid(restaurantId: string, orderId: string): Promise<Order> {
+  return setPaid(restaurantId, orderId, true);
+}
+
+/** Vale em qualquer status: existe para corrigir um clique errado. */
+export async function markUnpaid(restaurantId: string, orderId: string): Promise<Order> {
+  return setPaid(restaurantId, orderId, false);
 }

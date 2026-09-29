@@ -5,7 +5,7 @@ import { ApiError, describeError } from "../../api/client.ts";
 import type { OrderDetail } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { formatCents } from "../../lib/money.ts";
-import { orderCode } from "../../lib/orderCode.ts";
+import { orderNumber } from "../../lib/orderNumber.ts";
 import { formatElapsed } from "../../lib/time.ts";
 import { useNow } from "../../lib/useNow.ts";
 import buttons from "../../ui/buttons.module.css";
@@ -15,7 +15,7 @@ import { useOrderAction } from "./orderActionFlow.tsx";
 import { cancelKind, cancelLabel, closedMessage, primaryAction, progressSteps } from "./orderRules.ts";
 import { formatPhone, freightLine, groupOptions, itemsSubtotal, paymentLabel, whereLabel } from "./presentation.ts";
 import { TypePill } from "./TypePill.tsx";
-import { useOrder } from "./useOrders.ts";
+import { useOrder, useTogglePaid } from "./useOrders.ts";
 
 function OrderDetailView({
   order,
@@ -34,12 +34,15 @@ function OrderDetailView({
   const freight = freightLine(order);
   const closed = closedMessage(order, timeZone);
   const busy = busyOrderId === order.id;
+  const { restaurantId } = useSessionUser();
+  // pagamento é outro eixo que o status: fica fora do rodapé de transições
+  const togglePaid = useTogglePaid(restaurantId);
 
   return (
     <div className={classes.drawer}>
       <header className={classes.header}>
         <div className={classes.headTop}>
-          <span className={`${classes.code} n`}>{orderCode(order.id)}</span>
+          <span className={`${classes.code} n`}>{orderNumber(order)}</span>
           <TypePill order={order} />
           <span className="n">{formatElapsed(order.createdAt, now)}</span>
           <button type="button" className={classes.close} aria-label="Fechar" onClick={onClose}>
@@ -89,7 +92,24 @@ function OrderDetailView({
             <dd className="n">{formatCents(order.totalInCents)}</dd>
           </div>
         </dl>
-        <p className={classes.payment}>{paymentLabel(order)}</p>
+        <div className={classes.paymentRow}>
+          <p className={classes.payment}>{paymentLabel(order)}</p>
+          {order.status !== "cancelled" && (
+            <Button
+              variant="default"
+              size="xs"
+              loading={togglePaid.isPending}
+              onClick={() => togglePaid.mutate({ orderId: order.id, paid: order.paidAt === null })}
+            >
+              {order.paidAt === null ? "Marcar como pago" : "Desfazer pago"}
+            </Button>
+          )}
+        </div>
+        {togglePaid.isError && (
+          <p role="alert" className={classes.paidError}>
+            {describeError(togglePaid.error)}
+          </p>
+        )}
 
         <section className={classes.progress}>
           <span className="eyebrow">Andamento</span>
@@ -99,7 +119,7 @@ function OrderDetailView({
                 <span className={classes.stepDot} aria-hidden="true" />
                 <span>{step.label}</span>
                 <span className={`${classes.stepTime} n`}>
-                  {step.time ?? (step.state === "future" ? "—" : "")}
+                  {step.time ?? "—"}
                 </span>
               </li>
             ))}

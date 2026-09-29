@@ -1,5 +1,7 @@
 import { NavLink } from "react-router";
 import type { Me, Restaurant } from "../api/types.ts";
+import { useNow } from "../lib/useNow.ts";
+import { storeStatusLabel } from "../features/restaurant/storeStatus.ts";
 import classes from "./Rail.module.css";
 import { UserMenu } from "./UserMenu.tsx";
 
@@ -47,17 +49,25 @@ export function Rail({
   soundBlocked: boolean;
   onEnableSound: () => void;
 }) {
-  const paused = restaurant?.acceptingOrders === false;
+  const now = useNow();
+  // o painel FORMATA o que a API calculou; nenhuma regra de faixa mora aqui
+  const status = restaurant ? storeStatusLabel(restaurant, now) : null;
   return (
     <nav className={classes.rail} aria-label="Navegação do painel">
       <div className={classes.top}>
         <strong className={classes.store}>{restaurant?.name ?? ""}</strong>
-        {/* "Aberta · fecha 23:30" do handoff fica para quando a API expuser
-            isOpen e o próximo fechamento (pendência da spec). */}
-        <span className={classes.status}>
-          <span className={classes.dot} aria-hidden="true" />
-          {paused ? "Pausada agora" : "Aceitando pedidos"}
-        </span>
+        {status &&
+          (status.noSchedule ? (
+            <NavLink to="/horario" className={classes.status}>
+              <span className={classes.dot} aria-hidden="true" />
+              {status.text}
+            </NavLink>
+          ) : (
+            <span className={classes.status}>
+              <span className={classes.dot} aria-hidden="true" />
+              {status.text}
+            </span>
+          ))}
         {soundBlocked && (
           <button type="button" className={classes.sound} onClick={onEnableSound}>
             Som desligado · Ativar som

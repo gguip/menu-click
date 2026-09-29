@@ -141,6 +141,8 @@ const orderItemResponseSchema = {
 const orderSummaryProperties = {
   id: { type: "string" },
   restaurantId: { type: "string" },
+  // `#1042` no painel; contínuo por loja (ver a migration `add-order-number`)
+  number: { type: "integer" },
   customer: customerResponseSchema,
   type: { type: "string" },
   status: { type: "string" },
@@ -159,6 +161,8 @@ const orderSummaryProperties = {
   // ausente = "tenho o valor certo"; por isso não é `nullable` (F12) — a
   // ausência é a informação, um `null` explícito não diria nada a mais
   changeForInCents: { type: "integer" },
+  // `null` = não marcado como pago (F12: sempre presente, a nulidade é a informação)
+  paidAt: { type: "string", nullable: true },
   // a mesa, com o rótulo congelado na criação. `nullable` (F12) porque `null`
   // É a informação: fora de `dine_in`, e no pedido de salão vindo de um QR
   // code antigo, que não carrega hash. O `hash` NÃO sai aqui — a listagem e o
@@ -187,6 +191,21 @@ const orderResponseSchema = {
   properties: {
     ...orderSummaryProperties,
     items: { type: "array", items: orderItemResponseSchema },
+  },
+};
+
+/** Só o detalhe leva o histórico — ver `OrderDetail`. */
+const orderDetailResponseSchema = {
+  type: "object",
+  properties: {
+    ...orderResponseSchema.properties,
+    statusHistory: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { status: { type: "string" }, at: { type: "string" } },
+      },
+    },
   },
 };
 
@@ -548,6 +567,49 @@ export async function orderRoutes(app: FastifyInstance) {
     },
   );
 
+  // Pagamento: NÃO é transição de status — a loja registra que recebeu.
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/mark-paid",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "markOrderPaid",
+        summary: "Marca o pedido como pago",
+        description:
+          "Não há pagamento online: quem registra que o pedido foi pago é a loja. Vale em qualquer forma de pagamento. Marcar de novo mantém a hora da primeira marcação. Pedido cancelado é 409. Não muda o status.",
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.markPaid(restaurantId, orderId);
+    },
+  );
+
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/mark-unpaid",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "markOrderUnpaid",
+        summary: "Desfaz o pago",
+        description:
+          "Existe para corrigir um clique errado; vale em qualquer status, inclusive cancelado.",
+        params: orderParamsSchema,
+        response: { 200: orderResponseSchema, 404: errorResponseSchema },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.markUnpaid(restaurantId, orderId);
+    },
+  );
+
   // Buscar pedido específico, com os itens
   app.get<{ Params: { restaurantId: string; orderId: string } }>(
     "/restaurants/:restaurantId/orders/:orderId",
@@ -557,9 +619,9 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "getOrder",
         summary: "Detalhe do pedido, com os itens",
         description:
-          "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual.",
+          "Os itens trazem o nome e o preço congelados no momento do pedido, que podem divergir do cardápio atual. Traz `statusHistory`, o horário em que o pedido entrou em cada status; pedidos anteriores ao registro têm só a chegada e o status atual.",
         params: orderParamsSchema,
-        response: { 200: orderResponseSchema, 404: errorResponseSchema },
+        response: { 200: orderDetailResponseSchema, 404: errorResponseSchema },
       },
     },
     async (request) => {

@@ -21,7 +21,7 @@ export function stageLabel(status: OrderStatus): string | null {
 }
 
 /** Sem "pago": a API não registra se o pagamento aconteceu (spec). */
-export function paymentLabel(order: Pick<Order, "paymentMethod" | "changeForInCents">): string {
+function methodLabel(order: Pick<Order, "paymentMethod" | "changeForInCents">): string {
   switch (order.paymentMethod) {
     case "cash":
       return order.changeForInCents === undefined
@@ -34,6 +34,14 @@ export function paymentLabel(order: Pick<Order, "paymentMethod" | "changeForInCe
     case "meal_voucher":
       return "Vale-refeição";
   }
+}
+
+/** "Pix · pago": o "pago" é a loja que marca (a API não presume pagamento). */
+export function paymentLabel(
+  order: Pick<Order, "paymentMethod" | "changeForInCents"> & { paidAt?: string | null },
+): string {
+  const base = methodLabel(order);
+  return order.paidAt ? `${base} · pago` : base;
 }
 
 export function whereLabel(order: Pick<Order, "type" | "deliveryAddress" | "table">): string {

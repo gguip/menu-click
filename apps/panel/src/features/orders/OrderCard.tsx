@@ -1,7 +1,7 @@
 import { Button } from "@mantine/core";
 import type { Order } from "../../api/types.ts";
 import { formatCents } from "../../lib/money.ts";
-import { orderCode } from "../../lib/orderCode.ts";
+import { orderNumber } from "../../lib/orderNumber.ts";
 import { formatElapsed } from "../../lib/time.ts";
 import { useOrderAction } from "./orderActionFlow.tsx";
 import classes from "./OrderCard.module.css";
@@ -56,7 +56,7 @@ export function OrderCard({
   now: number;
   onOpen: (orderId: string) => void;
 }) {
-  const code = orderCode(order.id);
+  const code = orderNumber(order);
   return (
     <article
       className={`${classes.card} ${classes[`state_${order.status}`]}`}

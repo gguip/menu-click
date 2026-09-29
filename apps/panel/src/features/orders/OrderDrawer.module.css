@@ -126,6 +126,19 @@
   color: var(--mc-ink2);
 }
 
+.paymentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.paidError {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--mc-danger);
+}
+
 .progress {
   display: grid;
   gap: 8px;

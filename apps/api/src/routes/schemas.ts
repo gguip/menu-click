@@ -219,3 +219,20 @@ export const restaurantResponseSchema = {
   },
 };
 
+/** O GET por id: o restaurante mais o status de funcionamento, que só ele calcula. */
+export const restaurantDetailResponseSchema = {
+  type: "object",
+  properties: {
+    ...restaurantResponseSchema.properties,
+    // só a GRADE; a pausa manual continua em `acceptingOrders`
+    openingStatus: {
+      type: "object",
+      properties: {
+        isOpen: { type: "boolean" },
+        closesAt: { type: "string" },
+        opensAt: { type: "string" },
+      },
+    },
+  },
+};
+

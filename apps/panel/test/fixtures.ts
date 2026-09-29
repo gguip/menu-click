@@ -56,6 +56,7 @@ export function makeRestaurant(overrides: Partial<Restaurant> = {}): Restaurant 
     deliveryFixedFeeInCents: 900,
     deliveryFeeToArrange: false,
     minimumOrderInCents: 0,
+    openingStatus: { isOpen: true, closesAt: "2026-09-20T02:30:00.000Z" },
     ...overrides,
   };
 }
@@ -69,6 +70,7 @@ export function makeOrder(overrides: Partial<Order> = {}): Order {
   return {
     id: `${head}f00d-0000-4000-8000-000000000000`,
     restaurantId: RESTAURANT_ID,
+    number: orderSeq,
     customer: { id: "c1", name: "Marcela Andrade", phone: "11987654321" },
     type: "delivery",
     status: "pending",
@@ -83,6 +85,7 @@ export function makeOrder(overrides: Partial<Order> = {}): Order {
       zipCode: "05435-000",
     },
     paymentMethod: "pix",
+    paidAt: null,
     table: null,
     createdAt: "2026-09-19T22:58:00.000Z",
     updatedAt: "2026-09-19T22:58:00.000Z",
@@ -117,6 +120,7 @@ export function makeOrderDetail(overrides: Partial<OrderDetail> = {}): OrderDeta
         options: [],
       },
     ],
+    statusHistory: [{ status: "pending", at: "2026-09-19T22:58:00.000Z" }],
     ...overrides,
   };
 }

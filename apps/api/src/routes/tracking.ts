@@ -69,6 +69,8 @@ const trackedOrderResponseSchema = {
   type: "object",
   properties: {
     id: { type: "string" },
+    // o número que a loja fala no balcão — útil para quem vai retirar
+    number: { type: "integer" },
     type: { type: "string" },
     status: { type: "string" },
     // em `delivery`, já inclui o frete — ver `deliveryFeeInCents` abaixo

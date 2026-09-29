@@ -43,6 +43,11 @@ export type Restaurant = {
   freeDeliveryAboveInCents?: number;
   deliveryFeeToArrange: boolean;
   minimumOrderInCents: number;
+  /**
+   * Só o GET traz (PATCH não calcula): se a loja está dentro da grade agora.
+   * Ausente enquanto não houve GET — e o cache preserva o último valor.
+   */
+  openingStatus?: { isOpen: boolean; closesAt?: string; opensAt?: string };
 };
 
 export type OrderType = "dine_in" | "takeaway" | "delivery";
@@ -74,6 +79,8 @@ export type Customer = { id: string; name: string; phone: string };
 export type Order = {
   id: string;
   restaurantId: string;
+  /** Contínuo por loja: é o `#1042` do balcão. */
+  number: number;
   customer: Customer;
   type: OrderType;
   status: OrderStatus;
@@ -84,6 +91,8 @@ export type Order = {
   paymentMethod: PaymentMethod;
   /** Ausente no dinheiro = o cliente tem o valor exato. */
   changeForInCents?: number;
+  /** `null` = a loja não marcou como pago. */
+  paidAt: string | null;
   table: { id: string; label: string } | null;
   createdAt: string;
   updatedAt: string;
@@ -107,7 +116,10 @@ export type OrderItem = {
   options: OrderItemOption[];
 };
 
-export type OrderDetail = Order & { items: OrderItem[] };
+export type OrderStatusEvent = { status: OrderStatus; at: string };
+
+/** O detalhe traz o histórico; pedido anterior ao registro tem só chegada e status atual. */
+export type OrderDetail = Order & { items: OrderItem[]; statusHistory: OrderStatusEvent[] };
 
 export type OrdersSummary = {
   period: { from: string; to: string };

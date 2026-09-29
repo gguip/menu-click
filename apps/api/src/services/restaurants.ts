@@ -6,6 +6,7 @@ import type {
   Restaurant,
   UpdateRestaurantInput,
 } from "../domain/restaurant.ts";
+import type { OpeningStatus } from "../domain/opening-hours.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
 import { ABANDONED_REGISTRATION_DAYS } from "../domain/email-verification.ts";
 import { SLUG_MAX_LENGTH, slugify } from "../domain/slug.ts";
@@ -271,6 +272,22 @@ export async function getById(id: string): Promise<Restaurant> {
   const restaurant = await restaurantsRepository.findById(id);
   if (restaurant === null) throw restaurantNotFound(id);
   return restaurant;
+}
+
+/**
+ * O restaurante como o GET do painel devolve: com o status de funcionamento.
+ * Só o GET calcula — PATCH e POST devolvem o restaurante sem ele (o painel
+ * preserva o último valor no cache; ver `useRestaurant.ts`).
+ */
+export async function getDetail(
+  id: string,
+): Promise<Restaurant & { openingStatus: OpeningStatus }> {
+  const restaurant = await getById(id);
+  const openingStatus = await openingHoursRepository.findOpeningStatus(
+    restaurant.id,
+    restaurant.timezone,
+  );
+  return { ...restaurant, openingStatus };
 }
 
 export async function update(

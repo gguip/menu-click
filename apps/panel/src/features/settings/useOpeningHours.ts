@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getOpeningHours, putOpeningHours } from "../../api/openingHours.ts";
+import { restaurantQueryKey } from "../restaurant/useRestaurant.ts";
 
 export function openingHoursQueryKey(restaurantId: string) {
   return ["opening-hours", restaurantId] as const;
@@ -17,6 +18,11 @@ export function useSaveOpeningHours(restaurantId: string) {
   return useMutation({
     mutationFn: (hours: { weekday: number; opensAt: string; closesAt: string }[]) =>
       putOpeningHours(restaurantId, hours),
-    onSuccess: (hours) => queryClient.setQueryData(openingHoursQueryKey(restaurantId), hours),
+    onSuccess: (hours) => {
+      queryClient.setQueryData(openingHoursQueryKey(restaurantId), hours);
+      // o `openingStatus` do rail sai do GET do restaurante, calculado sobre a
+      // grade: sem refazê-lo, o rail fica na grade antiga até o polling
+      void queryClient.invalidateQueries({ queryKey: restaurantQueryKey(restaurantId) });
+    },
   });
 }

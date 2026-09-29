@@ -38,3 +38,13 @@ export type OpeningHour = OpeningHourInput & {
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * Se a loja está dentro da GRADE agora, e a próxima fronteira. Só a grade: a
+ * pausa manual (`acceptingOrders`) é outra condição, e a tela combina as duas.
+ *
+ * `closesAt` ausente com `isOpen: true` = aberta "direto" até o fim da janela
+ * calculada (a grade 24x7). `opensAt` ausente com `isOpen: false` = loja sem
+ * nenhuma faixa cadastrada.
+ */
+export type OpeningStatus = { isOpen: boolean; closesAt?: string; opensAt?: string };
