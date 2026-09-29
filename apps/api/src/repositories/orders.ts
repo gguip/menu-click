@@ -48,6 +48,8 @@ type OrderRow = {
   /** `null` fora de `dine_in` e no pedido de salão sem mesa informada. */
   table_id: string | null;
   table_label: string | null;
+  /** O número do pedido na loja. `number`, acima, é o do endereço. */
+  order_number: number;
   created_at: Date;
   updated_at: Date;
 };
@@ -127,6 +129,7 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
   return {
     id: row.id,
     restaurantId: row.restaurant_id,
+    number: row.order_number,
     customer: toCustomer(customerRow),
     type: row.type,
     status: row.status,
@@ -190,6 +193,8 @@ export type InsertOrderData = {
   changeForInCents?: number;
   /** A mesa já resolvida pelo serviço, com o rótulo a congelar. */
   table?: { id: string; label: string };
+  /** Já reservado por `nextOrderNumber`, na mesma transação. */
+  orderNumber: number;
 };
 
 /** Uma linha de `order_items` pronta para gravar, com os valores congelados. */
@@ -213,6 +218,30 @@ export type InsertOrderItemOptionData = {
 };
 
 /**
+ * Reserva o próximo número de pedido da loja. SÓ dentro da transação que cria
+ * o pedido: o `update` trava a linha do restaurante até o commit (serializando
+ * criações simultâneas da mesma loja), e o rollback de uma criação que falhou
+ * desfaz o incremento — a numeração não ganha buraco.
+ *
+ * Não toca `updated_at`: é contador interno, não edição de conteúdo (D10).
+ */
+export async function nextOrderNumber(
+  restaurantId: string,
+  client: PoolClient,
+): Promise<number> {
+  const { rows } = await client.query<{ last_order_number: number }>(
+    `update restaurants set last_order_number = last_order_number + 1
+      where id = $1 and deleted_at is null
+      returning last_order_number`,
+    [restaurantId],
+  );
+  if (rows.length === 0) {
+    throw new Error(`restaurante ${restaurantId} sumiu no meio da criação do pedido`);
+  }
+  return rows[0].last_order_number;
+}
+
+/**
  * Grava o pedido (sem os itens) e devolve o id.
  *
  * Só o id porque o pedido completo é montado por `findById` depois — inclusive
@@ -228,8 +257,8 @@ export async function insertOrder(
     `insert into orders
        (restaurant_id, customer_id, type, total_in_cents, delivery_fee_in_cents,
         tracking_token_hash, street, number, neighborhood, city, state, zip_code,
-        payment_method, change_for_in_cents, table_id, table_label)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        payment_method, change_for_in_cents, table_id, table_label, order_number)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
      returning id`,
     [
       restaurantId,
@@ -254,6 +283,7 @@ export async function insertOrder(
       // juntas, e só em `dine_in`
       data.table?.id ?? null,
       data.table?.label ?? null,
+      data.orderNumber,
     ],
   );
   return rows[0].id;

@@ -141,6 +141,8 @@ const orderItemResponseSchema = {
 const orderSummaryProperties = {
   id: { type: "string" },
   restaurantId: { type: "string" },
+  // `#1042` no painel; contínuo por loja (ver a migration `add-order-number`)
+  number: { type: "integer" },
   customer: customerResponseSchema,
   type: { type: "string" },
   status: { type: "string" },

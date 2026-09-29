@@ -4615,6 +4615,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -4968,6 +4971,9 @@
                           },
                           "restaurantId": {
                             "type": "string"
+                          },
+                          "number": {
+                            "type": "integer"
                           },
                           "customer": {
                             "type": "object",
@@ -5327,6 +5333,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -5557,6 +5566,9 @@
                     },
                     "restaurantId": {
                       "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
                     },
                     "customer": {
                       "type": "object",
@@ -5789,6 +5801,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -6019,6 +6034,9 @@
                     },
                     "restaurantId": {
                       "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
                     },
                     "customer": {
                       "type": "object",
@@ -6251,6 +6269,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -6482,6 +6503,9 @@
                     "restaurantId": {
                       "type": "string"
                     },
+                    "number": {
+                      "type": "integer"
+                    },
                     "customer": {
                       "type": "object",
                       "properties": {
@@ -6712,6 +6736,9 @@
                     },
                     "restaurantId": {
                       "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
                     },
                     "customer": {
                       "type": "object",
@@ -7443,6 +7470,9 @@
                   "properties": {
                     "id": {
                       "type": "string"
+                    },
+                    "number": {
+                      "type": "integer"
                     },
                     "type": {
                       "type": "string"

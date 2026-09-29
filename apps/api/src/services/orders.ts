@@ -513,9 +513,15 @@ export async function create(
       client,
     );
 
+    // depois de toda validação que pode recusar o pedido: um número reservado
+    // e desfeito pelo rollback não aparece, mas reservá-lo por último encurta
+    // o tempo em que a linha do restaurante fica travada
+    const orderNumber = await ordersRepository.nextOrderNumber(restaurantId, client);
+
     const orderId = await ordersRepository.insertOrder(
       restaurantId,
       {
+        orderNumber,
         customerId: customer.id,
         type: input.type,
         totalInCents,

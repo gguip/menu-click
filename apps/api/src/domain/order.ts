@@ -262,6 +262,11 @@ export type OrderItem = {
 export type OrderSummary = {
   id: string;
   restaurantId: string;
+  /**
+   * O número do pedido na loja (`#1042`), contínuo e sem buraco. Na coluna é
+   * `order_number`: `orders.number` é o número do endereço de entrega.
+   */
+  number: number;
   customer: Customer;
   type: OrderType;
   status: OrderStatus;
