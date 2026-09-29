@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #DDE2EC; font-family: Sora, system-ui, sans-serif; }
+  a { color: #1E5AE8; }
+  a:hover { color: #1442AE; }
+</style>
+</helmet>
+<div style="width: 390px; margin: 0 auto; background: #FFFFFF; color: #0B0D12; min-height: 844px; display: flex; flex-direction: column;">
+  <div style="display: flex; align-items: center; gap: 8px; padding: 11px 16px; background: #1E5AE8; color: #FFFFFF;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+    <div style="font-size: 14px; font-weight: 600;">Mesa 7</div>
+    <div style="margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.78);">Pedido no salão</div>
+  </div>
+
+  <div style="height: 118px; background: #E7EAF1; position: relative;">
+    <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #8B93A5;">capa da loja</div>
+  </div>
+
+  <div style="padding: 14px 16px 0; display: flex; gap: 12px; align-items: center;">
+    <div style="width: 52px; height: 52px; border-radius: 10px; background: #EEF1F7; border: 1px solid #E1E5EE; flex: none; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">LOGO</div>
+    <div style="min-width: 0;">
+      <div style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15;">Cantina do Porto</div>
+      <div style="font-size: 13px; color: #5C6474; margin-top: 2px;">Italiana · Pizzas</div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 6px; padding: 12px 16px 0; flex-wrap: wrap;">
+    <div style="font-size: 12px; font-weight: 600; color: #0B7A48; border: 1px solid #B6E3CC; padding: 5px 10px; border-radius: 99px;">Aberto agora</div>
+    <div style="font-size: 12px; font-weight: 600; color: #1442AE; border: 1px solid #C3D3F8; padding: 5px 10px; border-radius: 99px;">Pedido mínimo R$ 30</div>
+  </div>
+
+  <div style="padding: 14px 16px 0;">
+    <div style="display: flex; align-items: center; gap: 10px; background: #F4F6FA; border-radius: 10px; padding: 13px 14px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8B93A5" stroke-width="2.2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+      <div style="font-size: 15px; color: #8B93A5;">Buscar no cardápio</div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 22px; padding: 16px 16px 0; overflow: hidden; border-bottom: 1px solid #ECEFF5;">
+    <div style="font-size: 14px; font-weight: 600; color: #1E5AE8; padding-bottom: 10px; box-shadow: inset 0 -2px 0 #1E5AE8; white-space: nowrap;">Pizzas</div>
+    <div style="font-size: 14px; font-weight: 500; color: #5C6474; padding-bottom: 10px; white-space: nowrap;">Entradas</div>
+    <div style="font-size: 14px; font-weight: 500; color: #5C6474; padding-bottom: 10px; white-space: nowrap;">Massas</div>
+    <div style="font-size: 14px; font-weight: 500; color: #5C6474; padding-bottom: 10px; white-space: nowrap;">Bebidas</div>
+  </div>
+
+  <div style="padding: 18px 16px 6px; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #8B93A5;">Pizzas</div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px 120px;">
+    <div style="display: flex; flex-direction: column; border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden;">
+      <div style="height: 112px; background: #E7EAF1; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">FOTO</div>
+      <div style="padding: 10px 11px 12px; display: flex; flex-direction: column; gap: 3px; flex: 1;">
+        <div style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">Margherita</div>
+        <div style="font-size: 12px; color: #5C6474; line-height: 1.35;">Tomate, muçarela de búfala</div>
+        <div style="font-size: 15px; font-weight: 600; margin-top: auto; padding-top: 8px;">R$ 52,00</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden;">
+      <div style="height: 112px; background: #E7EAF1; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">FOTO</div>
+      <div style="padding: 10px 11px 12px; display: flex; flex-direction: column; gap: 3px; flex: 1;">
+        <div style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">Meio a meio</div>
+        <div style="font-size: 12px; color: #5C6474; line-height: 1.35;">Escolha 2 sabores</div>
+        <div style="margin-top: auto; padding-top: 8px;">
+          <div style="font-size: 11px; color: #8B93A5;">a partir de</div>
+          <div style="font-size: 15px; font-weight: 600;">R$ 58,00</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden; background: #FAFBFD;">
+      <div style="height: 112px; background: #E7EAF1; opacity: 0.45; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">FOTO</div>
+      <div style="padding: 10px 11px 12px; display: flex; flex-direction: column; gap: 5px; flex: 1;">
+        <div style="font-size: 14px; font-weight: 600; color: #8B93A5; letter-spacing: -0.01em;">Quatro queijos</div>
+        <div style="font-size: 11px; font-weight: 600; color: #5C6474; background: #ECEFF5; padding: 4px 8px; border-radius: 5px; align-self: flex-start; margin-top: auto;">Indisponível hoje</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden;">
+      <div style="height: 112px; background: #E7EAF1; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">FOTO</div>
+      <div style="padding: 10px 11px 12px; display: flex; flex-direction: column; gap: 3px; flex: 1;">
+        <div style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">Calabresa</div>
+        <div style="font-size: 12px; color: #5C6474; line-height: 1.35;">Cebola roxa, orégano</div>
+        <div style="font-size: 15px; font-weight: 600; margin-top: auto; padding-top: 8px;">R$ 49,00</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: sticky; bottom: 0; margin-top: auto; padding: 12px 16px 20px; background: linear-gradient(180deg, rgba(255,255,255,0), #FFFFFF 34%);">
+    <div style="display: flex; align-items: center; gap: 12px; background: #1E5AE8; color: #FFFFFF; border-radius: 10px; padding: 15px 18px;">
+      <div style="background: rgba(255,255,255,0.22); font-size: 13px; font-weight: 600; padding: 3px 9px; border-radius: 5px;">2</div>
+      <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.01em;">Ver carrinho</div>
+      <div style="margin-left: auto; font-size: 16px; font-weight: 600;">R$ 110,00</div>
+    </div>
+  </div>
+</div>
+
+<div style="width: 390px; margin: 0 auto 40px; background: #0B0D12; color: #FFFFFF; padding: 20px 16px 24px;">
+  <div style="font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #8B93A5;">Direção B · Balcão</div>
+  <div style="font-size: 21px; font-weight: 600; letter-spacing: -0.03em; margin-top: 6px;">Sora · branco puro · azul elétrico</div>
+  <div style="display: flex; gap: 8px; margin-top: 16px;">
+    <div style="flex: 1; height: 44px; border-radius: 8px; background: #1E5AE8;"></div>
+    <div style="flex: 1; height: 44px; border-radius: 8px; background: #0B0D12; border: 1px solid #2A2F3A;"></div>
+    <div style="flex: 1; height: 44px; border-radius: 8px; background: #FFFFFF;"></div>
+    <div style="flex: 1; height: 44px; border-radius: 8px; background: #0B7A48;"></div>
+  </div>
+  <div style="font-size: 13px; color: #8B93A5; line-height: 1.5; margin-top: 14px;">Branco, réguas finas, grade de dois cards com foto no topo — mais itens por tela. Abas sublinhadas, cantos 10px, acento carrega marca e ação.</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:390,&quot;height&quot;:1100}}"></script>
+</body>
+</html>

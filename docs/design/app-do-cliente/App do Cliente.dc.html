@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #DDE2EC; font-family: Sora, system-ui, sans-serif; }
+  a { color: #1E5AE8; }
+  a:hover { color: #1442AE; }
+  input, select, button { font-family: inherit; }
+  .om-scroll::-webkit-scrollbar { width: 0; }
+</style>
+</helmet>
+
+<div style="display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px 16px 40px;">
+
+  <div style="display: flex; flex-direction: column; gap: 8px; width: 390px; max-width: 100%;">
+    <div style="font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #6B7386;">A URL define o modo</div>
+    <div style="display: flex; gap: 8px;">
+      <div onClick="{{ goLink }}" style="flex: 1; cursor: pointer; background: #FFFFFF; border: 1px solid #D5DBE7; border-radius: 10px; padding: 9px 11px; font-size: 12px; color: #0B0D12;" style-hover="border-color: #1E5AE8;">/cantina-do-porto</div>
+      <div onClick="{{ goMesa }}" style="flex: 1; cursor: pointer; background: #FFFFFF; border: 1px solid #D5DBE7; border-radius: 10px; padding: 9px 11px; font-size: 12px; color: #0B0D12;" style-hover="border-color: #1E5AE8;">?mesa=a7f3</div>
+    </div>
+  </div>
+
+  <div class="om-scroll" style="width: 390px; max-width: 100%; height: 844px; overflow-y: auto; overflow-x: hidden; background: #FFFFFF; color: #0B0D12; border-radius: 22px; box-shadow: 0 18px 50px rgba(11,13,18,0.22); position: relative;">
+
+    <sc-if value="{{ isMesa }}" hint-placeholder-val="{{ true }}">
+      <div style="position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px; padding: 11px 16px; background: #1E5AE8; color: #FFFFFF;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        <div style="font-size: 14px; font-weight: 600;">{{ mesaLabel }}</div>
+        <div style="margin-left: auto; font-size: 12px; color: rgba(255,255,255,0.78);">Pedido no salão</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isMenu }}" hint-placeholder-val="{{ true }}">
+      <div>
+        <div style="height: 118px; background: #E7EAF1; position: relative;">
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #8B93A5;">capa da loja</div>
+        </div>
+
+        <div style="padding: 14px 16px 0; display: flex; gap: 12px; align-items: center;">
+          <div style="width: 52px; height: 52px; border-radius: 10px; background: #EEF1F7; border: 1px solid #E1E5EE; flex: none; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">LOGO</div>
+          <div style="min-width: 0;">
+            <div style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15;">Cantina do Porto</div>
+            <div style="font-size: 13px; color: #5C6474; margin-top: 2px;">Italiana · Pizzas</div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 6px; padding: 12px 16px 0; flex-wrap: wrap;">
+          <div style="font-size: 12px; font-weight: 600; color: #0B7A48; border: 1px solid #B6E3CC; padding: 5px 10px; border-radius: 99px;">Aberto até 23h</div>
+          <div style="font-size: 12px; font-weight: 600; color: #1442AE; border: 1px solid #C3D3F8; padding: 5px 10px; border-radius: 99px;">Pedido mínimo R$ 30</div>
+          <div style="font-size: 12px; font-weight: 600; color: #1442AE; border: 1px solid #C3D3F8; padding: 5px 10px; border-radius: 99px;">Entrega grátis acima de R$ 50</div>
+        </div>
+
+        <div style="padding: 14px 16px 0;">
+          <div style="display: flex; align-items: center; gap: 10px; background: #F4F6FA; border-radius: 10px; padding: 13px 14px;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8B93A5" stroke-width="2.2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+            <div style="font-size: 15px; color: #8B93A5;">Buscar no cardápio</div>
+          </div>
+        </div>
+
+        <div style="position: sticky; top: 0; z-index: 20; background: #FFFFFF; margin-top: 16px;">
+          <div class="om-scroll" style="display: flex; gap: 22px; padding: 0 16px; overflow-x: auto; border-bottom: 1px solid #ECEFF5;">
+            <sc-for list="{{ sections }}" as="s" hint-placeholder-count="3">
+              <sc-if value="{{ s.active }}" hint-placeholder-val="{{ true }}">
+                <div onClick="{{ s.go }}" style="cursor: pointer; font-size: 14px; font-weight: 600; color: #1E5AE8; padding: 12px 0 10px; box-shadow: inset 0 -2px 0 #1E5AE8; white-space: nowrap;">{{ s.name }}</div>
+              </sc-if>
+              <sc-if value="{{ s.idle }}" hint-placeholder-val="{{ false }}">
+                <div onClick="{{ s.go }}" style="cursor: pointer; font-size: 14px; font-weight: 500; color: #5C6474; padding: 12px 0 10px; white-space: nowrap;" style-hover="color: #0B0D12;">{{ s.name }}</div>
+              </sc-if>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-for list="{{ sections }}" as="s" hint-placeholder-count="2">
+          <div style="padding: 18px 16px 6px; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #8B93A5;">{{ s.name }}</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px;">
+            <sc-for list="{{ s.products }}" as="p" hint-placeholder-count="4">
+              <sc-if value="{{ p.available }}" hint-placeholder-val="{{ true }}">
+                <div onClick="{{ p.open }}" style="cursor: pointer; display: flex; flex-direction: column; border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden;" style-hover="border-color: #C3D3F8;">
+                  <div style="height: 112px; background: #E7EAF1; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">FOTO</div>
+                  <div style="padding: 10px 11px 12px; display: flex; flex-direction: column; gap: 3px; flex: 1;">
+                    <div style="font-size: 14px; font-weight: 600; letter-spacing: -0.01em;">{{ p.name }}</div>
+                    <div style="font-size: 12px; color: #5C6474; line-height: 1.35;">{{ p.desc }}</div>
+                    <div style="margin-top: auto; padding-top: 8px;">
+                      <div style="font-size: 11px; color: #8B93A5; min-height: 14px;">{{ p.prefix }}</div>
+                      <div style="font-size: 15px; font-weight: 600;">{{ p.priceLabel }}</div>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ p.soldOut }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden; background: #FAFBFD;">
+                  <div style="height: 112px; background: #E7EAF1; opacity: 0.4; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">FOTO</div>
+                  <div style="padding: 10px 11px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                    <div style="font-size: 14px; font-weight: 600; color: #8B93A5; letter-spacing: -0.01em;">{{ p.name }}</div>
+                    <div style="font-size: 11px; font-weight: 600; color: #5C6474; background: #ECEFF5; padding: 4px 8px; border-radius: 5px; align-self: flex-start; margin-top: auto;">Indisponível hoje</div>
+                  </div>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div>
+        </sc-for>
+
+        <div style="height: 120px;"></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isProduct }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="height: 188px; background: #E7EAF1; position: relative;">
+          <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #8B93A5;">foto do produto</div>
+          <div onClick="{{ back }}" style="position: absolute; top: 14px; left: 14px; width: 40px; height: 40px; border-radius: 99px; background: #FFFFFF; box-shadow: 0 2px 8px rgba(11,13,18,0.18); display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B0D12" stroke-width="2.4"><path d="M15 5l-7 7 7 7"></path></svg>
+          </div>
+        </div>
+
+        <div style="padding: 18px 16px 0;">
+          <div style="font-size: 21px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2;">{{ prod.name }}</div>
+          <div style="font-size: 14px; color: #5C6474; line-height: 1.45; margin-top: 6px;">{{ prod.desc }}</div>
+          <div style="font-size: 17px; font-weight: 600; margin-top: 10px;">{{ prod.baseLabel }}</div>
+        </div>
+
+        <sc-for list="{{ groups }}" as="g" hint-placeholder-count="2">
+          <div style="margin-top: 22px; border-top: 1px solid #ECEFF5;">
+            <div style="padding: 16px 16px 10px; display: flex; align-items: flex-start; gap: 10px;">
+              <div style="min-width: 0;">
+                <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.01em;">{{ g.name }}</div>
+                <div style="font-size: 12px; color: #5C6474; margin-top: 3px;">{{ g.hint }}</div>
+              </div>
+              <div style="margin-left: auto; flex: none; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; background: #F4F6FA; color: #5C6474;">{{ g.badge }}</div>
+            </div>
+            <div style="display: flex; flex-direction: column;">
+              <sc-for list="{{ g.options }}" as="o" hint-placeholder-count="3">
+                <sc-if value="{{ o.on }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ o.toggle }}" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 13px 16px; background: #F2F6FF; border-top: 1px solid #DCE7FF;">
+                    <div style="width: 20px; height: 20px; border-radius: 6px; background: #1E5AE8; flex: none; display: flex; align-items: center; justify-content: center;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2"><path d="M4 12l5 5L20 6"></path></svg>
+                    </div>
+                    <div style="font-size: 15px; font-weight: 500; min-width: 0;">{{ o.name }}</div>
+                    <div style="margin-left: auto; font-size: 13px; font-weight: 600; color: #1442AE; flex: none;">{{ o.priceLabel }}</div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ o.off }}" hint-placeholder-val="{{ true }}">
+                  <div onClick="{{ o.toggle }}" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-top: 1px solid #ECEFF5;" style-hover="background: #FAFBFD;">
+                    <div style="width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid #C6CCDA; flex: none;"></div>
+                    <div style="font-size: 15px; color: #0B0D12; min-width: 0;">{{ o.name }}</div>
+                    <div style="margin-left: auto; font-size: 13px; color: #5C6474; flex: none;">{{ o.priceLabel }}</div>
+                  </div>
+                </sc-if>
+              </sc-for>
+            </div>
+          </div>
+        </sc-for>
+
+        <div style="margin-top: 22px; border-top: 1px solid #ECEFF5; padding: 16px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.01em;">Observação</div>
+            <div style="font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8B5B00; background: #FFF4DB; border: 1px solid #FFE3A3; padding: 3px 7px; border-radius: 5px;">em breve</div>
+          </div>
+          <div style="margin-top: 10px; background: #FAFBFD; border: 1px dashed #D5DBE7; border-radius: 10px; padding: 13px 14px; font-size: 14px; color: #A2A9B8;">ex.: sem cebola</div>
+        </div>
+
+        <div style="height: 150px;"></div>
+
+        <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #ECEFF5; padding: 12px 16px 18px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 4px; border: 1px solid #D5DBE7; border-radius: 10px; padding: 4px;">
+              <div onClick="{{ decQty }}" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: #5C6474;" style-hover="background: #F4F6FA;">−</div>
+              <div style="min-width: 26px; text-align: center; font-size: 16px; font-weight: 600;">{{ qty }}</div>
+              <div onClick="{{ incQty }}" style="width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; color: #5C6474;" style-hover="background: #F4F6FA;">+</div>
+            </div>
+            <div style="margin-left: auto; text-align: right;">
+              <div style="font-size: 11px; color: #8B93A5;">Total do item</div>
+              <div style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em;">{{ itemTotalLabel }}</div>
+            </div>
+          </div>
+          <sc-if value="{{ canAdd }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ addToCart }}" style="cursor: pointer; background: #1E5AE8; color: #FFFFFF; border-radius: 10px; padding: 16px; text-align: center; font-size: 16px; font-weight: 600;" style-hover="background: #1749BF;">Adicionar ao carrinho</div>
+          </sc-if>
+          <sc-if value="{{ locked }}" hint-placeholder-val="{{ true }}">
+            <div style="background: #EEF1F7; color: #5C6474; border-radius: 10px; padding: 16px; text-align: center; font-size: 15px; font-weight: 600;">{{ lockReason }}</div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCart }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="position: sticky; top: 0; z-index: 10; background: #FFFFFF; border-bottom: 1px solid #ECEFF5; display: flex; align-items: center; gap: 10px; padding: 12px 14px;">
+          <div onClick="{{ back }}" style="width: 36px; height: 36px; border-radius: 99px; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: #F4F6FA;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B0D12" stroke-width="2.4"><path d="M15 5l-7 7 7 7"></path></svg>
+          </div>
+          <div style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em;">Seu carrinho</div>
+          <div style="margin-left: auto; font-size: 12px; color: #5C6474;">{{ cartContext }}</div>
+        </div>
+
+        <div style="display: flex; flex-direction: column;">
+          <sc-for list="{{ cart }}" as="l" hint-placeholder-count="2">
+            <div style="display: flex; gap: 12px; padding: 16px; border-bottom: 1px solid #ECEFF5;">
+              <div style="width: 64px; height: 64px; border-radius: 10px; background: #E7EAF1; flex: none; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #8B93A5;">FOTO</div>
+              <div style="min-width: 0; flex: 1;">
+                <div style="display: flex; gap: 10px;">
+                  <div style="font-size: 15px; font-weight: 600; letter-spacing: -0.01em; min-width: 0;">{{ l.name }}</div>
+                  <div style="margin-left: auto; font-size: 15px; font-weight: 600; flex: none;">{{ l.totalLabel }}</div>
+                </div>
+                <div style="font-size: 12px; color: #5C6474; line-height: 1.4; margin-top: 4px;">{{ l.optsText }}</div>
+                <div style="display: flex; align-items: center; gap: 4px; margin-top: 10px; border: 1px solid #D5DBE7; border-radius: 8px; padding: 2px; width: fit-content;">
+                  <div onClick="{{ l.dec }}" style="width: 34px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #5C6474;" style-hover="background: #F4F6FA;">−</div>
+                  <div style="min-width: 22px; text-align: center; font-size: 15px; font-weight: 600;">{{ l.qty }}</div>
+                  <div onClick="{{ l.inc }}" style="width: 34px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #5C6474;" style-hover="background: #F4F6FA;">+</div>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ cartEmpty }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 80px 32px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px;">
+            <div style="width: 56px; height: 56px; border-radius: 99px; background: #F4F6FA; display: flex; align-items: center; justify-content: center;">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#8B93A5" stroke-width="1.8"><path d="M4 6h16l-1.5 11H5.5L4 6z"></path><path d="M9 10v4M15 10v4"></path></svg>
+            </div>
+            <div style="font-size: 17px; font-weight: 600;">Carrinho vazio</div>
+            <div style="font-size: 14px; color: #5C6474; line-height: 1.5;">Volte ao cardápio e escolha o primeiro item.</div>
+            <div onClick="{{ back }}" style="cursor: pointer; margin-top: 4px; border: 1px solid #1E5AE8; color: #1E5AE8; border-radius: 10px; padding: 13px 22px; font-size: 15px; font-weight: 600;">Ver cardápio</div>
+          </div>
+        </sc-if>
+
+        <div style="padding: 18px 16px;">
+          <div onClick="{{ back }}" style="cursor: pointer; font-size: 14px; font-weight: 600; color: #1E5AE8;">+ Adicionar mais itens</div>
+        </div>
+
+        <div style="height: 160px;"></div>
+
+        <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #ECEFF5; padding: 14px 16px 18px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: baseline; gap: 10px;">
+            <div style="font-size: 14px; color: #5C6474;">Itens</div>
+            <div style="margin-left: auto; font-size: 18px; font-weight: 600; letter-spacing: -0.02em;">{{ subtotalLabel }}</div>
+          </div>
+          <sc-if value="{{ belowMin }}" hint-placeholder-val="{{ false }}">
+            <div style="background: #FFF4DB; border: 1px solid #FFE3A3; color: #7A4E00; border-radius: 10px; padding: 12px 14px; font-size: 13px; font-weight: 600;">{{ minMsg }}</div>
+          </sc-if>
+          <sc-if value="{{ canCheckout }}" hint-placeholder-val="{{ true }}">
+            <div onClick="{{ goCheckout }}" style="cursor: pointer; background: #1E5AE8; color: #FFFFFF; border-radius: 10px; padding: 16px; text-align: center; font-size: 16px; font-weight: 600;" style-hover="background: #1749BF;">Finalizar pedido</div>
+          </sc-if>
+          <sc-if value="{{ blockCheckout }}" hint-placeholder-val="{{ false }}">
+            <div style="background: #EEF1F7; color: #8B93A5; border-radius: 10px; padding: 16px; text-align: center; font-size: 16px; font-weight: 600;">Finalizar pedido</div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCheckout }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="position: sticky; top: 0; z-index: 10; background: #FFFFFF; border-bottom: 1px solid #ECEFF5; padding: 12px 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div onClick="{{ back }}" style="width: 36px; height: 36px; border-radius: 99px; display: flex; align-items: center; justify-content: center; cursor: pointer;" style-hover="background: #F4F6FA;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B0D12" stroke-width="2.4"><path d="M15 5l-7 7 7 7"></path></svg>
+            </div>
+            <div style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em;">Finalizar</div>
+            <div style="margin-left: auto; font-size: 12px; font-weight: 600; color: #5C6474;">{{ stepLabel }}</div>
+          </div>
+          <sc-if value="{{ hasSteps }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; gap: 5px; margin-top: 10px;">
+              <sc-for list="{{ stepBars }}" as="b" hint-placeholder-count="4">
+                <div style="flex: 1; height: 3px; border-radius: 99px; background: #ECEFF5;">
+                  <sc-if value="{{ b.done }}" hint-placeholder-val="{{ false }}">
+                    <div style="height: 3px; border-radius: 99px; background: #1E5AE8;"></div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ stModalidade }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 20px 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em;">Como você quer receber?</div>
+            <div onClick="{{ pickEntrega }}" style="cursor: pointer; border: 1px solid #D5DBE7; border-radius: 12px; padding: 16px; display: flex; gap: 12px; align-items: center;" style-hover="border-color: #1E5AE8;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E5AE8" stroke-width="1.8"><path d="M3 7h11v9H3zM14 11h4l3 3v2h-7"></path><circle cx="7" cy="18" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>
+              <div>
+                <div style="font-size: 16px; font-weight: 600;">Entrega</div>
+                <div style="font-size: 13px; color: #5C6474; margin-top: 2px;">Chega no seu endereço</div>
+              </div>
+            </div>
+            <div onClick="{{ pickRetirada }}" style="cursor: pointer; border: 1px solid #D5DBE7; border-radius: 12px; padding: 16px; display: flex; gap: 12px; align-items: center;" style-hover="border-color: #1E5AE8;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E5AE8" stroke-width="1.8"><path d="M4 9h16v11H4zM4 9l2-5h12l2 5"></path></svg>
+              <div>
+                <div style="font-size: 16px; font-weight: 600;">Retirada</div>
+                <div style="font-size: 13px; color: #5C6474; margin-top: 2px;">Você busca na loja</div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stDados }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 20px 16px; display: flex; flex-direction: column; gap: 16px;">
+            <div>
+              <div style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em;">Quem está pedindo?</div>
+              <div style="font-size: 13px; color: #5C6474; margin-top: 4px; line-height: 1.45;">Sem cadastro. Só o nome e o telefone para a loja te achar.</div>
+            </div>
+            <label style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 13px; font-weight: 600; color: #5C6474;">Nome</span>
+              <input value="{{ fName }}" onChange="{{ setName }}" placeholder="Seu nome" style="font-size: 16px; padding: 14px; border: 1px solid #D5DBE7; border-radius: 10px; outline: none; width: 100%; box-sizing: border-box; color: #0B0D12;" style-focus="border-color: #1E5AE8;" />
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 13px; font-weight: 600; color: #5C6474;">Telefone</span>
+              <input value="{{ fPhone }}" onChange="{{ setPhone }}" placeholder="(11) 90000-0000" style="font-size: 16px; padding: 14px; border: 1px solid #D5DBE7; border-radius: 10px; outline: none; width: 100%; box-sizing: border-box; color: #0B0D12;" style-focus="border-color: #1E5AE8;" />
+            </label>
+            <sc-if value="{{ mesaPayNote }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: flex-start; gap: 10px; background: #F4F6FA; border-radius: 10px; padding: 13px 14px;">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5C6474" stroke-width="2" style="flex: none; margin-top: 1px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg>
+                <div style="font-size: 13px; color: #5C6474; line-height: 1.45;">O pagamento é no caixa, na hora de sair. Você pode pedir mais coisas antes disso.</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stEndereco }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 20px 16px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em;">Onde entregar?</div>
+            <label style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 13px; font-weight: 600; color: #5C6474;">Bairro</span>
+              <select value="{{ fDistrict }}" onChange="{{ setDistrict }}" style="font-size: 16px; padding: 14px; border: 1px solid #D5DBE7; border-radius: 10px; outline: none; width: 100%; box-sizing: border-box; background: #FFFFFF; color: #0B0D12;">
+                <option value="">Selecione o bairro</option>
+                <sc-for list="{{ districts }}" as="d" hint-placeholder-count="3">
+                  <option value="{{ d.name }}">{{ d.name }}</option>
+                </sc-for>
+              </select>
+            </label>
+            <div style="display: flex; gap: 10px;">
+              <label style="display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-width: 0;">
+                <span style="font-size: 13px; font-weight: 600; color: #5C6474;">Rua</span>
+                <input value="{{ fStreet }}" onChange="{{ setStreet }}" placeholder="Rua" style="font-size: 16px; padding: 14px; border: 1px solid #D5DBE7; border-radius: 10px; outline: none; width: 100%; min-width: 0; box-sizing: border-box; color: #0B0D12;" style-focus="border-color: #1E5AE8;" />
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 6px; flex: 0 0 104px;">
+                <span style="font-size: 13px; font-weight: 600; color: #5C6474;">Número</span>
+                <input value="{{ fNum }}" onChange="{{ setNum }}" placeholder="000" style="font-size: 16px; padding: 14px; border: 1px solid #D5DBE7; border-radius: 10px; outline: none; width: 100%; min-width: 0; box-sizing: border-box; color: #0B0D12;" style-focus="border-color: #1E5AE8;" />
+              </label>
+            </div>
+            <label style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #5C6474;">Complemento <span style="font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #8B5B00; background: #FFF4DB; border: 1px solid #FFE3A3; padding: 3px 7px; border-radius: 5px;">em breve</span></span>
+              <div style="font-size: 15px; padding: 14px; border: 1px dashed #D5DBE7; border-radius: 10px; background: #FAFBFD; color: #A2A9B8;">apto, bloco, referência</div>
+            </label>
+
+            <sc-if value="{{ quoteValue }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 10px; background: #F2F6FF; border: 1px solid #DCE7FF; border-radius: 10px; padding: 14px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1442AE" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v10M9 10h6M9 14h6"></path></svg>
+                <div style="font-size: 14px; font-weight: 600; color: #1442AE;">{{ quoteText }}</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ quoteFree }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; align-items: center; gap: 10px; background: #EAF7F0; border: 1px solid #B6E3CC; border-radius: 10px; padding: 14px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0B7A48" stroke-width="2.2"><path d="M4 12l5 5L20 6"></path></svg>
+                <div style="font-size: 14px; font-weight: 600; color: #0B7A48;">Entrega grátis neste pedido</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ quoteArrange }}" hint-placeholder-val="{{ false }}">
+              <div style="background: #FFF4DB; border: 1px solid #FFE3A3; border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600; color: #7A4E00;">A loja combina a entrega com você</div>
+            </sc-if>
+            <sc-if value="{{ quoteNone }}" hint-placeholder-val="{{ false }}">
+              <div style="background: #FDEDEC; border: 1px solid #F5C6C1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="font-size: 14px; font-weight: 600; color: #A62B21; line-height: 1.4;">Esta loja não entrega no seu bairro</div>
+                <div onClick="{{ switchToRetirada }}" style="cursor: pointer; align-self: flex-start; background: #FFFFFF; border: 1px solid #A62B21; color: #A62B21; border-radius: 9px; padding: 11px 16px; font-size: 14px; font-weight: 600;">Trocar para retirada</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stPagamento }}" hint-placeholder-val="{{ true }}">
+          <div style="padding: 20px 16px 0; display: flex; flex-direction: column; gap: 14px;">
+            <div>
+              <div style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em;">Como você paga?</div>
+              <div style="font-size: 13px; color: #5C6474; margin-top: 4px;">{{ payHint }}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden;">
+              <sc-for list="{{ payments }}" as="m" hint-placeholder-count="3">
+                <sc-if value="{{ m.on }}" hint-placeholder-val="{{ false }}">
+                  <div onClick="{{ m.pick }}" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 15px; background: #F2F6FF; border-bottom: 1px solid #DCE7FF;">
+                    <div style="width: 20px; height: 20px; border-radius: 99px; border: 6px solid #1E5AE8; background: #FFFFFF; box-sizing: border-box; flex: none;"></div>
+                    <div style="font-size: 15px; font-weight: 600;">{{ m.name }}</div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ m.off }}" hint-placeholder-val="{{ true }}">
+                  <div onClick="{{ m.pick }}" style="cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 15px; border-bottom: 1px solid #ECEFF5;" style-hover="background: #FAFBFD;">
+                    <div style="width: 20px; height: 20px; border-radius: 99px; border: 1.5px solid #C6CCDA; flex: none;"></div>
+                    <div style="font-size: 15px;">{{ m.name }}</div>
+                  </div>
+                </sc-if>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ isCash }}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 10px; background: #FAFBFD; border: 1px solid #ECEFF5; border-radius: 12px; padding: 14px;">
+                <div style="font-size: 14px; font-weight: 600;">Troco para quanto?</div>
+                <input value="{{ fChange }}" onChange="{{ setChange }}" placeholder="R$ 0,00" style="font-size: 16px; padding: 13px; border: 1px solid #D5DBE7; border-radius: 10px; outline: none; width: 100%; box-sizing: border-box; background: #FFFFFF; color: #0B0D12;" style-focus="border-color: #1E5AE8;" />
+                <div onClick="{{ toggleNoChange }}" style="cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 4px 0;">
+                  <sc-if value="{{ noChange }}" hint-placeholder-val="{{ false }}">
+                    <div style="width: 20px; height: 20px; border-radius: 6px; background: #1E5AE8; flex: none; display: flex; align-items: center; justify-content: center;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2"><path d="M4 12l5 5L20 6"></path></svg>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ needChange }}" hint-placeholder-val="{{ true }}">
+                    <div style="width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid #C6CCDA; flex: none;"></div>
+                  </sc-if>
+                  <div style="font-size: 14px;">Não preciso de troco, tenho o valor exato</div>
+                </div>
+                <sc-if value="{{ changeTooLow }}" hint-placeholder-val="{{ false }}">
+                  <div style="background: #FDEDEC; border: 1px solid #F5C6C1; color: #A62B21; border-radius: 9px; padding: 11px 13px; font-size: 13px; font-weight: 600; line-height: 1.4;">{{ changeMsg }}</div>
+                </sc-if>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ showSummary }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top: 22px; padding: 0 16px;">
+            <div style="border-top: 1px solid #ECEFF5; padding-top: 16px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #8B93A5;">Resumo</div>
+              <div style="display: flex; font-size: 14px;"><div style="color: #5C6474;">Itens</div><div style="margin-left: auto; font-weight: 500;">{{ subtotalLabel }}</div></div>
+              <sc-if value="{{ showFreightLine }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; font-size: 14px;"><div style="color: #5C6474;">Entrega</div><div style="margin-left: auto; font-weight: 500;">{{ freightLabel }}</div></div>
+              </sc-if>
+              <div style="display: flex; align-items: baseline; border-top: 1px solid #ECEFF5; padding-top: 10px;"><div style="font-size: 14px; font-weight: 600;">TOTAL</div><div style="margin-left: auto; font-size: 20px; font-weight: 600; letter-spacing: -0.02em;">{{ totalLabel }}</div></div>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="height: 130px;"></div>
+
+        <div style="position: sticky; bottom: 0; background: #FFFFFF; border-top: 1px solid #ECEFF5; padding: 14px 16px 18px;">
+          <sc-if value="{{ ctaReady }}" hint-placeholder-val="{{ false }}">
+            <div onClick="{{ advance }}" style="cursor: pointer; background: #1E5AE8; color: #FFFFFF; border-radius: 10px; padding: 16px; text-align: center; font-size: 16px; font-weight: 600;" style-hover="background: #1749BF;">{{ ctaLabel }}</div>
+          </sc-if>
+          <sc-if value="{{ ctaBlocked }}" hint-placeholder-val="{{ true }}">
+            <div style="background: #EEF1F7; color: #5C6474; border-radius: 10px; padding: 16px; text-align: center; font-size: 15px; font-weight: 600;">{{ ctaBlockedLabel }}</div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isSent }}" hint-placeholder-val="{{ false }}">
+      <div style="min-height: 720px; display: flex; flex-direction: column; padding: 48px 20px 24px;">
+        <div style="width: 60px; height: 60px; border-radius: 99px; background: #EAF7F0; display: flex; align-items: center; justify-content: center;">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#0B7A48" stroke-width="2.4"><path d="M4 12l5 5L20 6"></path></svg>
+        </div>
+        <div style="font-size: 26px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; margin-top: 20px;">{{ sentTitle }}</div>
+        <div style="font-size: 15px; color: #5C6474; line-height: 1.5; margin-top: 10px;">{{ sentBody }}</div>
+
+        <div style="margin-top: 24px; border: 1px solid #ECEFF5; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+          <div style="display: flex; font-size: 14px;"><div style="color: #5C6474;">Itens</div><div style="margin-left: auto; font-weight: 500;">{{ subtotalLabel }}</div></div>
+          <sc-if value="{{ showFreightLine }}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; font-size: 14px;"><div style="color: #5C6474;">Entrega</div><div style="margin-left: auto; font-weight: 500;">{{ freightLabel }}</div></div>
+          </sc-if>
+          <div style="display: flex; align-items: baseline; border-top: 1px solid #ECEFF5; padding-top: 10px;"><div style="font-size: 14px; font-weight: 600;">TOTAL</div><div style="margin-left: auto; font-size: 19px; font-weight: 600;">{{ totalLabel }}</div></div>
+        </div>
+
+        <sc-if value="{{ canTrack }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="background: #FFF4DB; border: 1px solid #FFE3A3; border-radius: 12px; padding: 14px;">
+              <div style="font-size: 12px; font-weight: 600; color: #7A4E00;">Guarde este link — ele não se recupera</div>
+              <div style="font-size: 14px; font-weight: 600; margin-top: 6px; word-break: break-all;">/pedido/{{ trackCode }}</div>
+            </div>
+            <div onClick="{{ goTrack }}" style="cursor: pointer; background: #1E5AE8; color: #FFFFFF; border-radius: 10px; padding: 16px; text-align: center; font-size: 16px; font-weight: 600;" style-hover="background: #1749BF;">Acompanhar pedido</div>
+          </div>
+        </sc-if>
+
+        <div onClick="{{ restart }}" style="cursor: pointer; margin-top: auto; text-align: center; font-size: 14px; font-weight: 600; color: #5C6474; padding: 16px;">Voltar ao cardápio</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isTrack }}" hint-placeholder-val="{{ false }}">
+      <div>
+        <div style="padding: 24px 20px 20px; border-bottom: 1px solid #ECEFF5;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 7px; height: 7px; border-radius: 99px; background: #0B7A48;"></div>
+            <div style="font-size: 12px; font-weight: 600; color: #0B7A48;">Atualizando em tempo real</div>
+          </div>
+          <div style="font-size: 24px; font-weight: 600; letter-spacing: -0.03em; margin-top: 12px; line-height: 1.15;">{{ trackHeadline }}</div>
+          <div style="font-size: 14px; color: #5C6474; margin-top: 8px;">{{ trackEta }}</div>
+        </div>
+
+        <div style="padding: 20px 20px 0; display: flex; flex-direction: column;">
+          <sc-for list="{{ trackSteps }}" as="t" hint-placeholder-count="4">
+            <div style="display: flex; gap: 14px;">
+              <div style="display: flex; flex-direction: column; align-items: center; flex: none;">
+                <sc-if value="{{ t.done }}" hint-placeholder-val="{{ true }}">
+                  <div style="width: 22px; height: 22px; border-radius: 99px; background: #1E5AE8; display: flex; align-items: center; justify-content: center;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2"><path d="M4 12l5 5L20 6"></path></svg>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ t.pending }}" hint-placeholder-val="{{ false }}">
+                  <div style="width: 22px; height: 22px; border-radius: 99px; border: 1.5px solid #D5DBE7; background: #FFFFFF;"></div>
+                </sc-if>
+                <div style="width: 1.5px; flex: 1; min-height: 34px; background: #ECEFF5;"></div>
+              </div>
+              <div style="padding-bottom: 20px;">
+                <sc-if value="{{ t.done }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-size: 16px; font-weight: 600; color: #0B0D12;">{{ t.label }}</div>
+                </sc-if>
+                <sc-if value="{{ t.pending }}" hint-placeholder-val="{{ false }}">
+                  <div style="font-size: 16px; font-weight: 600; color: #A2A9B8;">{{ t.label }}</div>
+                </sc-if>
+                <div style="font-size: 13px; color: #8B93A5; margin-top: 2px;">{{ t.time }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="padding: 4px 20px 0;">
+          <div style="border-top: 1px solid #ECEFF5; padding-top: 16px; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #8B93A5;">Seu pedido</div>
+          <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+            <sc-for list="{{ cart }}" as="l" hint-placeholder-count="2">
+              <div style="display: flex; gap: 10px; font-size: 14px;">
+                <div style="color: #5C6474; font-weight: 600; flex: none;">{{ l.qty }}×</div>
+                <div style="min-width: 0;">
+                  <div style="font-weight: 500;">{{ l.name }}</div>
+                  <div style="font-size: 12px; color: #8B93A5; line-height: 1.4;">{{ l.optsText }}</div>
+                </div>
+                <div style="margin-left: auto; font-weight: 500; flex: none;">{{ l.totalLabel }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: baseline; border-top: 1px solid #ECEFF5; margin-top: 14px; padding-top: 12px;"><div style="font-size: 14px; font-weight: 600;">TOTAL</div><div style="margin-left: auto; font-size: 18px; font-weight: 600;">{{ totalLabel }}</div></div>
+        </div>
+
+        <div onClick="{{ restart }}" style="cursor: pointer; text-align: center; font-size: 14px; font-weight: 600; color: #5C6474; padding: 28px 16px 32px;">Voltar ao cardápio</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ showCartBar }}" hint-placeholder-val="{{ false }}">
+      <div style="position: sticky; bottom: 0; z-index: 25; padding: 12px 16px 20px; background: linear-gradient(180deg, rgba(255,255,255,0), #FFFFFF 34%);">
+        <div onClick="{{ goCart }}" style="cursor: pointer; display: flex; align-items: center; gap: 12px; background: #1E5AE8; color: #FFFFFF; border-radius: 10px; padding: 15px 18px;" style-hover="background: #1749BF;">
+          <div style="background: rgba(255,255,255,0.22); font-size: 13px; font-weight: 600; padding: 3px 9px; border-radius: 5px;">{{ cartCount }}</div>
+          <div style="font-size: 16px; font-weight: 600; letter-spacing: -0.01em;">Ver carrinho</div>
+          <div style="margin-left: auto; font-size: 16px; font-weight: 600;">{{ subtotalLabel }}</div>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <div style="width: 390px; max-width: 100%; font-size: 12px; color: #6B7386; line-height: 1.5;">{{ hintLine }}</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:430,&quot;height&quot;:1000}}">
+const MENU = [
+  { name: "Pizzas", products: [
+    { id: "p1", name: "Margherita", desc: "Tomate, muçarela de búfala", price: 52, available: true, groups: [
+      { id: "g-ad", name: "Adicionais", rule: "sum", min: 0, max: 3, options: [
+        { id: "o-bacon", name: "Bacon", price: 6 },
+        { id: "o-azeit", name: "Azeitona preta", price: 4 },
+        { id: "o-rucula", name: "Rúcula", price: 5 } ] },
+      { id: "g-bo", name: "Borda", rule: "sum", min: 0, max: 1, options: [
+        { id: "o-cat", name: "Catupiry", price: 8 },
+        { id: "o-ched", name: "Cheddar", price: 8 } ] } ] },
+    { id: "p2", name: "Meio a meio", desc: "Escolha 2 sabores", price: 30, available: true, groups: [
+      { id: "g-sab", name: "Escolha 2 sabores", rule: "max", min: 2, max: 2, note: "Cobramos o sabor mais caro", options: [
+        { id: "s-marg", name: "Margherita", price: 45 },
+        { id: "s-cala", name: "Calabresa", price: 45 },
+        { id: "s-quatro", name: "Quatro queijos", price: 50 },
+        { id: "s-port", name: "Portuguesa", price: 48 } ] },
+      { id: "g-bo2", name: "Borda", rule: "sum", min: 0, max: 1, options: [
+        { id: "o-cat2", name: "Catupiry", price: 8 } ] } ] },
+    { id: "p3", name: "Quatro queijos", desc: "Gorgonzola, parmesão, provolone", price: 58, available: false, groups: [] },
+    { id: "p4", name: "Calabresa", desc: "Cebola roxa, orégano", price: 49, available: true, groups: [] } ] },
+  { name: "Entradas", products: [
+    { id: "e1", name: "Bruschetta", desc: "Quatro fatias, tomate e manjericão", price: 28, available: true, groups: [] },
+    { id: "e2", name: "Focaccia", desc: "Azeite, romero e flor de sal", price: 24, available: true, groups: [] } ] },
+  { name: "Bebidas", products: [
+    { id: "b1", name: "Água com gás", desc: "500 ml", price: 6, available: true, groups: [] },
+    { id: "b2", name: "Limonada suíça", desc: "400 ml", price: 12, available: true, groups: [] } ] }
+];
+
+const DISTRICTS = [
+  { name: "Centro", freight: 9 },
+  { name: "Jardins", freight: 0 },
+  { name: "Alto da Serra", freight: "arrange" },
+  { name: "Vila Nova", freight: "none" }
+];
+
+const MIN_ORDER = 30;
+
+const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
+const allProducts = () => MENU.reduce((a, s) => a.concat(s.products), []);
+const findProduct = id => allProducts().find(p => p.id === id);
+
+function groupPrice(group, ids) {
+  const sel = group.options.filter(o => ids.indexOf(o.id) >= 0);
+  if (!sel.length) return 0;
+  if (group.rule === "max") return Math.max.apply(null, sel.map(o => o.price));
+  if (group.rule === "avg") return sel.reduce((a, o) => a + o.price, 0) / sel.length;
+  return sel.reduce((a, o) => a + o.price, 0);
+}
+
+function unitPrice(product, opts) {
+  return (product.groups || []).reduce((sum, g) => sum + groupPrice(g, opts[g.id] || []), product.price);
+}
+
+class Component extends DCLogic {
+  state = {
+    mesa: false, mesaLabel: "Mesa 7",
+    screen: "menu", section: 0,
+    productId: null, opts: {}, qty: 1,
+    cart: [],
+    dtype: null, step: 0,
+    name: "", phone: "", district: "", street: "", num: "",
+    pay: "", change: "", noChange: false,
+    trackStage: 1
+  };
+
+  componentDidMount() {
+    this.timer = setInterval(() => {
+      if (this.state.screen === "track" && this.state.trackStage < 4) {
+        this.setState(s => ({ trackStage: s.trackStage + 1 }));
+      }
+    }, 4500);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+
+  subtotal() { return this.state.cart.reduce((a, l) => a + l.unit * l.qty, 0); }
+
+  freight() {
+    const { dtype, district } = this.state;
+    if (dtype !== "entrega" || !district) return null;
+    const d = DISTRICTS.find(x => x.name === district);
+    if (!d) return null;
+    if (d.freight === "arrange") return { kind: "arrange", value: 0 };
+    if (d.freight === "none") return { kind: "none", value: 0 };
+    if (d.freight === 0 || this.subtotal() >= 50) return { kind: "free", value: 0 };
+    return { kind: "value", value: d.freight };
+  }
+
+  total() {
+    const f = this.freight();
+    return this.subtotal() + (f && f.kind === "value" ? f.value : 0);
+  }
+
+  steps() {
+    if (this.state.mesa) return ["dados"];
+    const base = ["modalidade", "dados"];
+    if (this.state.dtype === "entrega") base.push("endereco");
+    base.push("pagamento");
+    return base;
+  }
+
+  stepName() { return this.steps()[Math.min(this.state.step, this.steps().length - 1)]; }
+
+  payMethods() {
+    if (this.state.mesa) return ["Dinheiro no caixa", "Cartão no caixa", "Pix"];
+    if (this.state.dtype === "entrega") return ["Dinheiro", "Cartão na entrega", "Pix", "Vale-refeição"];
+    return ["Dinheiro", "Cartão na loja", "Pix"];
+  }
+
+  addLine() {
+    const p = findProduct(this.state.productId);
+    const opts = this.state.opts;
+    const names = (p.groups || []).reduce((acc, g) => acc.concat((opts[g.id] || []).map(id => (g.options.find(o => o.id === id) || {}).name)), []);
+    const key = p.id + "|" + JSON.stringify(Object.keys(opts).sort().map(k => [k, (opts[k] || []).slice().sort()]));
+    const unit = unitPrice(p, opts);
+    this.setState(s => {
+      const cart = s.cart.slice();
+      const hit = cart.findIndex(l => l.key === key);
+      if (hit >= 0) cart[hit] = Object.assign({}, cart[hit], { qty: cart[hit].qty + s.qty });
+      else cart.push({ key: key, pid: p.id, name: p.name, qty: s.qty, unit: unit, optsText: names.length ? names.join(" · ") : "Sem complementos" });
+      return { cart: cart, screen: "menu", productId: null, opts: {}, qty: 1 };
+    });
+  }
+
+  bump(key, delta) {
+    this.setState(s => ({
+      cart: s.cart.map(l => l.key === key ? Object.assign({}, l, { qty: l.qty + delta }) : l).filter(l => l.qty > 0)
+    }));
+  }
+
+  changeNum() {
+    const v = parseFloat(String(this.state.change).replace(/[^\d,.]/g, "").replace(",", "."));
+    return isNaN(v) ? null : v;
+  }
+
+  ctaState() {
+    const st = this.stepName();
+    const s = this.state;
+    if (st === "modalidade") return { ok: false, blocked: "Escolha entrega ou retirada" };
+    if (st === "dados") {
+      if (!s.name.trim()) return { ok: false, blocked: "Informe seu nome" };
+      if (s.phone.replace(/\D/g, "").length < 10) return { ok: false, blocked: "Informe um telefone válido" };
+      return { ok: true, label: s.mesa ? "Enviar para a cozinha" : "Continuar" };
+    }
+    if (st === "endereco") {
+      if (!s.district) return { ok: false, blocked: "Selecione o bairro" };
+      if (!s.street.trim() || !s.num.trim()) return { ok: false, blocked: "Complete rua e número" };
+      const f = this.freight();
+      if (f && f.kind === "none") return { ok: false, blocked: "Fora da área de entrega" };
+      return { ok: true, label: "Continuar" };
+    }
+    if (!s.pay) return { ok: false, blocked: "Escolha a forma de pagamento" };
+    const cash = s.pay.indexOf("Dinheiro") === 0;
+    if (cash && !s.noChange) {
+      const v = this.changeNum();
+      if (v === null) return { ok: false, blocked: "Informe o troco ou marque valor exato" };
+      if (v < this.total()) return { ok: false, blocked: "O troco não cobre o total" };
+    }
+    return { ok: true, label: s.mesa ? "Enviar para a cozinha" : "Enviar pedido" };
+  }
+
+  advanceStep() {
+    const cta = this.ctaState();
+    if (!cta.ok) return;
+    if (this.state.step >= this.steps().length - 1) this.setState({ screen: "sent" });
+    else this.setState(s => ({ step: s.step + 1 }));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const self = this;
+    const prod = s.productId ? findProduct(s.productId) : null;
+    const st = this.stepName();
+    const sub = this.subtotal();
+    const f = this.freight();
+    const cartCount = s.cart.reduce((a, l) => a + l.qty, 0);
+    const cash = s.pay.indexOf("Dinheiro") === 0;
+    const changeV = this.changeNum();
+
+    const missing = prod ? (prod.groups || []).filter(g => g.min > 0 && ((s.opts[g.id] || []).length < g.min))[0] : null;
+
+    const trackNames = s.dtype === "retirada"
+      ? ["Pedido aceito", "Preparando", "Pronto para retirada", "Retirado"]
+      : ["Pedido aceito", "Preparando", "Saiu para entrega", "Entregue"];
+
+    return {
+      isMesa: s.mesa, mesaLabel: s.mesaLabel,
+      isMenu: s.screen === "menu", isProduct: s.screen === "product", isCart: s.screen === "cart",
+      isCheckout: s.screen === "checkout", isSent: s.screen === "sent", isTrack: s.screen === "track",
+      goLink: () => this.setState({ mesa: false, screen: "menu", cart: [], dtype: null, step: 0, pay: "", district: "", trackStage: 1 }),
+      goMesa: () => this.setState({ mesa: true, screen: "menu", cart: [], dtype: null, step: 0, pay: "", district: "", trackStage: 1 }),
+      restart: () => this.setState({ screen: "menu", cart: [], step: 0, dtype: null, pay: "", change: "", noChange: false, district: "", name: "", phone: "", street: "", num: "", trackStage: 1 }),
+
+      sections: MENU.map((sec, i) => ({
+        name: sec.name, active: s.section === i, idle: s.section !== i,
+        go: () => this.setState({ section: i }),
+        products: sec.products.map(p => {
+          const min = (p.groups || []).filter(g => g.min > 0).reduce((a, g) => a + groupPrice(g, g.options.slice().sort((x, y) => x.price - y.price).slice(0, g.min).map(o => o.id)), p.price);
+          const hasReq = (p.groups || []).some(g => g.min > 0);
+          return {
+            name: p.name, desc: p.desc, available: p.available, soldOut: !p.available,
+            prefix: hasReq ? "a partir de" : "",
+            priceLabel: fmt(hasReq ? min : p.price),
+            open: () => p.available && this.setState({ screen: "product", productId: p.id, opts: {}, qty: 1 })
+          };
+        })
+      })),
+
+      prod: prod ? { name: prod.name, desc: prod.desc, baseLabel: fmt(prod.price) } : { name: "", desc: "", baseLabel: "" },
+      groups: prod ? (prod.groups || []).map(g => {
+        const sel = s.opts[g.id] || [];
+        return {
+          name: g.name,
+          hint: g.note ? g.note : (g.min > 0 ? "Obrigatório" : "Opcional"),
+          badge: g.min > 0 ? sel.length + " de " + g.max : sel.length + "/" + g.max,
+          options: g.options.map(o => ({
+            name: o.name,
+            priceLabel: o.price ? (g.rule === "max" ? "até +" + fmt(o.price) : "+ " + fmt(o.price)) : "",
+            on: sel.indexOf(o.id) >= 0, off: sel.indexOf(o.id) < 0,
+            toggle: () => self.setState(prev => {
+              const cur = (prev.opts[g.id] || []).slice();
+              const at = cur.indexOf(o.id);
+              if (at >= 0) cur.splice(at, 1);
+              else if (cur.length < g.max) cur.push(o.id);
+              else if (g.max === 1) { cur.length = 0; cur.push(o.id); }
+              const opts = Object.assign({}, prev.opts); opts[g.id] = cur;
+              return { opts: opts };
+            })
+          }))
+        };
+      }) : [],
+      qty: s.qty,
+      incQty: () => this.setState(p => ({ qty: p.qty + 1 })),
+      decQty: () => this.setState(p => ({ qty: Math.max(1, p.qty - 1) })),
+      itemTotalLabel: prod ? fmt(unitPrice(prod, s.opts) * s.qty) : "",
+      canAdd: !!prod && !missing, locked: !!prod && !!missing,
+      lockReason: missing ? missing.name : "",
+      addToCart: () => this.addLine(),
+      back: () => this.setState({ screen: s.screen === "checkout" && s.step > 0 ? "checkout" : "menu", step: s.screen === "checkout" ? Math.max(0, s.step - 1) : 0 }),
+
+      cart: s.cart.map(l => ({
+        name: l.name, qty: l.qty, optsText: l.optsText, totalLabel: fmt(l.unit * l.qty),
+        inc: () => this.bump(l.key, 1), dec: () => this.bump(l.key, -1)
+      })),
+      cartEmpty: s.cart.length === 0,
+      cartCount: cartCount,
+      cartContext: s.mesa ? s.mesaLabel : "Entrega ou retirada",
+      showCartBar: s.screen === "menu" && cartCount > 0,
+      goCart: () => this.setState({ screen: "cart" }),
+      subtotalLabel: fmt(sub),
+      belowMin: sub > 0 && sub < MIN_ORDER,
+      minMsg: "Faltam " + fmt(MIN_ORDER - sub) + " para o pedido mínimo",
+      canCheckout: s.cart.length > 0 && sub >= MIN_ORDER,
+      blockCheckout: s.cart.length === 0 || sub < MIN_ORDER,
+      goCheckout: () => this.setState({ screen: "checkout", step: 0 }),
+
+      stepLabel: s.mesa ? "Passo único" : "Passo " + (s.step + 1) + " de " + this.steps().length,
+      hasSteps: !s.mesa,
+      stepBars: this.steps().map((n, i) => ({ done: i <= s.step })),
+      stModalidade: st === "modalidade", stDados: st === "dados", stEndereco: st === "endereco", stPagamento: st === "pagamento",
+      pickEntrega: () => this.setState(p => ({ dtype: "entrega", step: p.step + 1 })),
+      pickRetirada: () => this.setState(p => ({ dtype: "retirada", step: p.step + 1 })),
+      switchToRetirada: () => this.setState({ dtype: "retirada", step: 2, district: "" }),
+      fName: s.name, setName: e => this.setState({ name: e.target.value }),
+      fPhone: s.phone, setPhone: e => this.setState({ phone: e.target.value }),
+      districts: DISTRICTS.map(d => ({ name: d.name })),
+      fDistrict: s.district, setDistrict: e => this.setState({ district: e.target.value }),
+      fStreet: s.street, setStreet: e => this.setState({ street: e.target.value }),
+      fNum: s.num, setNum: e => this.setState({ num: e.target.value }),
+      quoteValue: !!f && f.kind === "value", quoteFree: !!f && f.kind === "free",
+      quoteArrange: !!f && f.kind === "arrange", quoteNone: !!f && f.kind === "none",
+      quoteText: f && f.kind === "value" ? "Entrega: " + fmt(f.value) : "",
+      payments: this.payMethods().map(m => ({ name: m, on: s.pay === m, off: s.pay !== m, pick: () => this.setState({ pay: m }) })),
+      payHint: s.mesa ? "Você paga no caixa ao sair. A loja registra a forma." : "A loja cobra na entrega ou na retirada.",
+      isCash: cash, noChange: s.noChange, needChange: !s.noChange,
+      fChange: s.change, setChange: e => this.setState({ change: e.target.value }),
+      toggleNoChange: () => this.setState(p => ({ noChange: !p.noChange, change: "" })),
+      changeTooLow: cash && !s.noChange && changeV !== null && changeV < this.total(),
+      changeMsg: "O troco precisa ser no mínimo " + fmt(this.total()),
+      showSummary: st === "pagamento" || st === "endereco" || s.mesa,
+      mesaPayNote: s.mesa,
+      showFreightLine: !!f && f.kind !== "none",
+      freightLabel: f ? (f.kind === "free" ? "Grátis" : f.kind === "arrange" ? "A combinar" : fmt(f.value)) : "",
+      totalLabel: fmt(this.total()),
+      ctaReady: this.ctaState().ok, ctaBlocked: !this.ctaState().ok,
+      ctaLabel: this.ctaState().label || "", ctaBlockedLabel: this.ctaState().blocked || "",
+      advance: () => this.advanceStep(),
+
+      sentTitle: s.mesa ? "Pedido enviado para a cozinha" : "Pedido enviado",
+      sentBody: s.mesa
+        ? "É só aguardar na " + s.mesaLabel + ". A comida chega até você."
+        : s.dtype === "retirada"
+          ? "A loja vai confirmar e avisar quando estiver pronto para retirada."
+          : "A loja vai confirmar o pedido e você acompanha a entrega por aqui.",
+      canTrack: !s.mesa,
+      trackCode: "8F2K-91DA",
+      goTrack: () => this.setState({ screen: "track", trackStage: 1 }),
+
+      trackHeadline: trackNames[Math.min(s.trackStage, 4) - 1],
+      trackEta: s.dtype === "retirada" ? "Pronto em cerca de 25 min" : "Previsão de entrega: 19:40 – 19:55",
+      trackSteps: trackNames.map((n, i) => ({
+        label: n, done: i < s.trackStage, pending: i >= s.trackStage,
+        color: i < s.trackStage ? "#0B0D12" : "#A2A9B8",
+        time: i < s.trackStage ? "19:0" + (i + 2) : "—"
+      })),
+
+      hintLine: s.mesa
+        ? "Modo salão: mesa fixa no topo, sem modalidade, sem frete, sem acompanhamento — a tela encerra no comprovante."
+        : "Modo link: wizard de 3 ou 4 passos. Bairros de teste — Centro R$ 9, Jardins grátis, Alto da Serra a combinar, Vila Nova fora da área."
+    };
+  }
+}
+</script>
+</body>
+</html>
