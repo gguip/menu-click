@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Hex fora do globals.css de propósito: asset estático, fora do tema. É a cor de ação padrão (#1E5AE8). -->
+  <rect width="32" height="32" rx="7" fill="#1E5AE8"/>
+  <path d="M9 23V10l7 8 7-8v13" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
