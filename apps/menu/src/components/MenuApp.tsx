@@ -86,6 +86,9 @@ export function MenuApp({
         acceptingOrders: live.acceptingOrders,
         closesAt: live.closesAt,
         opensAt: live.opensAt,
+        // o interruptor de salão também é do momento: desligado depois do
+        // cache, a pessoa montaria o carrinho para levar 409 no "Enviar"
+        isQrcode: typeof live.isQrcode === "boolean" ? live.isQrcode : current.isQrcode,
       }));
     });
     return () => {
@@ -111,7 +114,7 @@ export function MenuApp({
   const sections = useMemo(() => filterSections(menu.sections, query), [menu.sections, query]);
   const inDineIn = tableHash !== null;
   // Na parte 1 só o salão monta pedido: o link (entrega/retirada) é a parte 2.
-  const canOrder = inDineIn && restaurant.isOpen;
+  const canOrder = inDineIn && restaurant.isOpen && restaurant.isQrcode;
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
   const brand = { "--brand-action": restaurant.brandColor ?? "#1E5AE8" } as CSSProperties;
 
@@ -136,7 +139,12 @@ export function MenuApp({
       {screen === "menu" && (
         <main className="pb-32">
           <MenuHeader restaurant={restaurant} inDineIn={inDineIn} />
-          <StoreNotice restaurant={restaurant} tableUnknown={table.kind === "not-found"} now={now} />
+          <StoreNotice
+            restaurant={restaurant}
+            tableUnknown={table.kind === "not-found"}
+            dineInOff={inDineIn && !restaurant.isQrcode}
+            now={now}
+          />
 
           {menu.sections.length === 0 ? (
             <section className="px-4 pt-8">

@@ -36,6 +36,7 @@ export function CheckoutScreen({
   const [error, setError] = useState<{ message: string; staleCart: boolean } | null>(null);
 
   const blocked = checkoutBlock({ name, phone, payment });
+  const payments = dineInPayments(restaurant.paymentMethods);
   const total = subtotal(lines);
 
   const send = async () => {
@@ -106,8 +107,13 @@ export function CheckoutScreen({
 
       <section className="border-t border-paper-3 px-4 py-5">
         <h2 className="text-[19px] font-semibold tracking-[-0.02em]">Como você paga?</h2>
+        {payments.length === 0 && (
+          <p role="status" className="mt-3 rounded-field bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn">
+            Nenhuma forma de pagamento está disponível no salão agora. Chame o garçom.
+          </p>
+        )}
         <div role="radiogroup" aria-label="Forma de pagamento" className="mt-3 overflow-hidden rounded-card border border-paper-3">
-          {dineInPayments(restaurant.paymentMethods).map((option) => {
+          {payments.map((option) => {
             const on = payment === option.method;
             return (
               <label
