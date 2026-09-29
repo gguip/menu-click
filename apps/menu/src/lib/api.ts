@@ -1,3 +1,4 @@
+import type { TableLookup } from "./table.ts";
 import type { Menu, MenuOptionGroup, MenuRestaurant, MenuSection } from "./types.ts";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
@@ -46,15 +47,21 @@ export async function fetchLiveRestaurant(slug: string): Promise<MenuRestaurant 
   }
 }
 
-/** O rótulo da mesa do QR, ou `null` (adesivo velho, mesa removida, hash girado). */
-export async function resolveTable(slug: string, hash: string): Promise<string | null> {
+/**
+ * O rótulo da mesa do QR. Só o 404 é "não existe": falha de rede, 5xx e 429
+ * (a API acordando num plano gratuito) são "não deu para saber", e não podem
+ * tirar a mesa de quem está sentado nela.
+ */
+export async function resolveTable(slug: string, hash: string): Promise<TableLookup> {
   try {
     const res = await fetch(`${API_URL}/menu/${encodeURIComponent(slug)}/table/${encodeURIComponent(hash)}`, {
       cache: "no-store",
     });
-    return res.ok ? ((await res.json()) as { label: string }).label : null;
+    if (res.status === 404) return { kind: "not-found" };
+    if (!res.ok) return { kind: "unreachable" };
+    return { kind: "found", label: ((await res.json()) as { label: string }).label };
   } catch {
-    return null;
+    return { kind: "unreachable" };
   }
 }
 

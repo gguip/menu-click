@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
-import { TableResolver } from "@/components/TableResolver.tsx";
+import { MenuApp } from "@/components/MenuApp.tsx";
 import { getMenu } from "@/lib/api.ts";
 
 // ISR: o cardápio sai do cache e se refaz a cada 60 s. A mesa (?mesa=) é lida
-// NO NAVEGADOR — ler a querystring aqui tornaria a página dinâmica e mataria o
-// cache (e com ele a folga para a API acordar num plano gratuito).
+// NO NAVEGADOR, depois de montar (`useTable`) — ler a querystring aqui tornaria
+// a página dinâmica, e o hook do Next para lê-la manda tudo até o limite de
+// suspensão mais próximo para o navegador: o HTML do cache sairia vazio.
 export const revalidate = 60;
 
 // Nenhuma loja é gerada no build: cada cardápio é renderizado no primeiro
@@ -33,9 +33,5 @@ export default async function MenuPage({ params }: Props) {
   const { slug } = await params;
   const menu = await getMenu(slug);
   if (!menu) notFound();
-  return (
-    <Suspense fallback={null}>
-      <TableResolver menu={menu} />
-    </Suspense>
-  );
+  return <MenuApp menu={menu} />;
 }

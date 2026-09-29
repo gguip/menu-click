@@ -13,7 +13,7 @@ export function StoreNotice({
 }: {
   restaurant: MenuRestaurant;
   tableUnknown: boolean;
-  now: number;
+  now: number | null;
 }) {
   const paused = !restaurant.acceptingOrders;
   const closed = !paused && !restaurant.isOpen;

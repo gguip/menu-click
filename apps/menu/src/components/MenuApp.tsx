@@ -4,6 +4,7 @@ import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { fetchLiveRestaurant } from "@/lib/api.ts";
 import { addLine, type CartLine, cartStorageKey, loadCart, saveCart, subtotal } from "@/lib/cart.ts";
 import { formatCents } from "@/lib/money.ts";
+import { orderTableHash, type TableState, tableHashOf, tableLabelOf } from "@/lib/table.ts";
 import type { Menu, MenuProduct, MenuRestaurant, MenuSection } from "@/lib/types.ts";
 import { SearchIcon, TableIcon } from "./icons.tsx";
 import { CartScreen } from "./CartScreen.tsx";
@@ -13,6 +14,7 @@ import { ProductScreen } from "./ProductScreen.tsx";
 import { ProductGrid, sectionAnchor } from "./ProductGrid.tsx";
 import { SentScreen } from "./SentScreen.tsx";
 import { StoreNotice } from "./StoreNotice.tsx";
+import { useTable } from "./useTable.ts";
 
 export type Screen = "menu" | "product" | "cart" | "checkout" | "sent";
 
@@ -39,23 +41,28 @@ function filterSections(sections: MenuSection[], query: string): MenuSection[] {
  */
 export function MenuApp({
   menu,
-  tableHash,
-  tableLabel,
-  tableUnknown,
+  table: tableOverride,
   now: fixedNow,
   initialScreen = "menu",
 }: {
   menu: Menu;
-  tableHash: string | null;
-  tableLabel: string | null;
-  tableUnknown: boolean;
+  /** A mesa já resolvida, para teste; padrão, `?mesa=` lido no navegador. */
+  table?: TableState;
   /** Relógio injetável para teste; padrão, a hora do navegador. */
   now?: number;
   /** Só para teste de estado de tela. */
   initialScreen?: Screen;
 }) {
   const [restaurant, setRestaurant] = useState<MenuRestaurant>(menu.restaurant);
-  const [now] = useState(() => fixedNow ?? Date.now());
+  const table = useTable(menu.restaurant.slug, tableOverride);
+  const tableHash = tableHashOf(table);
+  const tableLabel = tableLabelOf(table);
+  // `null` no servidor e na hidratação: o HTML do cache é lido noutra hora, e
+  // "abre amanhã" escrito lá viraria erro de hidratação. A hora entra depois.
+  const [now, setNow] = useState<number | null>(fixedNow ?? null);
+  useEffect(() => {
+    if (fixedNow === undefined) setNow(Date.now());
+  }, [fixedNow]);
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const [query, setQuery] = useState("");
   const [activeSection, setActiveSection] = useState(0);
@@ -122,8 +129,8 @@ export function MenuApp({
 
       {screen === "menu" && (
         <main className="pb-32">
-          <MenuHeader restaurant={restaurant} inDineIn={inDineIn} now={now} />
-          <StoreNotice restaurant={restaurant} tableUnknown={tableUnknown} now={now} />
+          <MenuHeader restaurant={restaurant} inDineIn={inDineIn} />
+          <StoreNotice restaurant={restaurant} tableUnknown={table.kind === "not-found"} now={now} />
 
           {menu.sections.length === 0 ? (
             <section className="px-4 pt-8">
@@ -209,7 +216,7 @@ export function MenuApp({
         <CheckoutScreen
           restaurant={restaurant}
           lines={lines}
-          tableHash={tableHash}
+          tableHash={orderTableHash(table)}
           onBack={() => setScreen("cart")}
           onSent={() => {
             setSentLines(lines);

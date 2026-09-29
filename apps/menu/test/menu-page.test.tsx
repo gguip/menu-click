@@ -7,7 +7,7 @@ import { makeMenu } from "./fixtures.ts";
 
 describe("cardápio", () => {
   it("topo, chips, seções e cards", () => {
-    render(<MenuApp menu={makeMenu()} tableHash={null} tableLabel={null} tableUnknown={false} />);
+    render(<MenuApp menu={makeMenu()} />);
     expect(screen.getByRole("heading", { name: "Cantina do Porto" })).toBeTruthy();
     expect(screen.getByText("Aberto até 23h")).toBeTruthy();
     expect(screen.getByText("Pedido mínimo R$ 30,00")).toBeTruthy();
@@ -17,14 +17,14 @@ describe("cardápio", () => {
   });
 
   it("na mesa: faixa com o rótulo, sem mínimo nem frete grátis", () => {
-    render(<MenuApp menu={makeMenu()} tableHash="a7f3" tableLabel="Mesa 7" tableUnknown={false} />);
+    render(<MenuApp menu={makeMenu()} table={{ kind: "found", hash: "a7f3", label: "Mesa 7" }} />);
     expect(screen.getByText("Mesa 7")).toBeTruthy();
     expect(screen.getByText("Pedido no salão")).toBeTruthy();
     expect(screen.queryByText(/Pedido mínimo/)).toBeNull();
   });
 
   it("mesa não resolveu: aviso discreto, cardápio segue", () => {
-    render(<MenuApp menu={makeMenu()} tableHash="velho" tableLabel={null} tableUnknown />);
+    render(<MenuApp menu={makeMenu()} table={{ kind: "not-found", hash: "velho" }} />);
     expect(
       screen.getByText("Não reconhecemos esta mesa. Você pode pedir normalmente — a loja vai confirmar sua mesa."),
     ).toBeTruthy();
@@ -32,7 +32,7 @@ describe("cardápio", () => {
   });
 
   it("busca filtra no aparelho", () => {
-    render(<MenuApp menu={makeMenu()} tableHash={null} tableLabel={null} tableUnknown={false} />);
+    render(<MenuApp menu={makeMenu()} />);
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar no cardápio" }), { target: { value: "calab" } });
     expect(screen.getByText("Calabresa")).toBeTruthy();
     expect(screen.queryByText("Margherita")).toBeNull();
@@ -40,19 +40,19 @@ describe("cardápio", () => {
 
   it("fechada: manchete, grade da semana, sem adicionar", () => {
     const menu = makeMenu({ isOpen: false, closesAt: undefined, opensAt: "2026-09-22T21:00:00.000Z" });
-    render(<MenuApp menu={menu} tableHash="a7f3" tableLabel="Mesa 7" tableUnknown={false} now={Date.parse("2026-09-21T15:00:00-03:00")} />);
+    render(<MenuApp menu={menu} table={{ kind: "found", hash: "a7f3", label: "Mesa 7" }} now={Date.parse("2026-09-21T15:00:00-03:00")} />);
     expect(screen.getByText("Fechado. Abre amanhã às 18h")).toBeTruthy();
     expect(screen.getByText("O cardápio continua visível abaixo — só não dá para pedir.")).toBeTruthy();
   });
 
   it("pausada: texto sem prometer hora", () => {
-    render(<MenuApp menu={makeMenu({ isOpen: false, acceptingOrders: false })} tableHash="a7f3" tableLabel="Mesa 7" tableUnknown={false} />);
+    render(<MenuApp menu={makeMenu({ isOpen: false, acceptingOrders: false })} table={{ kind: "found", hash: "a7f3", label: "Mesa 7" }} />);
     expect(screen.getByText("A loja não está aceitando pedidos no momento")).toBeTruthy();
     expect(screen.getByText("Pode ser uma pausa curta. Vale tentar de novo em alguns minutos.")).toBeTruthy();
   });
 
   it("cardápio vazio", () => {
-    render(<MenuApp menu={makeMenu({}, [])} tableHash={null} tableLabel={null} tableUnknown={false} />);
+    render(<MenuApp menu={makeMenu({}, [])} />);
     expect(screen.getByText("Cardápio ainda não publicado")).toBeTruthy();
   });
 
@@ -67,7 +67,7 @@ describe("cardápio", () => {
 
   it("a cor da marca vira a cor de ação", () => {
     const { container } = render(
-      <MenuApp menu={makeMenu({ brandColor: "#0B7A48" })} tableHash={null} tableLabel={null} tableUnknown={false} />,
+      <MenuApp menu={makeMenu({ brandColor: "#0B7A48" })} />,
     );
     const root = container.firstElementChild as HTMLElement;
     expect(root.style.getPropertyValue("--brand-action")).toBe("#0B7A48");

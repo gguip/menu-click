@@ -12,13 +12,11 @@ const CHIP = "rounded-full border px-2.5 py-[5px] text-xs font-semibold";
 export function MenuHeader({
   restaurant,
   inDineIn,
-  now,
 }: {
   restaurant: MenuRestaurant;
   inDineIn: boolean;
-  now: number;
 }) {
-  const chip = openChip(restaurant, now);
+  const chip = openChip(restaurant);
   const chipTone =
     chip.tone === "open" ? "border-success/30 text-success" : "border-warn/30 bg-warn-soft text-warn";
 

@@ -32,20 +32,23 @@ function localParts(iso: string | number, timezone: string) {
 }
 
 /** O chip do topo: pausa ganha de tudo, depois aberta, depois fechada. */
-export function openChip(r: Status, nowMs: number): { tone: "open" | "closed" | "paused"; text: string } {
+export function openChip(r: Status): { tone: "open" | "closed" | "paused"; text: string } {
   if (!r.acceptingOrders) return { tone: "paused", text: "Pedidos pausados" };
   if (r.isOpen) {
     return r.closesAt
       ? { tone: "open", text: `Aberto até ${hourLabel(localParts(r.closesAt, r.timezone ?? DEFAULT_TZ).hhmm)}` }
       : { tone: "open", text: "Aberto agora" };
   }
-  void nowMs;
   return { tone: "closed", text: "Fechado agora" };
 }
 
-/** "Fechado. Abre amanhã às 18h" — a grade é a saída, não o aviso. */
-export function closedHeadline(r: Status, nowMs: number): string {
-  if (!r.opensAt) return "Fechado agora";
+/**
+ * "Fechado. Abre amanhã às 18h" — a grade é a saída, não o aviso. Sem relógio
+ * (`null`: servidor e hidratação) não dá para dizer hoje/amanhã, e a manchete
+ * não arrisca.
+ */
+export function closedHeadline(r: Status, nowMs: number | null): string {
+  if (!r.opensAt || nowMs === null) return "Fechado agora";
   const tz = r.timezone ?? DEFAULT_TZ;
   const opens = localParts(r.opensAt, tz);
   const today = localParts(nowMs, tz);

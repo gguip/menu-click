@@ -24,10 +24,22 @@ describe("API do cardápio", () => {
     expect(await getMenu("nao-existe")).toBeNull();
   });
 
-  it("resolveTable devolve o rótulo, ou null quando a mesa não existe", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => (url.endsWith("/ok") ? json({ label: "Mesa 7" }) : json({}, 404))));
-    expect(await resolveTable("cantina", "ok")).toBe("Mesa 7");
-    expect(await resolveTable("cantina", "velho")).toBeNull();
+  // "não existe" (404) e "não deu para saber" (rede, 5xx, 429 com a API
+  // acordando) são coisas diferentes: só o primeiro tira a mesa do pedido
+  it("resolveTable distingue mesa achada, inexistente e falha", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.endsWith("/ok")) return json({ label: "Mesa 7" });
+        if (url.endsWith("/velho")) return json({}, 404);
+        if (url.endsWith("/acordando")) return json({}, 503);
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    expect(await resolveTable("cantina", "ok")).toEqual({ kind: "found", label: "Mesa 7" });
+    expect(await resolveTable("cantina", "velho")).toEqual({ kind: "not-found" });
+    expect(await resolveTable("cantina", "acordando")).toEqual({ kind: "unreachable" });
+    expect(await resolveTable("cantina", "sem-rede")).toEqual({ kind: "unreachable" });
   });
 
   // resposta 200 sem o status (proxy, página de erro) não pode trocar o

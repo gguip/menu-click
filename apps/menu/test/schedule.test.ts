@@ -8,21 +8,21 @@ const now = Date.parse("2026-09-21T15:00:00-03:00");
 
 describe("horário na tela", () => {
   it("aberta com fechamento: 'Aberto até 23h' (e 23h30 quando há minutos)", () => {
-    expect(openChip({ ...base, closesAt: "2026-09-22T02:00:00.000Z" }, now)).toEqual({ tone: "open", text: "Aberto até 23h" });
-    expect(openChip({ ...base, closesAt: "2026-09-22T02:30:00.000Z" }, now).text).toBe("Aberto até 23h30");
+    expect(openChip({ ...base, closesAt: "2026-09-22T02:00:00.000Z" })).toEqual({ tone: "open", text: "Aberto até 23h" });
+    expect(openChip({ ...base, closesAt: "2026-09-22T02:30:00.000Z" }).text).toBe("Aberto até 23h30");
   });
 
   it("aberta direto: 'Aberto agora'", () => {
-    expect(openChip(base, now)).toEqual({ tone: "open", text: "Aberto agora" });
+    expect(openChip(base)).toEqual({ tone: "open", text: "Aberto agora" });
   });
 
   it("pausada vence o horário (Review Focus 4)", () => {
-    expect(openChip({ ...base, isOpen: false, acceptingOrders: false, closesAt: "2026-09-22T02:00:00.000Z" }, now))
+    expect(openChip({ ...base, isOpen: false, acceptingOrders: false, closesAt: "2026-09-22T02:00:00.000Z" }))
       .toEqual({ tone: "paused", text: "Pedidos pausados" });
   });
 
   it("fechada: 'Fechado agora'", () => {
-    expect(openChip({ ...base, isOpen: false, opensAt: "2026-09-21T21:00:00.000Z" }, now)).toEqual({
+    expect(openChip({ ...base, isOpen: false, opensAt: "2026-09-21T21:00:00.000Z" })).toEqual({
       tone: "closed",
       text: "Fechado agora",
     });

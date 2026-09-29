@@ -11,7 +11,7 @@ function withCart() {
   saveCart("cart:cantina-do-porto:a7f3", [
     { key: `${marg.id}|note:sem cebola`, productId: marg.id, name: "Margherita", unitPriceInCents: 5200, quantity: 2, options: [], note: "sem cebola" },
   ]);
-  render(<MenuApp menu={menu} tableHash="a7f3" tableLabel="Mesa 7" tableUnknown={false} />);
+  render(<MenuApp menu={menu} table={{ kind: "found", hash: "a7f3", label: "Mesa 7" }} />);
 }
 
 function json(body: unknown, status = 200) {
@@ -66,7 +66,7 @@ describe("pedido no salão", () => {
   });
 
   it("carrinho vazio orienta de volta ao cardápio", async () => {
-    render(<MenuApp menu={menu} tableHash="a7f3" tableLabel="Mesa 7" tableUnknown={false} initialScreen="cart" />);
+    render(<MenuApp menu={menu} table={{ kind: "found", hash: "a7f3", label: "Mesa 7" }} initialScreen="cart" />);
     expect(screen.getByText("Carrinho vazio")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Ver cardápio" })).toBeTruthy();
   });
