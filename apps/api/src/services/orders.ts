@@ -998,3 +998,38 @@ export async function cancel(
 ): Promise<Order> {
   return transitionAndPublish(restaurantId, orderId, "cancelled");
 }
+
+/**
+ * Marca ou desmarca o pagamento. NÃO é transição de status: não passa pelo
+ * mapa de `TRANSITIONS` nem publica no acompanhamento (que não mostra
+ * pagamento). O lock no pedido é o mesmo das transições, pelo mesmo motivo:
+ * sem ele, marcar enquanto outro aparelho cancela veria o status antigo.
+ */
+async function setPaid(
+  restaurantId: string,
+  orderId: string,
+  paid: boolean,
+): Promise<Order> {
+  await restaurantsService.ensureExists(restaurantId);
+  if (!isUuid(orderId)) throw orderNotFound(orderId);
+
+  return withTransaction(async (client) => {
+    const atual = await ordersRepository.selectForUpdate(restaurantId, orderId, client);
+    if (atual === null) throw orderNotFound(orderId);
+    if (paid && atual.status === "cancelled") {
+      throw new ConflictError("Pedido cancelado não recebe pagamento");
+    }
+    await ordersRepository.setPaid(orderId, paid, client);
+    return (await ordersRepository.findById(restaurantId, orderId, client)) as Order;
+  });
+}
+
+/** A loja diz que recebeu. Vale em qualquer forma de pagamento. */
+export async function markPaid(restaurantId: string, orderId: string): Promise<Order> {
+  return setPaid(restaurantId, orderId, true);
+}
+
+/** Vale em qualquer status: existe para corrigir um clique errado. */
+export async function markUnpaid(restaurantId: string, orderId: string): Promise<Order> {
+  return setPaid(restaurantId, orderId, false);
+}

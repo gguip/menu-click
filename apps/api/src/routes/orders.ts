@@ -161,6 +161,8 @@ const orderSummaryProperties = {
   // ausente = "tenho o valor certo"; por isso não é `nullable` (F12) — a
   // ausência é a informação, um `null` explícito não diria nada a mais
   changeForInCents: { type: "integer" },
+  // `null` = não marcado como pago (F12: sempre presente, a nulidade é a informação)
+  paidAt: { type: "string", nullable: true },
   // a mesa, com o rótulo congelado na criação. `nullable` (F12) porque `null`
   // É a informação: fora de `dine_in`, e no pedido de salão vindo de um QR
   // code antigo, que não carrega hash. O `hash` NÃO sai aqui — a listagem e o
@@ -562,6 +564,49 @@ export async function orderRoutes(app: FastifyInstance) {
     async (request) => {
       const { restaurantId, orderId } = request.params;
       return ordersService.cancel(restaurantId, orderId);
+    },
+  );
+
+  // Pagamento: NÃO é transição de status — a loja registra que recebeu.
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/mark-paid",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "markOrderPaid",
+        summary: "Marca o pedido como pago",
+        description:
+          "Não há pagamento online: quem registra que o pedido foi pago é a loja. Vale em qualquer forma de pagamento. Marcar de novo mantém a hora da primeira marcação. Pedido cancelado é 409. Não muda o status.",
+        params: orderParamsSchema,
+        response: {
+          200: orderResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.markPaid(restaurantId, orderId);
+    },
+  );
+
+  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+    "/restaurants/:restaurantId/orders/:orderId/mark-unpaid",
+    {
+      schema: {
+        tags: ["Pedidos"],
+        operationId: "markOrderUnpaid",
+        summary: "Desfaz o pago",
+        description:
+          "Existe para corrigir um clique errado; vale em qualquer status, inclusive cancelado.",
+        params: orderParamsSchema,
+        response: { 200: orderResponseSchema, 404: errorResponseSchema },
+      },
+    },
+    async (request) => {
+      const { restaurantId, orderId } = request.params;
+      return ordersService.markUnpaid(restaurantId, orderId);
     },
   );
 

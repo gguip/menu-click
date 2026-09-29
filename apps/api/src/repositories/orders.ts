@@ -51,6 +51,7 @@ type OrderRow = {
   table_label: string | null;
   /** O número do pedido na loja. `number`, acima, é o do endereço. */
   order_number: number;
+  paid_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -146,6 +147,7 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
     ...(row.change_for_in_cents === null
       ? {}
       : { changeForInCents: row.change_for_in_cents }),
+    paidAt: row.paid_at === null ? null : row.paid_at.toISOString(),
     // presente e `null` quando não há mesa, como `deliveryFeeInCents` — o
     // `check` do banco garante que as duas colunas andam juntas
     table:
@@ -482,6 +484,26 @@ export async function updateStatus(
   );
   // o evento vai na mesma transação da mudança: rollback desfaz os dois
   await insertStatusEvent(orderId, status, client);
+}
+
+/**
+ * Marca ou desmarca o pagamento. Marcar mantém o `paid_at` que já existia
+ * (`coalesce`): o primeiro registro é o que vale, e um segundo aparelho
+ * marcando de novo não muda a hora. Quem trava o pedido é o serviço.
+ */
+export async function setPaid(
+  orderId: string,
+  paid: boolean,
+  client: PoolClient,
+): Promise<void> {
+  await client.query(
+    paid
+      ? `update orders set paid_at = coalesce(paid_at, now()), updated_at = now()
+          where id = $1 and deleted_at is null`
+      : `update orders set paid_at = null, updated_at = now()
+          where id = $1 and deleted_at is null`,
+    [orderId],
+  );
 }
 
 /** Registra que o pedido entrou em `status`. Só a criação e `updateStatus` chamam. */

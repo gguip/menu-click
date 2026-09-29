@@ -286,6 +286,8 @@ export type OrderSummary = {
   paymentMethod: PaymentMethod;
   /** Ausente = "tenho o valor certo". Só faz sentido junto de `paymentMethod: "cash"`. */
   changeForInCents?: number;
+  /** Quando a loja marcou como pago; `null` = não marcado. Sempre presente (F12). */
+  paidAt: string | null;
   /**
    * A mesa de onde o pedido veio, com o rótulo **congelado** na criação —
    * nunca lido de `tables`. Renomear a mesa não reescreve pedido antigo, e
