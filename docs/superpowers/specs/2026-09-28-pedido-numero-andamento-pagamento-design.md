@@ -1,6 +1,6 @@
 # Número do pedido, andamento, horário da loja e pagamento — desenho
 
-**Data:** 2026-09-28 · **Estado:** aprovado, a implementar (branch `feat/pedido-numero-andamento-pagamento`)
+**Data:** 2026-09-28 · **Estado:** implementado (branch `feat/pedido-numero-andamento-pagamento`)
 
 ## O problema
 

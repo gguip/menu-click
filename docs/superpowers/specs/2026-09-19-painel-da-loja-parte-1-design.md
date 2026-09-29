@@ -400,18 +400,16 @@ entram na parte 3, e a separação das origens é pendência já registrada.
 
 | Handoff | Aqui | Por quê |
 | --- | --- | --- |
-| `#1042` sequencial | `#A3F9`, derivado do UUID | a API não tem número de pedido |
-| hora real em toda etapa do Andamento | hora só em "Novo" e na etapa atual | a API só tem `createdAt` e `updatedAt` |
-| "Pix · pago" | só a forma de pagamento | a API não registra se o pagamento aconteceu |
 | "Borda: Catupiry +R$ 8,00" | sem valor por opção | o pedido não guarda a regra do grupo; em "mais caro" e "média" o "+R$" mentiria |
 | cancelar pedido novo com o texto "as unidades voltam" | terceiro texto, "Recusar" | pedido `pending` nunca baixou estoque |
 | cadastro com nome e tipo de cozinha | + endereço e modalidades | o register exige |
 | "Salvar e entrar" | "Salvar nova senha" | o reset não devolve sessão e a página não sabe o e-mail |
-| "Aberta · fecha 23:30" no rail | só "Aceitando pedidos" / "Pausada agora" | a rota do restaurante não expõe `isOpen`, e calcular no front duplicaria regra que mora no Postgres |
 | sem logout | "Sair" no menu do rodapé do rail | sem ele, só limpando o navegador |
 | sem troca de senha | "Trocar senha" no mesmo menu, num modal | a senha provisória do convite (parte 3b) promete a troca "no menu da conta"; sem ela, quem foi convidado ficava preso à senha que recebeu |
 | sem remoção de produto | bloco "Remover produto" no fim da edição, com confirmação que diz que pedidos antigos ficam intactos e sugere zerar o estoque para tirar do ar por um tempo | a API tem a rota; a parte 4 desenhou o fluxo seguindo o `DangerZone` de Dados da loja |
 | sem aviso de alteração não salva | "Sair sem salvar?" ao trocar de tela com a barra suja, e o aviso do navegador ao recarregar | sem ele, um clique no rail descartava um horário ou um produto inteiro em silêncio |
+| só "Aberta · fecha …" e "Pausada agora" no rail | + "Fechada · abre …" e "Fechada · sem horário cadastrado" | o handoff não desenha a loja fora do horário (spec de 2026-09-28) |
+| "Pix · pago" sem dizer quem registra | "Marcar como pago" / "Desfazer pago" no drawer | não há pagamento online: quem marca é a loja (spec de 2026-09-28) |
 
 ## Pendências de backend que este desenho gera
 
