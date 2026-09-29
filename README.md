@@ -11,40 +11,45 @@ Monorepo gerenciado com [Turborepo](https://turborepo.dev) + [pnpm](https://pnpm
 - **Monorepo:** Turborepo + pnpm workspaces
 - **API:** [Fastify](https://fastify.dev) + TypeScript (rodando nativamente no Node 24, sem `tsx`/`ts-node`)
 - **Banco:** PostgreSQL com o driver [`pg`](https://node-postgres.com) (SQL na mão, sem ORM)
+- **Painel da loja:** Vite + React + Mantine + TanStack Query
+- **App do cliente:** Next.js (ISR no cardápio) + Tailwind
 
 ## Estrutura
 
 ```
 MenuClick/
 ├─ apps/
-│  └─ api/            # API HTTP (Fastify + TypeScript)
-│     ├─ .env.example        # variáveis de ambiente (copie para .env)
-│     ├─ migrations/         # migrations em SQL puro (node-pg-migrate)
-│     ├─ test/               # testes de integração (vitest + app.inject)
-│     └─ src/
-│        ├─ server.ts        # listen (chama o buildApp)
-│        ├─ app.ts           # monta o app: plugins, rotas e error handler
-│        ├─ errors.ts        # erros de negócio (NotFoundError, ConflictError)
-│        ├─ db/
-│        │  ├─ pool.ts       # pool de conexões do Postgres + withTransaction
-│        │  ├─ migrate.ts    # runner das migrations (pnpm migrate:up/down)
-│        │  ├─ seed.sql      # dados de exemplo
-│        │  └─ seed.ts       # aplica o seed (pnpm db:seed)
-│        ├─ domain/          # tipos do domínio (sem runtime): restaurant, product,
-│        │                    # customer, order, pagination
-│        ├─ repositories/    # só SQL: restaurants, restaurant-users, sessions,
-│        │                    # products, customers, orders
-│        ├─ services/        # só regra: auth, restaurants, menu, products, orders
-│        └─ routes/          # só HTTP (schema, params, status code)
-│           ├─ health.ts     # GET /health
-│           ├─ schemas.ts    # schemas compartilhados (erro, paginação, endereço)
-│           ├─ authenticate.ts      # hook que fecha tudo por padrão
-│           ├─ auth.ts              # cadastro, login, logout, /me
-│           ├─ menu.ts              # cardápio PÚBLICO por slug (o QR code)
-│           ├─ restaurants.ts        # CRUD de restaurantes
-│           ├─ products.ts           # CRUD de produtos do restaurante
-│           └─ orders.ts             # pedidos: criar, listar, confirmar, cancelar
-├─ packages/          # libs compartilhadas (em breve)
+│  ├─ api/            # API HTTP (Fastify + TypeScript)
+│  │  ├─ .env.example        # variáveis de ambiente (copie para .env)
+│  │  ├─ migrations/         # migrations em SQL puro (node-pg-migrate)
+│  │  ├─ test/               # testes de integração (vitest + app.inject)
+│  │  └─ src/
+│  │     ├─ server.ts        # listen (chama o buildApp)
+│  │     ├─ app.ts           # monta o app: plugins, rotas e error handler
+│  │     ├─ errors.ts        # erros de negócio (NotFoundError, ConflictError)
+│  │     ├─ db/
+│  │     │  ├─ pool.ts       # pool de conexões do Postgres + withTransaction
+│  │     │  ├─ migrate.ts    # runner das migrations (pnpm migrate:up/down)
+│  │     │  ├─ seed.sql      # dados de exemplo
+│  │     │  └─ seed.ts       # aplica o seed (pnpm db:seed)
+│  │     ├─ domain/          # tipos do domínio (sem runtime): restaurant, product,
+│  │     │                    # customer, order, pagination
+│  │     ├─ repositories/    # só SQL: restaurants, restaurant-users, sessions,
+│  │     │                    # products, customers, orders
+│  │     ├─ services/        # só regra: auth, restaurants, menu, products, orders
+│  │     └─ routes/          # só HTTP (schema, params, status code)
+│  │        ├─ health.ts     # GET /health
+│  │        ├─ schemas.ts    # schemas compartilhados (erro, paginação, endereço)
+│  │        ├─ authenticate.ts      # hook que fecha tudo por padrão
+│  │        ├─ auth.ts              # cadastro, login, logout, /me
+│  │        ├─ menu.ts              # cardápio PÚBLICO por slug (o QR code)
+│  │        ├─ restaurants.ts        # CRUD de restaurantes
+│  │        ├─ products.ts           # CRUD de produtos do restaurante
+│  │        └─ orders.ts             # pedidos: criar, listar, confirmar, cancelar
+│  ├─ panel/          # painel da loja (Vite + React + Mantine), porta 5173
+│  └─ menu/           # app do cliente: cardápio do QR code (Next.js), porta 3000
+├─ packages/
+│  └─ pricing/        # a conta do preço do item, usada pela API e pelo app
 ├─ turbo.json         # tasks do Turborepo
 └─ pnpm-workspace.yaml
 ```
@@ -379,8 +384,7 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 - [ ] Recuperação de senha e papéis dentro do restaurante (dono vs. garçom)
 - [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
 - [ ] Histórico do cliente (`GET /customers/:id/orders`) e CRUD próprio de clientes
-- [ ] `packages/` compartilhados (tipos, config) — quando o front existir
-- [ ] App do cliente (cardápio via QR code) e painel admin — a API já está pronta para os dois
+- [ ] App do cliente, parte 2: entrega, retirada e acompanhamento do pedido
 - [ ] Redis: contador de rate limit e emissor de eventos compartilhados, quando houver mais de uma instância
 # menu-click
 # menu-click

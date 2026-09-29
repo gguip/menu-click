@@ -1,6 +1,6 @@
 # App do cliente, parte 1 — base, cardápio e o pedido do salão — desenho
 
-**Data:** 2026-09-29 · **Estado:** aprovado, a implementar (branch `feat/app-cliente-parte-1`)
+**Data:** 2026-09-29 · **Estado:** implementado (branch `feat/app-cliente-parte-1`)
 
 ## O problema
 

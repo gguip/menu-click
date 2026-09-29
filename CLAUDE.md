@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: existem a API e o painel da loja (`apps/panel` — acesso, pedidos, resumo do dia, modo cozinha, cardápio com grupos de opções, e a configuração de modalidades, entrega, horário e dados da loja). A API tem (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, taxa de entrega por bairro ou fixa com pedido mínimo, mesas do salão com QR code próprio, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
+MenuClick — plataforma de cardápio digital, QR code e delivery para restaurantes (estilo Goomer). Monorepo Turborepo + pnpm. Está em fase inicial: existem a API, o painel da loja (`apps/panel` — acesso, pedidos, resumo do dia, modo cozinha, cardápio com grupos de opções, e a configuração de modalidades, entrega, horário e dados da loja) e o app do cliente (`apps/menu` — por enquanto cardápio, produto com opções, carrinho e pedido do salão pelo QR da mesa), mais um pacote compartilhado, `packages/pricing`, com a conta do preço. A API tem (autenticação por sessão com papéis, troca de senha e verificação do e-mail do restaurante, cardápio público por slug agrupado em seções, CRUD de restaurantes, de categorias, de produtos e de grupos de opções no Postgres, busca no cardápio, resumo e filtros de período para o painel, controle de estoque e o fluxo de pedidos — com opções escolhidas — em três modalidades — salão, retirada e entrega — cada uma com sua trilha de status —, horário de funcionamento com pausa manual e forma de pagamento do pedido, taxa de entrega por bairro ou fixa com pedido mínimo, mesas do salão com QR code próprio, e acompanhamento em tempo real por WebSocket). O produto é construído **incrementalmente, começando simples** — não adicione dependências, camadas ou apps que não foram pedidos.
 
 ## Comandos
 
@@ -30,6 +30,11 @@ pnpm --filter @menuclick/api test             # suíte de integração (precisa 
 pnpm --filter @menuclick/panel dev            # painel em http://localhost:5173 (proxy /api → :3333)
 pnpm --filter @menuclick/panel test           # testes do painel (jsdom, sem banco)
 pnpm --filter @menuclick/panel build          # type-check + vite build
+
+pnpm --filter @menuclick/menu dev             # app do cliente em http://localhost:3000
+pnpm --filter @menuclick/menu test            # testes do app (jsdom, sem banco)
+pnpm --filter @menuclick/menu build           # type-check + next build
+pnpm --filter @menuclick/pricing test         # a conta do preço (sem banco)
 ```
 
 A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). 🚨 **`MENU_BASE_URL` é obrigatória e não tem default — sem ela a API não sobe** (é a raiz da URL do cardápio, de onde sai o endereço dentro do QR code das mesas; ver a seção de mesas). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
@@ -318,7 +323,7 @@ Não há `check (stock >= 0)` no banco **de propósito** (ver a migration `add-s
 
 Três coisas do painel do restaurante andam juntas, e a primeira sustenta as outras duas.
 
-**`restaurants.timezone` decide onde o dia começa.** É nome IANA (`America/Sao_Paulo`, o default), não offset fixo: offset não sabe de horário de verão, e o Brasil já mudou o dele por município. Sem a coluna, "pedidos de hoje" não tem resposta — o dia de Manaus começa uma hora depois do de São Paulo, e o painel precisa que "hoje" signifique a mesma coisa para o dono em casa e para o gerente no salão. É editável por PATCH (ao contrário do slug, mudá-lo não quebra QR code impresso) e **não** sai no cardápio público (S10).
+**`restaurants.timezone` decide onde o dia começa.** É nome IANA (`America/Sao_Paulo`, o default), não offset fixo: offset não sabe de horário de verão, e o Brasil já mudou o dele por município. Sem a coluna, "pedidos de hoje" não tem resposta — o dia de Manaus começa uma hora depois do de São Paulo, e o painel precisa que "hoje" signifique a mesma coisa para o dono em casa e para o gerente no salão. É editável por PATCH (ao contrário do slug, mudá-lo não quebra QR code impresso). ⚠️ Passou a sair no cardápio público, por decisão explícita (S10): sem ele o app do cliente escreveria "abre às 18h" no fuso do celular de quem lê, e erraria a hora para quem está em outro fuso.
 
 A validação é construir um `Intl.DateTimeFormat` e ver se ele reclama, **não** comparar com `Intl.supportedValuesOf("timeZone")`: aquela lista traz só nomes canônicos e recusaria apelidos como `Brazil/East`, que o Postgres aceita — e aí a API e o banco discordariam sobre o que existe.
 
@@ -460,7 +465,9 @@ suficiente para a tela anunciar "frete grátis acima de R$ 50" e "pedido mínimo
 de R$ 30" antes do carrinho. `MenuRestaurant` (`domain/menu.ts`) é um `Pick`
 explícito do `Restaurant`, não um `Omit` — coluna nova não chega ao cardápio
 sozinha, precisa entrar no `Pick`, no `toMenuRestaurant()` e no
-`schema.response` da rota, os três (S10).
+`schema.response` da rota, os três (S10). (Fora do frete, o cardápio também traz
+`timezone`, `closesAt`/`opensAt`, `coverUrl` e `brandColor` — ver a seção do app
+do cliente.)
 `deliveryFixedFeeInCents` e `deliveryFeeToArrange` ficam de fora **de
 propósito**: a cotação já devolve o número certo para o endereço do cliente, e
 a política de "a combinar" é operação interna da loja, não informação dele.
@@ -669,7 +676,7 @@ SPA em Vite + React 19 + Mantine 9 + React Router 8 + TanStack Query 5 — **o p
 - **Polling de 10 s continua com a aba em segundo plano** (`refetchIntervalInBackground`): o painel passa o dia atrás de outras janelas. O aviso de pedido novo (bipe, título da aba, contador) vigia os `pending` de qualquer data, na casca — toca em qualquer tela.
 - **A lista de pedidos pagina até o fim** (`fetchAllPages`): com "mais recentes" num dia cheio, um pedido aberto antigo sumiria do kanban.
 - **"Aceitar" encadeia `confirm` + `start-preparing`**; se o segundo falhar, o pedido fica `confirmed` com "Começar preparo" como rede. Cancelar tem **três** textos (recusar / devolve / não devolve estoque), regra em `features/orders/orderRules.ts`.
-- ⚠️ **Token em `localStorage` é provisório** (pendência de integração); as rotas `/recuperar-senha` e `/verificar-email` casam com os defaults de `PASSWORD_RESET_URL` e `EMAIL_VERIFICATION_URL`. O `MENU_BASE_URL` default também aponta para `:5173` — até o cardápio do cliente existir, o QR de uma mesa abriria o painel.
+- ⚠️ **Token em `localStorage` é provisório** (pendência de integração); as rotas `/recuperar-senha` e `/verificar-email` casam com os defaults de `PASSWORD_RESET_URL` e `EMAIL_VERIFICATION_URL`. O `MENU_BASE_URL` do `.env.example` aponta para o app do cliente (`:3000`), e essa origem entra em `CORS_ORIGINS`.
 - **Testes:** Vitest + Testing Library + jsdom, `fetch` mockado por `test/api-mock.ts`, Mantine com `env="test"`. Não há `jest-dom`.
 - **A grade de horário é `PUT` de lista inteira** (`/opening-hours`): por isso a tela tem barra de salvar e nada sai enquanto a pessoa digita — uma hora pela metade (`18:`) viraria uma grade quebrada, e o `PUT` substitui tudo. Dia sem faixa some do corpo: é assim que ele fica fechado. A regra (dias, faixas, tradução da numeração `0 = domingo`, validação) mora em `features/settings/openingHours.ts`, sem React.
 - **Interruptor salva sozinho, com volta atrás** (`useToggleRestaurantFlag`): o estado novo aparece na hora e o cache volta ao anterior se o `PATCH` falhar. Formulário (Dados da loja, produto, horário) usa a `SaveBar` de `src/ui/`.
@@ -695,9 +702,26 @@ SPA em Vite + React 19 + Mantine 9 + React Router 8 + TanStack Query 5 — **o p
 - **A `SaveBar` avisa antes de sair de tela suja** (`useBlocker` na troca de rota, `beforeunload` no recarregar), então os quatro formulários herdam o aviso sem código próprio. ⚠️ **Toda navegação que sai de propósito leva `LEAVE_WITHOUT_ASKING` no `state`** (`src/ui/unsavedChanges.ts`): o salvar que navega com a tela ainda suja, o "Cancelar", a sessão expirada, o "Sair" e a remoção da loja. Navegação nova que sai de um formulário sem a marca faz o aviso perguntar sobre o que acabou de ser salvo. O `useBlocker` exige router de dados — teste de `SaveBar` renderiza dentro de `renderRoutes`.
 - **Remover produto mora na edição**, não na listagem (cada linha já é um link inteiro). A API tira o produto dos grupos de opções na mesma transação; o painel só invalida `["products", restaurantId]`, que também refaz o "usado em N produtos".
 
+### App do cliente (`apps/menu`)
+
+O que a pessoa abre ao escanear o QR. Next.js 16 (App Router) + Tailwind 4 + React 19, testes em Vitest + Testing Library + jsdom. Spec: `docs/superpowers/specs/2026-09-29-app-do-cliente-parte-1-design.md`; handoff de design em `docs/design/app-do-cliente/`. A **parte 1** cobre cardápio, produto, carrinho e pedido do **salão**; entrega, retirada e acompanhamento ficam para a parte 2.
+
+- ⚠️ **Este Next não é o do treino.** O `AGENTS.md` do app (gerado pelo `next dev`, e commitado para a árvore ficar limpa) manda ler o guia em `node_modules/next/dist/docs/` antes de escrever código. Leia.
+- **ISR de 60 s só no cardápio** (`app/[slug]/page.tsx`: `revalidate = 60` + `generateStaticParams()` vazio). Sem o `generateStaticParams` o Next 16 constrói a rota como dinâmica e o `revalidate` não vale nada — o `next build` mostra `●` quando está certo e `ƒ` quando não. O ISR também esconde o sono da API num plano gratuito: o cardápio sai do cache mesmo com ela acordando.
+- ⚠️ **A mesa (`?mesa=`) é lida no NAVEGADOR** (`useSearchParams` dentro de `Suspense`, em `TableResolver`). Ler `searchParams` na página a tornaria dinâmica — uma renderização por mesa, por visita. Há teste que lê o fonte da página e falha se `searchParams` aparecer.
+- **O "aberto agora" é buscado ao vivo, sem cache** (`fetchLiveRestaurant`), porque o HTML pode ter 60 s. Só `isOpen`, `acceptingOrders`, `closesAt` e `opensAt` são mesclados por cima do cardápio, e a resposta só vale se os dois booleanos vierem como booleanos — um 200 qualquer já trocou o restaurante inteiro e escondeu o carrinho.
+- **`packages/pricing` é a fonte única do preço** — a API cobra e o app mostra com a MESMA `unitPrice()`, então o total ao vivo da tela do produto não diverge do que a loja recebe. Um arquivo só (`src/index.ts`), TypeScript apagável, sem build: a API o carrega pelo symlink do pnpm e o Next pelo `transpilePackages`. `domain/option.ts` da API reexporta dele.
+- **O carrinho mora em `localStorage`, por loja e por mesa** (`cart:<slug>:<hash|link>`), com leitura e escrita em `try/catch` (aba anônima pode recusar). Linhas se fundem com a MESMA regra da API: produto + opções + observação aparada — "sem cebola" e "com cebola" são duas linhas.
+- **A observação do item (`order_items.note`, 140 caracteres)** entra na chave de fusão do pedido na API (`chaveDeFusao`) e aparece no painel e no modo cozinha como "Obs.:".
+- **A cor de ação vem de `restaurants.brand_color`** (variável CSS `--brand-action`, com `#1E5AE8` de padrão), e a API **recusa** cor com contraste menor que 4.5:1 contra o texto branco do botão (`domain/color.ts`) — cor ilegível não é gosto da loja, é botão que ninguém lê. `cover_url` é a capa do topo. As duas são opcionais e o `PATCH` aceita `null` para limpar (F12).
+- **O cardápio público ganhou campos, cada um por decisão (S10):** `timezone` (a hora de "abre às 18h" é a da loja, não a do celular), `closesAt`/`opensAt` (de `findOpeningStatus()`, a mesma conta do painel; `isOpen` ali já é grade **e** pausa), `coverUrl` e `brandColor`.
+- 🚨 **`MENU_BASE_URL` é a origem deste app** (`http://localhost:3000` em dev), e essa origem precisa estar em `CORS_ORIGINS` — o app chama a API direto do navegador para o status ao vivo, a mesa e o pedido.
+- **Testes:** o `fetch` global é trocado por um que **rejeita** em todo teste (`test/setup.ts`): nenhum teste sai para a rede sem mock explícito. `localStorage` é limpo depois de cada um.
+- ⚠️ **Opção de produto é checkbox visualmente escondido, em todo grupo** (inclusive o de uma escolha só): o `toggleOption` permite desmarcar, e radio nativo não desmarca. Automação de navegador que clicar no `input` falha — clique no texto da opção, como a pessoa faria.
+
 ### Monorepo
 
-Turborepo (`turbo.json`) + pnpm workspaces (`pnpm-workspace.yaml`: `apps/*` + `packages/*`). `packages/` ainda **não existe** no disco — o `pnpm-workspace.yaml` só o declara, reservado para libs compartilhadas. As tasks `dev`/`start` são `persistent` e sem cache; `build` depende de `^build` (builds das dependências primeiro).
+Turborepo (`turbo.json`) + pnpm workspaces (`pnpm-workspace.yaml`: `apps/*` + `packages/*`). `packages/` tem um pacote só, `@menuclick/pricing` — ver a seção do app do cliente. As tasks `dev`/`start` são `persistent` e sem cache; `build` depende de `^build` (builds das dependências primeiro).
 
 ## Convenções
 
