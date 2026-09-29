@@ -2,11 +2,12 @@
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { fetchLiveRestaurant } from "@/lib/api.ts";
-import { type CartLine, cartStorageKey, loadCart, subtotal } from "@/lib/cart.ts";
+import { addLine, type CartLine, cartStorageKey, loadCart, saveCart, subtotal } from "@/lib/cart.ts";
 import { formatCents } from "@/lib/money.ts";
 import type { Menu, MenuProduct, MenuRestaurant, MenuSection } from "@/lib/types.ts";
 import { SearchIcon, TableIcon } from "./icons.tsx";
 import { MenuHeader } from "./MenuHeader.tsx";
+import { ProductScreen } from "./ProductScreen.tsx";
 import { ProductGrid, sectionAnchor } from "./ProductGrid.tsx";
 import { StoreNotice } from "./StoreNotice.tsx";
 
@@ -57,6 +58,7 @@ export function MenuApp({
   const [activeSection, setActiveSection] = useState(0);
   const storageKey = cartStorageKey(restaurant.slug, tableHash);
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [product, setProduct] = useState<MenuProduct | null>(null);
 
   // O cardápio da página tem até 60 s (ISR); horário e pausa são de AGORA.
   useEffect(() => {
@@ -74,6 +76,11 @@ export function MenuApp({
     setLines(loadCart(storageKey));
   }, [storageKey]);
 
+  const updateLines = (next: CartLine[]) => {
+    setLines(next);
+    saveCart(storageKey, next);
+  };
+
   const sections = useMemo(() => filterSections(menu.sections, query), [menu.sections, query]);
   const inDineIn = tableHash !== null;
   // Na parte 1 só o salão monta pedido: o link (entrega/retirada) é a parte 2.
@@ -81,8 +88,10 @@ export function MenuApp({
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
   const brand = { "--brand-action": restaurant.brandColor ?? "#1E5AE8" } as CSSProperties;
 
-  const openProduct = (product: MenuProduct) => {
-    void product;
+  const openProduct = (chosen: MenuProduct) => {
+    setProduct(chosen);
+    setScreen("product");
+    window.scrollTo?.(0, 0);
   };
 
   return (
@@ -155,6 +164,19 @@ export function MenuApp({
             </>
           )}
         </main>
+      )}
+
+      {screen === "product" && product && (
+        <ProductScreen
+          product={product}
+          groups={menu.optionGroups}
+          canOrder={canOrder}
+          onBack={() => setScreen("menu")}
+          onAdd={(line) => {
+            updateLines(addLine(lines, line));
+            setScreen("menu");
+          }}
+        />
       )}
 
       {screen === "menu" && canOrder && count > 0 && (
