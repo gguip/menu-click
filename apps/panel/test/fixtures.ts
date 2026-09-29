@@ -56,6 +56,7 @@ export function makeRestaurant(overrides: Partial<Restaurant> = {}): Restaurant 
     deliveryFixedFeeInCents: 900,
     deliveryFeeToArrange: false,
     minimumOrderInCents: 0,
+    openingStatus: { isOpen: true, closesAt: "2026-09-20T02:30:00.000Z" },
     ...overrides,
   };
 }

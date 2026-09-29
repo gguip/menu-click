@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRestaurant, updateRestaurant } from "../../api/restaurant.ts";
 import type { RestaurantPatch } from "../../api/restaurant.ts";
 import type { Restaurant } from "../../api/types.ts";
+import { keepOpeningStatus } from "./storeStatus.ts";
 
 export function restaurantQueryKey(id: string) {
   return ["restaurant", id] as const;
@@ -39,7 +40,7 @@ export function useSetAcceptingOrders(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (acceptingOrders: boolean) => updateRestaurant(id, { acceptingOrders }),
-    onSuccess: (restaurant) => queryClient.setQueryData(restaurantQueryKey(id), restaurant),
+    onSuccess: (restaurant) => queryClient.setQueryData<Restaurant>(restaurantQueryKey(id), (previous) => keepOpeningStatus(previous, restaurant)),
   });
 }
 
@@ -49,7 +50,7 @@ export function useUpdateRestaurant(id: string) {
   return useMutation({
     mutationFn: (patch: RestaurantPatch) => updateRestaurant(id, patch),
     onSuccess: (restaurant, patch) => {
-      queryClient.setQueryData(restaurantQueryKey(id), restaurant);
+      queryClient.setQueryData<Restaurant>(restaurantQueryKey(id), (previous) => keepOpeningStatus(previous, restaurant));
       // O fuso decide onde o dia começa: "pedidos de hoje" e o faturamento
       // do header dependem dele. Sem invalidar, o header e o kanban ficam no
       // dia antigo até o próximo poll — o prefixo `["orders"]` existe
@@ -81,6 +82,6 @@ export function useToggleRestaurantFlag(id: string) {
     onError: (_error, _patch, context) => {
       if (context?.previous !== undefined) queryClient.setQueryData(key, context.previous);
     },
-    onSuccess: (restaurant) => queryClient.setQueryData(key, restaurant),
+    onSuccess: (restaurant) => queryClient.setQueryData<Restaurant>(key, (previous) => keepOpeningStatus(previous, restaurant)),
   });
 }

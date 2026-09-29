@@ -43,6 +43,11 @@ export type Restaurant = {
   freeDeliveryAboveInCents?: number;
   deliveryFeeToArrange: boolean;
   minimumOrderInCents: number;
+  /**
+   * Só o GET traz (PATCH não calcula): se a loja está dentro da grade agora.
+   * Ausente enquanto não houve GET — e o cache preserva o último valor.
+   */
+  openingStatus?: { isOpen: boolean; closesAt?: string; opensAt?: string };
 };
 
 export type OrderType = "dine_in" | "takeaway" | "delivery";

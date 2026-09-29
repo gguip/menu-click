@@ -37,7 +37,8 @@ describe("PanelLayout", () => {
     expect(screen.getByText("R$ 75,00")).toBeTruthy();
     expect(screen.getByText("Aceitos hoje")).toBeTruthy();
     expect(screen.getByText("6")).toBeTruthy();
-    expect(screen.getByText("Aceitando pedidos", { selector: "span" })).toBeTruthy();
+    // o rail diz a GRADE ("Aberta · fecha …"); "Aceitando pedidos" é o interruptor do header
+    expect(screen.getByText("Aberta · fecha 23:30")).toBeTruthy();
   });
 
   it("o interruptor pausa a loja e a faixa aparece", async () => {
@@ -57,6 +58,15 @@ describe("PanelLayout", () => {
     expect(api.calls.find((call) => call.method === "PATCH")?.body).toEqual({ acceptingOrders: false });
     expect(pause.getAttribute("aria-checked")).toBe("false");
     expect(screen.getByText("Pausada agora")).toBeTruthy();
+
+    // despausa: o PATCH volta sem `openingStatus`, e o rail NÃO pode esquecê-lo
+    api.add({
+      method: "PATCH",
+      path: `/restaurants/${RESTAURANT_ID}`,
+      body: makeRestaurant({ acceptingOrders: true, openingStatus: undefined }),
+    });
+    fireEvent.click(pause);
+    expect(await screen.findByText("Aberta · fecha 23:30")).toBeTruthy();
   });
 
   it("loja já pausada abre com a faixa", async () => {
