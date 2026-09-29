@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { pool } from "../src/db/pool.ts";
+import { pool, withTransaction } from "../src/db/pool.ts";
+import * as ordersRepository from "../src/repositories/orders.ts";
 import { buildTestApp, createOrder, createProduct, createRestaurant } from "./helpers.ts";
 
 /**
@@ -53,11 +54,14 @@ describe("número do pedido", () => {
     expect(tracked.json().number).toBe(1);
   });
 
-  it("criação que falha depois do número não queima o número", async () => {
+  // A reserva é a ÚLTIMA coisa antes do insert: toda validação que recusa o
+  // pedido (troco, mínimo, mesa, opções) roda antes dela. Este teste prende o
+  // efeito visível disso; o seguinte prende o rollback em si.
+  it("pedido recusado não queima número", async () => {
     const r = await createRestaurant(app);
     const p = await createProduct(app, r, { stock: 100, priceInCents: 5000 });
     await createOrder(app, r.id, [{ productId: p.id, quantity: 1 }]);
-    // troco menor que o total: 400 no serviço, DEPOIS do incremento
+    // troco menor que o total: 400 no serviço, antes da reserva do número
     const falha = await app.inject({
       method: "POST",
       url: `/restaurants/${r.id}/orders`,
@@ -70,6 +74,21 @@ describe("número do pedido", () => {
       },
     });
     expect(falha.statusCode).toBe(400);
+
+    const next = await createOrder(app, r.id, [{ productId: p.id, quantity: 1 }]);
+    expect(next.number).toBe(2);
+  });
+
+  it("número reservado numa transação desfeita volta para o contador", async () => {
+    const r = await createRestaurant(app);
+    const p = await createProduct(app, r, { stock: 100 });
+    await createOrder(app, r.id, [{ productId: p.id, quantity: 1 }]);
+
+    // reserva e desfaz: é o que acontece se algo falhar DEPOIS da reserva
+    await withTransaction(async (client) => {
+      expect(await ordersRepository.nextOrderNumber(r.id, client)).toBe(2);
+      throw new Error("falha depois da reserva");
+    }).catch(() => {});
 
     const next = await createOrder(app, r.id, [{ productId: p.id, quantity: 1 }]);
     expect(next.number).toBe(2);
