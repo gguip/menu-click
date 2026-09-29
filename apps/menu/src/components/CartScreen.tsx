@@ -10,6 +10,7 @@ import { ScreenHeader } from "./ScreenHeader.tsx";
 export function CartScreen({
   lines,
   context,
+  notice = null,
   onChange,
   onBack,
   onCheckout,
@@ -17,6 +18,8 @@ export function CartScreen({
   lines: CartLine[];
   /** "Mesa 7" no salão. */
   context: string;
+  /** O carrinho guardado mudou ao ser conferido com o cardápio. */
+  notice?: string | null;
   onChange: (next: CartLine[]) => void;
   onBack: () => void;
   onCheckout: () => void;
@@ -25,6 +28,11 @@ export function CartScreen({
     return (
       <main>
         <ScreenHeader title="Seu carrinho" context={context} onBack={onBack} />
+        {notice && (
+          <p role="status" className="mx-4 mt-3 rounded-field bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn">
+            {notice}
+          </p>
+        )}
         <div className="flex flex-col items-center gap-3.5 px-8 py-20 text-center">
           <span className="flex size-14 items-center justify-center rounded-full bg-paper-2 text-ink-3" aria-hidden="true">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
@@ -49,6 +57,11 @@ export function CartScreen({
   return (
     <main className="pb-32">
       <ScreenHeader title="Seu carrinho" context={context} onBack={onBack} />
+      {notice && (
+        <p role="status" className="mx-4 mt-3 rounded-field bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn">
+          {notice}
+        </p>
+      )}
       <ul>
         {lines.map((line) => (
           <li key={line.key} className="flex gap-3 border-b border-paper-3 p-4">

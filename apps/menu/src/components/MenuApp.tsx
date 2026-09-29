@@ -2,7 +2,7 @@
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { fetchLiveRestaurant, type OrderReceipt } from "@/lib/api.ts";
-import { addLine, type CartLine, cartStorageKey, loadCart, saveCart, subtotal } from "@/lib/cart.ts";
+import { addLine, type CartLine, cartStorageKey, loadCart, reconcileCart, saveCart, subtotal } from "@/lib/cart.ts";
 import { formatCents } from "@/lib/money.ts";
 import { orderTableHash, type TableState, tableHashOf, tableLabelOf } from "@/lib/table.ts";
 import type { Menu, MenuProduct, MenuRestaurant, MenuSection } from "@/lib/types.ts";
@@ -69,6 +69,7 @@ export function MenuApp({
   // a chave vem do cardápio da página, que não muda: o status ao vivo não mexe nela
   const storageKey = cartStorageKey(menu.restaurant.slug, tableHash);
   const [lines, setLines] = useState<CartLine[]>([]);
+  const [cartUpdated, setCartUpdated] = useState(false);
   const [product, setProduct] = useState<MenuProduct | null>(null);
   // o que a loja gravou, e o que o aparelho esperava — o carrinho já foi limpo
   const [sent, setSent] = useState<{ receipt: OrderReceipt; expectedTotal: number } | null>(null);
@@ -92,10 +93,15 @@ export function MenuApp({
     };
   }, [menu.restaurant.slug]);
 
-  // Carrinho por loja e por mesa, lido depois de montar (o servidor não tem storage).
+  // Carrinho por loja e por mesa, lido depois de montar (o servidor não tem
+  // storage) e conferido contra o cardápio desta página: o guardado não tem
+  // prazo, e o que o servidor recusaria sai antes de a pessoa tentar.
   useEffect(() => {
-    setLines(loadCart(storageKey));
-  }, [storageKey]);
+    const { lines: fresh, changed } = reconcileCart(loadCart(storageKey), menu);
+    setLines(fresh);
+    setCartUpdated(changed);
+    if (changed) saveCart(storageKey, fresh);
+  }, [storageKey, menu]);
 
   const updateLines = (next: CartLine[]) => {
     setLines(next);
@@ -206,6 +212,7 @@ export function MenuApp({
         <CartScreen
           lines={lines}
           context={tableLabel ?? ""}
+          notice={cartUpdated ? "Atualizamos seu carrinho com o cardápio de agora." : null}
           onChange={updateLines}
           onBack={() => setScreen("menu")}
           onCheckout={() => setScreen("checkout")}

@@ -42,18 +42,31 @@ export function CheckoutScreen({
     if (blocked || !payment) return;
     setSending(true);
     setError(null);
+    const body = {
+      type: "dine_in" as const,
+      customer: { name: name.trim(), phone },
+      items: toOrderItems(lines),
+      paymentMethod: payment,
+    };
     try {
-      const receipt = await createDineInOrder(restaurant.id, {
-        type: "dine_in",
-        customer: { name: name.trim(), phone },
-        items: toOrderItems(lines),
-        paymentMethod: payment,
-        ...(tableHash ? { tableHash } : {}),
-      });
+      let receipt;
+      try {
+        receipt = await createDineInOrder(restaurant.id, tableHash ? { ...body, tableHash } : body);
+      } catch (cause) {
+        // 400 com mesa: o código do adesivo pode ter girado entre abrir o
+        // cardápio e enviar. O salão aceita pedido sem mesa (é o que um QR
+        // antigo manda), então vai de novo sem ela — se o 400 era de outra
+        // coisa, a segunda tentativa falha igual e a mensagem aparece.
+        if (!(cause instanceof OrderError && cause.status === 400 && tableHash)) throw cause;
+        receipt = await createDineInOrder(restaurant.id, body);
+      }
       onSent(receipt);
     } catch (cause) {
       const failure = cause instanceof OrderError ? cause : new OrderError(0, "Não deu para enviar. Tente de novo.");
-      setError({ message: failure.message, staleCart: failure.status === 400 });
+      // 404 é produto ou opção que saiu do cardápio depois do cache: a mensagem
+      // da API traz o id, que não diz nada a quem está pedindo
+      const message = failure.status === 404 ? "Algum item do seu carrinho saiu do cardápio." : failure.message;
+      setError({ message, staleCart: failure.status === 400 || failure.status === 404 });
       setSending(false);
     }
   };
@@ -143,9 +156,9 @@ export function CheckoutScreen({
           <p>{error.message}</p>
           {error.staleCart && (
             <>
-              <p className="mt-1">Revise o carrinho: algo mudou no cardápio.</p>
-              <button type="button" onClick={onBack} className="mt-2 min-h-11 font-semibold underline">
-                Voltar ao carrinho
+              <p className="mt-1">O cardápio mudou desde que você abriu. Atualize para ver o de agora — o carrinho é conferido e o que saiu é retirado.</p>
+              <button type="button" onClick={() => window.location.reload()} className="mt-2 min-h-11 font-semibold underline">
+                Atualizar o cardápio
               </button>
             </>
           )}
