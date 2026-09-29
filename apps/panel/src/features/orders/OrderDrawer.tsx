@@ -70,6 +70,7 @@ function OrderDetailView({
                     {group.groupName}: {group.text}
                   </span>
                 ))}
+                {item.note && <span className={classes.options}>Obs.: {item.note}</span>}
               </div>
               <span className={`${classes.price} n`}>{formatCents(item.unitPriceInCents * item.quantity)}</span>
             </li>

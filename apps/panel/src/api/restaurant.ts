@@ -12,6 +12,8 @@ export type RestaurantPatch = Partial<{
   name: string;
   cuisineType: string;
   logoUrl: string | null;
+  coverUrl: string | null;
+  brandColor: string | null;
   address: Address;
   isDelivery: boolean;
   isTakeaway: boolean;

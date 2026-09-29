@@ -63,6 +63,27 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
               {...field("logoUrl")}
             />
             <TextInput
+              label="Capa do cardápio (URL)"
+              placeholder="https://"
+              description="A imagem do topo do cardápio que o cliente abre pelo QR code."
+              {...field("coverUrl")}
+            />
+            <TextInput
+              label="Cor da marca"
+              placeholder="#1E5AE8"
+              description="É a cor do botão principal no cardápio do cliente. Precisa de contraste com o texto branco — a loja recusa tons claros."
+              {...field("brandColor")}
+            />
+            <div className={classes.brandPreview}>
+              <span
+                className={classes.brandButton}
+                // hex fora de tokens.ts de propósito: é a cor DA LOJA, não do tema do painel
+                style={{ background: /^#[0-9A-Fa-f]{6}$/.test(form.brandColor.trim()) ? form.brandColor.trim() : "#1E5AE8" }}
+              >
+                Adicionar ao carrinho
+              </span>
+            </div>
+            <TextInput
               label="Endereço público"
               disabled
               value={`/${restaurant.slug}`}

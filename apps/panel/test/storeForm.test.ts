@@ -16,6 +16,8 @@ describe("formulário de dados da loja", () => {
       cuisineType: "Italiana",
       timezone: "America/Sao_Paulo",
       logoUrl: "",
+      coverUrl: "",
+      brandColor: "",
       street: "Rua Aspicuelta",
       number: "120",
       neighborhood: "Vila Madalena",
@@ -23,6 +25,21 @@ describe("formulário de dados da loja", () => {
       state: "SP",
       zipCode: "05433-010",
     });
+  });
+
+  it("capa e cor esvaziadas vão como null; preenchidas, como texto", () => {
+    const withBrand = { ...initial, coverUrl: "https://cdn.exemplo/capa.jpg", brandColor: "#0B7A48" };
+    expect(changedPatch({ ...withBrand, coverUrl: "", brandColor: "" }, withBrand)).toEqual({
+      coverUrl: null,
+      brandColor: null,
+    });
+    expect(changedPatch({ ...initial, brandColor: "#0b7a48" }, initial)).toEqual({ brandColor: "#0B7A48" });
+  });
+
+  it("cor fora de #RRGGBB não chega à API", () => {
+    expect(validateStoreForm({ ...initial, brandColor: "azul" })).toBe(
+      "Use a cor no formato #RRGGBB, por exemplo #1E5AE8.",
+    );
   });
 
   it("nada mudou, nada vai", () => {

@@ -73,6 +73,7 @@ function KitchenCard({
                   {group.groupName}: {group.text}
                 </span>
               ))}
+              {item.note && <span className={classes.option}>Obs.: {item.note}</span>}
             </li>
           ))}
         </ul>
