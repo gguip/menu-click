@@ -8,6 +8,7 @@ import {
   errorResponseSchema,
   pageResponseSchema,
   paginationQuerystringSchema,
+  restaurantDetailResponseSchema,
   restaurantResponseSchema,
   updateRestaurantBodySchema,
 } from "./schemas.ts";
@@ -85,13 +86,13 @@ export async function restaurantRoutes(app: FastifyInstance) {
         operationId: "getRestaurant",
         summary: "Detalhe do restaurante",
         description:
-          "Pedir um restaurante que não é o da sessão responde 404, e não 403: 'proibido' confirmaria que ele existe.",
+          "Pedir um restaurante que não é o da sessão responde 404, e não 403: 'proibido' confirmaria que ele existe. Traz `openingStatus`: se a loja está dentro da grade de horário agora, com `closesAt` (aberta) ou `opensAt` (fechada); sem `closesAt`, está aberta direto pelos próximos 7 dias, e sem `opensAt`, não tem nenhuma faixa cadastrada. A pausa manual não entra nele — está em `acceptingOrders`.",
         params: restaurantIdParamsSchema,
-        response: { 200: restaurantResponseSchema, 404: errorResponseSchema },
+        response: { 200: restaurantDetailResponseSchema, 404: errorResponseSchema },
       },
     },
     async (request) => {
-      return restaurantsService.getById(request.params.restaurantId);
+      return restaurantsService.getDetail(request.params.restaurantId);
     },
   );
 

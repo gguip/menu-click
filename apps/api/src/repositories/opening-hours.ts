@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.ts";
 import type { Queryable } from "../db/pool.ts";
-import type { OpeningHour, OpeningHourInput } from "../domain/opening-hours.ts";
+import type { OpeningHour, OpeningHourInput, OpeningStatus } from "../domain/opening-hours.ts";
 
 /**
  * Repositório de horário de funcionamento: **só acesso a dados**.
@@ -157,4 +157,82 @@ export async function isOpenNow(
     [restaurantId, timezone],
   );
   return rows[0].aberto;
+}
+
+/** Quantos dias à frente a conta olha. Trecho aberto até aqui = "aberta direto". */
+const WINDOW_DAYS = 7;
+
+/**
+ * O status de funcionamento no instante `at` (padrão: agora), no fuso da loja.
+ *
+ * Mesma decisão de `isOpenNow`: a conta é do Postgres, que conhece o banco de
+ * fusos. Cada faixa vira um intervalo de instantes concretos, de ontem até
+ * `WINDOW_DAYS` dias à frente (a faixa que atravessa a meia-noite termina no
+ * dia seguinte); intervalos encostados ou sobrepostos se FUNDEM — sem isso, a
+ * grade 24x7 do backfill (`00:00–23:59` + `23:59–00:00`) diria "fecha 23:59"
+ * numa loja que nunca fecha.
+ */
+export async function findOpeningStatus(
+  restaurantId: string,
+  timezone: string,
+  at: Date | null = null,
+  db: Queryable = pool,
+): Promise<OpeningStatus> {
+  const { rows } = await db.query<{
+    is_open: boolean;
+    closes_at: Date | null;
+    opens_at: Date | null;
+    open_through_window: boolean;
+  }>(
+    `with ref as (
+       select coalesce($3::timestamptz, now()) as at, $2::text as tz
+     ),
+     days as (
+       select ((ref.at at time zone ref.tz)::date + d) as day
+         from ref, generate_series(-1, $4::int) as d
+     ),
+     spans as (
+       select ((days.day + h.opens_at) at time zone ref.tz) as starts_at,
+              ((days.day + h.closes_at
+                + case when h.closes_at < h.opens_at then interval '1 day' else interval '0' end)
+                at time zone ref.tz) as ends_at
+         from days
+         join opening_hours h
+           on h.restaurant_id = $1
+          and h.deleted_at is null
+          and h.weekday = extract(dow from days.day)
+         cross join ref
+     ),
+     marked as (
+       select starts_at, ends_at,
+              max(ends_at) over (order by starts_at, ends_at
+                                 rows between unbounded preceding and 1 preceding) as prev_end
+         from spans
+     ),
+     islands as (
+       select starts_at, ends_at,
+              sum(case when prev_end is null or starts_at > prev_end then 1 else 0 end)
+                over (order by starts_at, ends_at) as island
+         from marked
+     ),
+     merged as (
+       select min(starts_at) as starts_at, max(ends_at) as ends_at from islands group by island
+     ),
+     current_span as (
+       select merged.* from merged, ref where merged.starts_at <= ref.at and ref.at < merged.ends_at
+     )
+     select exists (select 1 from current_span) as is_open,
+            (select ends_at from current_span) as closes_at,
+            (select min(merged.starts_at) from merged, ref where merged.starts_at > ref.at) as opens_at,
+            coalesce((select ends_at >= ref.at + make_interval(days => $4::int)
+                        from current_span, ref), false) as open_through_window`,
+    [restaurantId, timezone, at, WINDOW_DAYS],
+  );
+  const row = rows[0];
+  if (row.is_open) {
+    return row.open_through_window || row.closes_at === null
+      ? { isOpen: true }
+      : { isOpen: true, closesAt: row.closes_at.toISOString() };
+  }
+  return row.opens_at === null ? { isOpen: false } : { isOpen: false, opensAt: row.opens_at.toISOString() };
 }
