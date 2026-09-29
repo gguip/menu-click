@@ -91,6 +91,8 @@ export type Order = {
   paymentMethod: PaymentMethod;
   /** Ausente no dinheiro = o cliente tem o valor exato. */
   changeForInCents?: number;
+  /** `null` = a loja não marcou como pago. */
+  paidAt: string | null;
   table: { id: string; label: string } | null;
   createdAt: string;
   updatedAt: string;

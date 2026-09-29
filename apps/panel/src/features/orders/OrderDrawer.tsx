@@ -15,7 +15,7 @@ import { useOrderAction } from "./orderActionFlow.tsx";
 import { cancelKind, cancelLabel, closedMessage, primaryAction, progressSteps } from "./orderRules.ts";
 import { formatPhone, freightLine, groupOptions, itemsSubtotal, paymentLabel, whereLabel } from "./presentation.ts";
 import { TypePill } from "./TypePill.tsx";
-import { useOrder } from "./useOrders.ts";
+import { useOrder, useTogglePaid } from "./useOrders.ts";
 
 function OrderDetailView({
   order,
@@ -34,6 +34,9 @@ function OrderDetailView({
   const freight = freightLine(order);
   const closed = closedMessage(order, timeZone);
   const busy = busyOrderId === order.id;
+  const { restaurantId } = useSessionUser();
+  // pagamento é outro eixo que o status: fica fora do rodapé de transições
+  const togglePaid = useTogglePaid(restaurantId);
 
   return (
     <div className={classes.drawer}>
@@ -89,7 +92,24 @@ function OrderDetailView({
             <dd className="n">{formatCents(order.totalInCents)}</dd>
           </div>
         </dl>
-        <p className={classes.payment}>{paymentLabel(order)}</p>
+        <div className={classes.paymentRow}>
+          <p className={classes.payment}>{paymentLabel(order)}</p>
+          {order.status !== "cancelled" && (
+            <Button
+              variant="default"
+              size="xs"
+              loading={togglePaid.isPending}
+              onClick={() => togglePaid.mutate({ orderId: order.id, paid: order.paidAt === null })}
+            >
+              {order.paidAt === null ? "Marcar como pago" : "Desfazer pago"}
+            </Button>
+          )}
+        </div>
+        {togglePaid.isError && (
+          <p role="alert" className={classes.paidError}>
+            {describeError(togglePaid.error)}
+          </p>
+        )}
 
         <section className={classes.progress}>
           <span className="eyebrow">Andamento</span>

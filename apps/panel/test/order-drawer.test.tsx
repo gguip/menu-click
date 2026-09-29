@@ -22,8 +22,8 @@ function setup(detail: OrderDetail) {
     { method: "GET", path: `/restaurants/${RESTAURANT_ID}/tables`, body: { data: [], limit: 100, offset: 0, total: 0 } },
     ...panelHandlers(),
   ];
-  mockApi(handlers);
-  return renderInPanel(routes, `/pedidos/${detail.id}`);
+  const api = mockApi(handlers);
+  return { ...renderInPanel(routes, `/pedidos/${detail.id}`), api };
 }
 
 async function drawer() {
@@ -31,6 +31,34 @@ async function drawer() {
 }
 
 describe("OrderDrawer", () => {
+  it("marca como pago", async () => {
+    const { api } = setup(makeOrderDetail({ id: ID, paymentMethod: "pix", paidAt: null }));
+    api.add({
+      method: "POST",
+      path: `${LIST}/${ID}/mark-paid`,
+      body: makeOrderDetail({ id: ID, paymentMethod: "pix", paidAt: "2026-09-19T23:00:00.000Z" }),
+    });
+    const view = await drawer();
+    fireEvent.click(await within(view).findByRole("button", { name: "Marcar como pago" }));
+    await waitFor(() => expect(api.calls.some((call) => call.path === `${LIST}/${ID}/mark-paid`)).toBe(true));
+  });
+
+  it("pago mostra '· pago' e oferece desfazer", async () => {
+    const { api } = setup(makeOrderDetail({ id: ID, paymentMethod: "pix", paidAt: "2026-09-19T23:00:00.000Z" }));
+    api.add({ method: "POST", path: `${LIST}/${ID}/mark-unpaid`, body: makeOrderDetail({ id: ID, paidAt: null }) });
+    const view = await drawer();
+    expect(await within(view).findByText("Pix · pago")).toBeTruthy();
+    fireEvent.click(within(view).getByRole("button", { name: "Desfazer pago" }));
+    await waitFor(() => expect(api.calls.some((call) => call.path === `${LIST}/${ID}/mark-unpaid`)).toBe(true));
+  });
+
+  it("pedido cancelado não oferece marcar como pago", async () => {
+    setup(makeOrderDetail({ id: ID, status: "cancelled", paidAt: null }));
+    const view = await drawer();
+    await within(view).findByText(/Pedido cancelado às/);
+    expect(within(view).queryByRole("button", { name: "Marcar como pago" })).toBeNull();
+  });
+
   it("a conta fecha: itens + frete = total", async () => {
     setup(makeOrderDetail({ id: ID, number: 1041, totalInCents: 10100, deliveryFeeInCents: 900, paymentMethod: "cash", changeForInCents: 15000 }));
     const view = await drawer();

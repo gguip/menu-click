@@ -26,6 +26,8 @@ describe("apresentação do pedido", () => {
 
   it("pagamento, com troco ou sem", () => {
     expect(paymentLabel({ paymentMethod: "pix" })).toBe("Pix");
+    expect(paymentLabel({ paymentMethod: "pix", paidAt: "2026-09-19T23:00:00.000Z" })).toBe("Pix · pago");
+    expect(paymentLabel({ paymentMethod: "pix", paidAt: null })).toBe("Pix");
     expect(paymentLabel({ paymentMethod: "card_on_delivery" })).toBe("Cartão na entrega");
     expect(paymentLabel({ paymentMethod: "meal_voucher" })).toBe("Vale-refeição");
     expect(paymentLabel({ paymentMethod: "cash", changeForInCents: 5000 })).toBe(

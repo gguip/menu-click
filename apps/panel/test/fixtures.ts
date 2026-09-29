@@ -85,6 +85,7 @@ export function makeOrder(overrides: Partial<Order> = {}): Order {
       zipCode: "05435-000",
     },
     paymentMethod: "pix",
+    paidAt: null,
     table: null,
     createdAt: "2026-09-19T22:58:00.000Z",
     updatedAt: "2026-09-19T22:58:00.000Z",

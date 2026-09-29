@@ -1,6 +1,6 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listNeighborhoods } from "../../api/delivery.ts";
-import { getOrder, listAllOrders } from "../../api/orders.ts";
+import { getOrder, listAllOrders, markOrderPaid, markOrderUnpaid } from "../../api/orders.ts";
 import { listAllTables } from "../../api/tables.ts";
 import type { Restaurant } from "../../api/types.ts";
 import { neighborhoodsQueryKey } from "../settings/useDelivery.ts";
@@ -36,6 +36,16 @@ export function useOrder(restaurantId: string, orderId: string) {
     queryFn: () => getOrder(restaurantId, orderId),
     refetchInterval: ORDER_DETAIL_POLL_MS,
     refetchIntervalInBackground: true,
+  });
+}
+
+/** Pago/não pago: invalida o prefixo "orders" (cartão, detalhe e lista mostram). */
+export function useTogglePaid(restaurantId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ orderId, paid }: { orderId: string; paid: boolean }) =>
+      paid ? markOrderPaid(restaurantId, orderId) : markOrderUnpaid(restaurantId, orderId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["orders"] }),
   });
 }
 
