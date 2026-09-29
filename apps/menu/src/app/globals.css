@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/* Direção Balcão. Só a AÇÃO é temável (a loja troca pela cor da marca);
+   tinta, papel e semânticas ficam fixas — é o que garante o contraste AA. */
+:root {
+  --brand-action: #1e5ae8;
+}
+
+@theme inline {
+  --color-action: var(--brand-action);
+  --font-sans: var(--font-sora), system-ui, sans-serif;
+}
+
+@theme {
+  --color-ink: #0b0d12;
+  --color-ink-2: #5c6474;
+  --color-ink-3: #8b93a5;
+  --color-paper: #ffffff;
+  --color-paper-2: #f4f6fa;
+  --color-paper-3: #eceff5;
+  --color-line: #e1e5ee;
+  --color-success: #0b7a48;
+  --color-success-soft: #e8f5ee;
+  --color-warn-soft: #fff4db;
+  --color-warn: #7a4e00;
+  --color-danger: #a62b21;
+  --radius-chip: 5px;
+  --radius-field: 10px;
+  --radius-card: 12px;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-action);
+  outline-offset: 2px;
+}

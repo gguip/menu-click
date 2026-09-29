@@ -18,6 +18,9 @@ export default tseslint.config(
       "**/dist",
       "**/build",
       "**/.turbo",
+      // saída de build e tipos gerados pelo Next (apps/menu)
+      "**/.next",
+      "**/next-env.d.ts",
       "**/migrations",
       // Protótipo de design copiado do handoff: código gerado por outra
       // ferramenta, referência visual e não código do projeto.
