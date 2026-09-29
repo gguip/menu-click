@@ -80,6 +80,24 @@ describe("status de funcionamento", () => {
     expect(await openingHours.findOpeningStatus(r.id, TZ, segunda("23:59"))).toEqual({ isOpen: true });
   });
 
+  // A conta é no fuso DA LOJA, não no de São Paulo nem no da sessão do banco:
+  // Tóquio é UTC+9, sem horário de verão.
+  it("em outro fuso, as fronteiras saem no fuso da loja", async () => {
+    const tokyo = "Asia/Tokyo";
+    const r = await createRestaurant(app, { timezone: tokyo });
+    await setOpeningHours(app, r, [{ weekday: 1, opensAt: "11:00", closesAt: "23:30" }]);
+    const segundaTokyo = (hora: string) => new Date(`2026-09-21T${hora}:00+09:00`);
+
+    expect(await openingHours.findOpeningStatus(r.id, tokyo, segundaTokyo("20:00"))).toEqual({
+      isOpen: true,
+      closesAt: "2026-09-21T14:30:00.000Z",
+    });
+    expect(await openingHours.findOpeningStatus(r.id, tokyo, segundaTokyo("08:00"))).toEqual({
+      isOpen: false,
+      opensAt: "2026-09-21T02:00:00.000Z",
+    });
+  });
+
   it("sem grade nenhuma: fechada, sem próxima abertura", async () => {
     const r = await lojaCom([]);
     expect(await openingHours.findOpeningStatus(r.id, TZ, segunda("12:00"))).toEqual({ isOpen: false });
