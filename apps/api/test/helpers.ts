@@ -295,6 +295,7 @@ export async function createOrder(
     productId: string;
     quantity: number;
     options?: { optionId: string; quantity: number }[];
+    note?: string;
   }[],
   overrides: Record<string, unknown> = {},
 ) {

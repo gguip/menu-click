@@ -179,6 +179,8 @@ export type CreateOrderItemInput = {
   quantity: number;
   /** Ausente = nenhuma opção. Produto sem grupo obrigatório aceita assim. */
   options?: { optionId: string; quantity: number }[];
+  /** "Sem cebola". Só espaços = nenhuma observação. */
+  note?: string;
 };
 
 /**
@@ -250,6 +252,8 @@ export type OrderItem = {
   unitPriceInCents: number;
   quantity: number;
   options: OrderItemOption[];
+  /** Observação do cliente, congelada; `null` = nenhuma. */
+  note: string | null;
 };
 
 /**

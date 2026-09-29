@@ -291,11 +291,13 @@ async function resolverMesa(
 function chaveDeFusao(
   productId: string,
   escolhas: Map<string, number>,
+  note: string | null,
 ): string {
   const partes = [...escolhas.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([optionId, quantity]) => `${optionId}:${quantity}`);
-  return [productId, ...partes].join("|");
+  // a observação separa linhas: "sem cebola" e "com cebola" não são dois iguais
+  return [productId, ...partes, `note:${note ?? ""}`].join("|");
 }
 
 /** Uma linha em montagem, antes de virar `InsertOrderItemData`. */
@@ -303,6 +305,8 @@ type LinhaEmMontagem = {
   productId: string;
   quantity: number;
   escolhas: Map<string, number>;
+  /** Observação já normalizada: só espaços vira `null`. */
+  note: string | null;
 };
 
 /**
@@ -419,13 +423,15 @@ export async function create(
       escolhas.set(escolha.optionId, atual + escolha.quantity);
     }
 
-    const chave = chaveDeFusao(item.productId, escolhas);
+    const note = item.note?.trim() ? item.note.trim() : null;
+    const chave = chaveDeFusao(item.productId, escolhas, note);
     const linha = linhas.get(chave);
     if (linha === undefined) {
       linhas.set(chave, {
         productId: item.productId,
         quantity: item.quantity,
         escolhas,
+        note,
       });
     } else {
       linha.quantity += item.quantity;
@@ -473,6 +479,7 @@ export async function create(
         unitPriceInCents: unitPrice(product.priceInCents, grupos),
         quantity: linha.quantity,
         options: congeladas,
+        note: linha.note,
       };
     });
 

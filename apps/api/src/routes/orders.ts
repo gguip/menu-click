@@ -57,6 +57,8 @@ const createOrderBodySchema = {
         properties: {
           productId: { type: "string", format: "uuid" },
           quantity: { type: "integer", minimum: 1 },
+          // observação do cliente ("sem cebola"); só espaços = nenhuma
+          note: { type: "string", maxLength: 140 },
           // ausente = nenhuma opção; o serviço confere contra os grupos do
           // produto (obrigatoriedade, teto de opções, teto de unidades,
           // disponibilidade) — tudo isso é 400, não 404: é a montagem do
@@ -135,6 +137,8 @@ const orderItemResponseSchema = {
     unitPriceInCents: { type: "integer" },
     quantity: { type: "integer" },
     options: { type: "array", items: orderItemOptionResponseSchema },
+    // `null` = sem observação (F12: sempre presente)
+    note: { type: "string", nullable: true },
   },
 };
 

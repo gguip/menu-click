@@ -4549,6 +4549,10 @@
                           "type": "integer",
                           "minimum": 1
                         },
+                        "note": {
+                          "type": "string",
+                          "maxLength": 140
+                        },
                         "options": {
                           "type": "array",
                           "items": {
@@ -4796,6 +4800,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -5522,6 +5530,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -5760,6 +5772,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -5998,6 +6014,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6236,6 +6256,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6474,6 +6498,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6712,6 +6740,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6950,6 +6982,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -7188,6 +7224,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -7405,6 +7445,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -8094,6 +8138,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }

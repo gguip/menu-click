@@ -74,6 +74,7 @@ type OrderItemRow = {
   /** Preço de uma unidade já com as opções escolhidas (ver `add-option-groups`). */
   unit_price_in_cents: number;
   quantity: number;
+  note: string | null;
 };
 
 /** Linha da tabela `order_item_options` — o congelamento de uma escolha. */
@@ -168,6 +169,7 @@ function toOrderItem(row: OrderItemRow, options: OrderItemOption[]): OrderItem {
     unitPriceInCents: row.unit_price_in_cents,
     quantity: row.quantity,
     options,
+    note: row.note,
   };
 }
 
@@ -208,6 +210,8 @@ export type InsertOrderItemData = {
   /** Preço de uma unidade já com as opções escolhidas — ver `domain/option.ts`. */
   unitPriceInCents: number;
   quantity: number;
+  /** Observação do cliente, congelada; `null` = nenhuma. */
+  note: string | null;
 };
 
 /** Uma linha de `order_item_options` pronta para gravar, já com o item dono. */
@@ -326,18 +330,19 @@ export async function insertItems(
       item.priceInCents,
       item.unitPriceInCents,
       item.quantity,
+      item.note,
     );
     // os `$n` são gerados a partir do TAMANHO do array, não de nada que veio do
     // cliente — o conteúdo continua indo 100% por parâmetro (S2/S8).
     const n = values.length;
     tuples.push(
-      `($${n - 5}, $${n - 4}, $${n - 3}, $${n - 2}, $${n - 1}, $${n})`,
+      `($${n - 6}, $${n - 5}, $${n - 4}, $${n - 3}, $${n - 2}, $${n - 1}, $${n})`,
     );
   }
 
   const { rows } = await db.query<{ id: string }>(
     `insert into order_items
-       (order_id, product_id, name, price_in_cents, unit_price_in_cents, quantity)
+       (order_id, product_id, name, price_in_cents, unit_price_in_cents, quantity, note)
      values ${tuples.join(", ")}
      returning id`,
     values,

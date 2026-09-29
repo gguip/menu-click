@@ -106,6 +106,8 @@ const trackedOrderResponseSchema = {
             type: "array",
             items: trackedOrderItemOptionResponseSchema,
           },
+          // o que a própria pessoa escreveu no item
+          note: { type: "string", nullable: true },
         },
       },
     },
