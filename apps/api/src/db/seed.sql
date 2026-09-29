@@ -266,26 +266,45 @@ on conflict (id) do nothing;
 insert into orders
   (id, restaurant_id, customer_id, type, status, total_in_cents, delivery_fee_in_cents,
    street, number, neighborhood, city, state, zip_code,
-   payment_method, change_for_in_cents, table_id, table_label)
+   payment_method, change_for_in_cents, table_id, table_label, order_number, paid_at)
 values
   -- entrega pendente: só ela leva endereço (ver orders_address_check), e é o
   -- pedido em dinheiro com troco
   ('3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'delivery', 'pending', 13170, 900,
    'Rua Augusta', '1500', 'Consolação', 'São Paulo', 'SP', '01304-001',
-   'cash', 15000, null, null),
+   'cash', 15000, null, null, 1, null),
   -- salão, já aceito, pago no pix, e VINDO DA MESA 7: `table_label` é cópia
   -- congelada, então renomear ou remover a mesa não mexe neste pedido
   ('b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'dine_in', 'confirmed', 890, null,
    null, null, null, null, null, null,
-   'pix', null, '9b1e4f27-3a06-4d58-8c92-1f7b5a3e0d64', 'Mesa 7'),
+   'pix', null, '9b1e4f27-3a06-4d58-8c92-1f7b5a3e0d64', 'Mesa 7', 2, now()),
   -- retirada em preparo: o próximo passo dela é `ready_for_pickup`, pago no
   -- cartão na entrega
   ('5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42', 'cb95db58-0ea1-4157-a6fd-64f775f24a6e',
    '8f2c1d3a-7b4e-4c9a-9d1e-2f5a6b8c0d3e', 'takeaway', 'preparing', 2490, null,
    null, null, null, null, null, null,
-   'card_on_delivery', null, null, null)
+   'card_on_delivery', null, null, null, 3, null)
+on conflict (id) do nothing;
+
+-- O contador da loja acompanha os números acima: sem isso, o primeiro pedido
+-- criado pela API sairia #1 e bateria no índice único
+-- `orders_order_number_active_key` (500). `greatest` mantém o seed idempotente
+-- num banco em que a loja já tem pedidos depois destes.
+update restaurants set last_order_number = greatest(last_order_number, 3)
+ where id = 'cb95db58-0ea1-4157-a6fd-64f775f24a6e';
+
+-- O andamento dos três pedidos (ver a migration `add-order-status-events`):
+-- a chegada, e cada status por que já passaram.
+insert into order_status_events (id, order_id, status)
+values
+  ('0d7e2a51-4c83-4b9f-a1e6-5f2b8c9d3e01', '3e7b9c21-5a48-4f6d-8b02-1c9d4e7a5f83', 'pending'),
+  ('1e8f3b62-5d94-4ca0-b2f7-6a3c9d0e4f12', 'b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12', 'pending'),
+  ('2f904c73-6ea5-4db1-83a8-7b4d0e1f5a23', 'b41f6d80-2c93-4a17-8e5b-7d0a3f9c6e12', 'confirmed'),
+  ('3a015d84-7fb6-4ec2-94b9-8c5e1f2a6b34', '5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42', 'pending'),
+  ('4b126e95-80c7-4fd3-a5ca-9d6f2a3b7c45', '5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42', 'confirmed'),
+  ('5c237fa6-91d8-4ae4-b6db-ae703b4c8d56', '5c2a8f14-6b39-4e70-91d5-7a0e3b6c8d42', 'preparing')
 on conflict (id) do nothing;
 
 -- name/price_in_cents são cópias congeladas do produto no momento do pedido —
