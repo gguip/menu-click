@@ -894,6 +894,7 @@ async function transitionTo(
   restaurantId: string,
   orderId: string,
   to: OrderStatus,
+  cancellationReason: string | null = null,
 ): Promise<Order> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(orderId)) throw orderNotFound(orderId);
@@ -924,7 +925,7 @@ async function transitionTo(
       await devolverEstoque(orderId, client);
     }
 
-    await ordersRepository.updateStatus(orderId, to, client);
+    await ordersRepository.updateStatus(orderId, to, client, cancellationReason);
 
     const order = await ordersRepository.findById(restaurantId, orderId, client);
     return order as Order;
@@ -942,8 +943,9 @@ async function transitionAndPublish(
   restaurantId: string,
   orderId: string,
   to: OrderStatus,
+  cancellationReason: string | null = null,
 ): Promise<Order> {
-  const order = await transitionTo(restaurantId, orderId, to);
+  const order = await transitionTo(restaurantId, orderId, to, cancellationReason);
   orderEvents.publish(order);
   return order;
 }
@@ -1007,8 +1009,9 @@ export async function complete(
 export async function cancel(
   restaurantId: string,
   orderId: string,
+  reason?: string,
 ): Promise<Order> {
-  return transitionAndPublish(restaurantId, orderId, "cancelled");
+  return transitionAndPublish(restaurantId, orderId, "cancelled", normalizeText(reason));
 }
 
 /**

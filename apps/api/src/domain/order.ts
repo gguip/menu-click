@@ -299,6 +299,8 @@ export type OrderSummary = {
   changeForInCents?: number;
   /** Quando a loja marcou como pago; `null` = não marcado. Sempre presente (F12). */
   paidAt: string | null;
+  /** O porquê do cancelamento, para o cliente ler; `null` fora de `cancelled` ou sem motivo. */
+  cancellationReason: string | null;
   /**
    * A mesa de onde o pedido veio, com o rótulo **congelado** na criação —
    * nunca lido de `tables`. Renomear a mesa não reescreve pedido antigo, e

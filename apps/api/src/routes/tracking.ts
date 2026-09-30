@@ -111,6 +111,8 @@ const trackedOrderResponseSchema = {
         },
       },
     },
+    // o porquê do cancelamento, escrito pela loja para quem pediu
+    cancellationReason: { type: "string", nullable: true },
     deliveryAddress: {
       type: "object",
       properties: { ...addressProperties, complement: { type: "string", nullable: true } },

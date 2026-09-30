@@ -6595,7 +6595,25 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Cancela a partir de qualquer estado não terminal. O estoque volta quando o pedido ainda estava em `confirmed` ou `preparing`; depois que saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha.",
+        "description": "Cancela a partir de qualquer estado não terminal. O estoque volta quando o pedido ainda estava em `confirmed` ou `preparing`; depois que saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha. Aceita `reason` opcional (até 200 caracteres), que o cliente lê no acompanhamento; sem corpo, cancela sem motivo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "nullable": true,
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -7501,6 +7519,10 @@
                         }
                       }
                     },
+                    "cancellationReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "statusHistory": {
                       "type": "array",
                       "items": {
@@ -8193,6 +8215,10 @@
                           }
                         }
                       }
+                    },
+                    "cancellationReason": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "deliveryAddress": {
                       "type": "object",

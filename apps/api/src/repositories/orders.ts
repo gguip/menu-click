@@ -55,6 +55,7 @@ type OrderRow = {
   /** O número do pedido na loja. `number`, acima, é o do endereço. */
   order_number: number;
   paid_at: Date | null;
+  cancellation_reason: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -153,6 +154,7 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
       ? {}
       : { changeForInCents: row.change_for_in_cents }),
     paidAt: row.paid_at === null ? null : row.paid_at.toISOString(),
+    cancellationReason: row.cancellation_reason,
     // presente e `null` quando não há mesa, como `deliveryFeeInCents` — o
     // `check` do banco garante que as duas colunas andam juntas
     table:
@@ -487,11 +489,13 @@ export async function updateStatus(
   orderId: string,
   status: OrderStatus,
   client: PoolClient,
+  cancellationReason: string | null = null,
 ): Promise<void> {
+  // o motivo só vale no cancelamento; o check do banco recusa em outro status
   await client.query(
-    `update orders set status = $1, updated_at = now()
+    `update orders set status = $1, cancellation_reason = $3, updated_at = now()
       where id = $2 and deleted_at is null`,
-    [status, orderId],
+    [status, orderId, status === "cancelled" ? cancellationReason : null],
   );
   // o evento vai na mesma transação da mudança: rollback desfaz os dois
   await insertStatusEvent(orderId, status, client);
