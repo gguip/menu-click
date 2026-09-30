@@ -1,5 +1,5 @@
 import type { TableLookup } from "./table.ts";
-import type { Menu, MenuOptionGroup, MenuRestaurant, MenuSection } from "./types.ts";
+import type { Address, Menu, MenuOptionGroup, MenuRestaurant, MenuSection, PaymentMethod } from "./types.ts";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
@@ -72,6 +72,15 @@ export type OrderItemBody = {
   note?: string;
 };
 
+export type LinkOrderBody = {
+  type: "delivery" | "takeaway";
+  customer: { name: string; phone: string };
+  items: OrderItemBody[];
+  paymentMethod: PaymentMethod;
+  changeForInCents?: number;
+  deliveryAddress?: Address & { complement?: string };
+};
+
 export type DineInOrderBody = {
   type: "dine_in";
   customer: { name: string; phone: string };
@@ -97,12 +106,17 @@ export class OrderError extends Error {
 export type OrderReceipt = {
   id: string;
   number: number;
+  type: "dine_in" | "takeaway" | "delivery";
   totalInCents: number;
+  /** `null` fora da entrega e no "a combinar"; `0` = grátis. */
+  deliveryFeeInCents: number | null;
+  /** Só em entrega e retirada: a credencial do acompanhamento (S27). */
+  trackingToken?: string;
   table: { id: string; label: string } | null;
   items: { name: string; quantity: number; unitPriceInCents: number; note: string | null }[];
 };
 
-export async function createDineInOrder(restaurantId: string, body: DineInOrderBody): Promise<OrderReceipt> {
+export async function createOrder(restaurantId: string, body: DineInOrderBody | LinkOrderBody): Promise<OrderReceipt> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}/restaurants/${restaurantId}/orders`, {
@@ -118,8 +132,13 @@ export async function createDineInOrder(restaurantId: string, body: DineInOrderB
   return {
     id: payload?.id as string,
     number: payload?.number as number,
+    type: payload?.type ?? body.type,
     totalInCents: payload?.totalInCents ?? 0,
+    deliveryFeeInCents: payload?.deliveryFeeInCents ?? null,
+    ...(payload?.trackingToken ? { trackingToken: payload.trackingToken } : {}),
     table: payload?.table ?? null,
     items: payload?.items ?? [],
   };
 }
+
+export const createDineInOrder = (restaurantId: string, body: DineInOrderBody) => createOrder(restaurantId, body);

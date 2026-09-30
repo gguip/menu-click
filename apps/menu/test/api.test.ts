@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fetchLiveRestaurant, getMenu, resolveTable } from "../src/lib/api.ts";
+import { createOrder, fetchLiveRestaurant, getMenu, resolveTable } from "../src/lib/api.ts";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -49,5 +49,21 @@ describe("API do cardápio", () => {
     expect(await fetchLiveRestaurant("cantina")).toBeNull();
     vi.stubGlobal("fetch", vi.fn(async () => json({ isOpen: false, acceptingOrders: true })));
     expect(await fetchLiveRestaurant("cantina")).toMatchObject({ isOpen: false });
+  });
+
+  it("createOrder devolve frete e token do servidor", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({ id: "o1", number: 7, type: "delivery", totalInCents: 5400, deliveryFeeInCents: 900, table: null, items: [], trackingToken: "tk" }, 201),
+      ),
+    );
+    const receipt = await createOrder("r1", {
+      type: "takeaway",
+      customer: { name: "Ana", phone: "1" },
+      items: [],
+      paymentMethod: "pix",
+    });
+    expect(receipt).toMatchObject({ type: "delivery", deliveryFeeInCents: 900, trackingToken: "tk" });
   });
 });
