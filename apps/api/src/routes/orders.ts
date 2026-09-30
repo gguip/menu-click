@@ -31,6 +31,19 @@ import {
 
 // ===================== JSON Schemas =====================
 
+/**
+ * O endereço de entrega do PEDIDO: o value object compartilhado mais o
+ * complemento. Schema próprio, e não uma mudança no `addressSchema`: aquele é
+ * também o do cadastro da loja e o da cotação, onde complemento não existe.
+ */
+const orderAddressSchema = {
+  ...addressSchema,
+  properties: {
+    ...addressProperties,
+    complement: { type: "string", maxLength: 120 },
+  },
+};
+
 const createOrderBodySchema = {
   type: "object",
   additionalProperties: false,
@@ -83,7 +96,7 @@ const createOrderBodySchema = {
       },
     },
     // obrigatório em `delivery`, recusado nas outras duas (400)
-    deliveryAddress: addressSchema,
+    deliveryAddress: orderAddressSchema,
     // como o pedido será pago; o restaurante que não aceitar a forma responde
     // 409 (mesma pergunta que já recusa modalidade)
     paymentMethod: { type: "string", enum: [...PAYMENT_METHODS] },
@@ -159,7 +172,11 @@ const orderSummaryProperties = {
   deliveryAddress: {
     type: "object",
     nullable: true,
-    properties: addressProperties,
+    properties: {
+      ...addressProperties,
+      // `nullable` (F12): sempre presente no endereço, `null` = sem complemento
+      complement: { type: "string", nullable: true },
+    },
   },
   paymentMethod: { type: "string" },
   // ausente = "tenho o valor certo"; por isso não é `nullable` (F12) — a

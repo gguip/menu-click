@@ -111,7 +111,10 @@ const trackedOrderResponseSchema = {
         },
       },
     },
-    deliveryAddress: { type: "object", properties: addressProperties },
+    deliveryAddress: {
+      type: "object",
+      properties: { ...addressProperties, complement: { type: "string", nullable: true } },
+    },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

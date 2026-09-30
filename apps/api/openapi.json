@@ -4612,6 +4612,10 @@
                       "zipCode": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "complement": {
+                        "type": "string",
+                        "maxLength": 120
                       }
                     }
                   },
@@ -4724,6 +4728,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -5089,6 +5097,10 @@
                               "zipCode": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "complement": {
+                                "type": "string",
+                                "nullable": true
                               }
                             }
                           },
@@ -5454,6 +5466,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -5696,6 +5712,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -5938,6 +5958,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -6180,6 +6204,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -6422,6 +6450,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -6664,6 +6696,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -6906,6 +6942,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -7148,6 +7188,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -7369,6 +7413,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -8172,6 +8220,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },

@@ -11,6 +11,13 @@ import type { Address } from "./restaurant.ts";
 import type { PaymentMethod } from "./payment.ts";
 
 /**
+ * O endereço de entrega **do pedido**: o value object `Address` mais o
+ * complemento. O complemento mora só aqui — o `Address` é compartilhado com o
+ * cadastro da loja e a cotação, e lá ele não significa nada.
+ */
+export type DeliveryAddress = Address & { complement: string | null };
+
+/**
  * Modalidade do pedido.
  *
  * Era inferida do endereço — com endereço, entrega; sem endereço, mesa. Retirada
@@ -195,7 +202,7 @@ export type CreateOrderInput = {
   customer: CreateCustomerInput;
   items: CreateOrderItemInput[];
   /** Obrigatório em `delivery`, proibido nas outras duas modalidades. */
-  deliveryAddress?: Address;
+  deliveryAddress?: Address & { complement?: string };
   /** Como o pedido será pago. Sempre na entrega — o sistema registra, não cobra. */
   paymentMethod: PaymentMethod;
   /**
@@ -286,7 +293,7 @@ export type OrderSummary = {
    */
   deliveryFeeInCents: number | null;
   /** Preenchido só em `delivery`; `null` nas outras duas modalidades. */
-  deliveryAddress: Address | null;
+  deliveryAddress: DeliveryAddress | null;
   paymentMethod: PaymentMethod;
   /** Ausente = "tenho o valor certo". Só faz sentido junto de `paymentMethod: "cash"`. */
   changeForInCents?: number;

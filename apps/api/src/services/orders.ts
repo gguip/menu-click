@@ -536,7 +536,12 @@ export async function create(
         // congelado no momento da criação; nunca recalculado a partir do
         // cadastro atual do restaurante numa leitura futura
         deliveryFeeInCents: frete.feeInCents,
-        deliveryAddress: input.deliveryAddress,
+        // o complemento é aparado e "só espaços" vira null — a mesma regra da
+        // observação do item: o que não diz nada não é gravado
+        deliveryAddress:
+          input.deliveryAddress === undefined
+            ? undefined
+            : { ...input.deliveryAddress, complement: normalizeText(input.deliveryAddress.complement) },
         trackingTokenHash:
           trackingToken === null ? null : hashToken(trackingToken),
         paymentMethod: input.paymentMethod,
@@ -1039,4 +1044,10 @@ export async function markPaid(restaurantId: string, orderId: string): Promise<O
 /** Vale em qualquer status: existe para corrigir um clique errado. */
 export async function markUnpaid(restaurantId: string, orderId: string): Promise<Order> {
   return setPaid(restaurantId, orderId, false);
+}
+
+/** Texto livre do cliente: aparado, e vazio vira `null`. */
+function normalizeText(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed === "" ? null : trimmed;
 }
