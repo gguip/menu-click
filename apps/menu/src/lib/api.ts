@@ -31,6 +31,14 @@ export async function getMenu(slug: string): Promise<Menu | null> {
   return { restaurant, sections, optionGroups: [...groups.values()] };
 }
 
+/** Só o restaurante do cardápio, no SERVIDOR (a página de acompanhamento). */
+export async function getMenuRestaurant(slug: string): Promise<MenuRestaurant | null> {
+  const res = await fetch(`${API_URL}/menu/${encodeURIComponent(slug)}`, { next: { revalidate: MENU_REVALIDATE_SECONDS } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`restaurante ${slug}: ${res.status}`);
+  return (await res.json()) as MenuRestaurant;
+}
+
 /** Horário e pausa AGORA, no navegador e sem cache: o da página tem até 60 s. */
 export async function fetchLiveRestaurant(slug: string): Promise<MenuRestaurant | null> {
   try {

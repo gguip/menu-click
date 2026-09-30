@@ -8,6 +8,7 @@ import { formatCents } from "@/lib/money.ts";
 import { orderTableHash, type TableState, tableHashOf, tableLabelOf } from "@/lib/table.ts";
 import type { Menu, MenuProduct, MenuRestaurant, MenuSection } from "@/lib/types.ts";
 import { SearchIcon, TableIcon } from "./icons.tsx";
+import { ActiveOrderBanner } from "./ActiveOrderBanner.tsx";
 import { CartScreen } from "./CartScreen.tsx";
 import { CheckoutScreen } from "./CheckoutScreen.tsx";
 import { LinkCheckout } from "./LinkCheckout.tsx";
@@ -214,6 +215,7 @@ export function MenuApp({
             linkOff={!inDineIn && linkModalities(restaurant).length === 0}
             now={now}
           />
+          {!inDineIn && <ActiveOrderBanner slug={menu.restaurant.slug} />}
 
           {menu.sections.length === 0 ? (
             <section className="px-4 pt-8">
