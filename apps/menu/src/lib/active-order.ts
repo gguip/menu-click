@@ -44,3 +44,8 @@ export function clearActiveOrder(slug: string): void {
     // sem storage: não havia o que apagar
   }
 }
+
+/** O caminho do acompanhamento. O token vai na querystring: é a credencial (S27). */
+export function trackingPath(slug: string, orderId: string, token: string): string {
+  return `/${encodeURIComponent(slug)}/pedido/${encodeURIComponent(orderId)}?t=${encodeURIComponent(token)}`;
+}
