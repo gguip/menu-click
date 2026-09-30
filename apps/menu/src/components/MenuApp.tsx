@@ -11,7 +11,8 @@ import { CartScreen } from "./CartScreen.tsx";
 import { CheckoutScreen } from "./CheckoutScreen.tsx";
 import { MenuHeader } from "./MenuHeader.tsx";
 import { ProductScreen } from "./ProductScreen.tsx";
-import { ProductGrid, sectionAnchor } from "./ProductGrid.tsx";
+import { ProductGrid } from "./ProductGrid.tsx";
+import { SectionTabs } from "./SectionTabs.tsx";
 import { SentScreen } from "./SentScreen.tsx";
 import { StoreNotice } from "./StoreNotice.tsx";
 import { FIELD_BOX, FIELD_FOCUS_WITHIN, FIELD_TEXT } from "./field.ts";
@@ -73,7 +74,6 @@ export function MenuApp({
   }, [fixedNow]);
   const [screen, setScreen] = useState<Screen>(initialScreen);
   const [query, setQuery] = useState("");
-  const [activeSection, setActiveSection] = useState(0);
   // a chave vem do cardápio da página, que não muda: o status ao vivo não mexe nela
   const storageKey = cartStorageKey(menu.restaurant.slug, tableHash);
   const [lines, setLines] = useState<CartLine[]>([]);
@@ -211,31 +211,7 @@ export function MenuApp({
                 </label>
               </div>
 
-              <nav
-                role="tablist"
-                aria-label="Seções do cardápio"
-                className={`sticky z-20 mt-4 flex gap-[22px] overflow-x-auto border-b border-paper-3 bg-paper px-4 [scrollbar-width:none] ${tableLabel ? "top-[42px]" : "top-0"}`}
-              >
-                {menu.sections.map((section, index) => (
-                  <button
-                    key={section.id ?? section.name}
-                    type="button"
-                    role="tab"
-                    aria-selected={index === activeSection}
-                    onClick={() => {
-                      setActiveSection(index);
-                      document.getElementById(sectionAnchor(index))?.scrollIntoView?.({ behavior: "smooth" });
-                    }}
-                    className={`min-h-11 whitespace-nowrap pb-2.5 pt-3 text-sm ${
-                      index === activeSection
-                        ? "font-semibold text-action shadow-[inset_0_-2px_0_var(--brand-action)]"
-                        : "font-medium text-ink-2 hover:text-ink"
-                    }`}
-                  >
-                    {section.name}
-                  </button>
-                ))}
-              </nav>
+              <SectionTabs sections={sections} top={tableLabel ? "top-[42px]" : "top-0"} />
 
               {sections.length === 0 ? (
                 <p className="px-4 pt-6 text-[15px] text-ink-2">Nada encontrado para “{query.trim()}”.</p>
