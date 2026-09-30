@@ -23,7 +23,9 @@ cartão, estourar um limite suspende o serviço em vez de cobrar.
 ## 2. Resend (e-mail)
 
 1. Na conta do TirzeFlow, criar a chave de API **"menuclick"**, com permissão só de envio.
-2. O `SMTP_URL` fica `smtps://resend:<chave>@smtp.resend.com:465`. O domínio `gguip.dev` já está verificado — nenhum registro de DNS novo para o e-mail.
+2. O `SMTP_URL` fica `smtps://resend:<chave>@smtp.resend.com:2465`. O domínio `gguip.dev` já está verificado — nenhum registro de DNS novo para o e-mail.
+
+⚠️ **Porta 2465, não 465.** O plano gratuito do Render bloqueia a saída para as portas 25, 465 e 587 (desde set/2025); o Resend também atende SMTPS na 2465. Pela 465 a conexão só expira, e o erro vai só para o log — o "Esqueci a senha" responderia 202 e o e-mail nunca chegaria.
 
 ## 3. Render (API)
 
@@ -66,13 +68,18 @@ Nada nos registros do TirzeFlow (`api.gguip.dev`) nem nos do Resend.
    ```bash
    DATABASE_URL='<connection string do Neon>' pnpm --filter @menuclick/api db:seed
    ```
-2. No editor SQL do Neon, trocar o e-mail dos donos para endereços seus com "+" (o e-mail é único no banco; o "+" chega na mesma caixa):
+2. No editor SQL do Neon, trocar o e-mail dos donos para endereços seus com "+" (o e-mail é único no banco; o "+" chega na mesma caixa) **e, na mesma instrução, invalidar a senha do seed** — `senha-de-exemplo-123` está no repositório público, e a loja não pode ficar com ela nem até o passo seguinte:
    ```sql
-   update restaurant_users set email = '<seu-email>+tokyo@<domínio>'
+   update restaurant_users
+      set email = '<seu-email>+tokyo@<domínio>',
+          password_hash = md5(random()::text || clock_timestamp()::text)
     where email = 'dono@tokyoramen.com.br' and deleted_at is null;
-   update restaurant_users set email = '<seu-email>+cantina@<domínio>'
+   update restaurant_users
+      set email = '<seu-email>+cantina@<domínio>',
+          password_hash = md5(random()::text || clock_timestamp()::text)
     where email = 'dona@cantinadanona.com.br' and deleted_at is null;
    ```
+   (Um valor aleatório que não é um hash bcrypt: o `bcrypt` devolve "não confere" para qualquer senha — conferido —, até o "Esqueci a senha" gravar a nova.)
 3. Em `https://painel.menuclick.gguip.dev`, usar "Esqueci a senha" para cada um e definir as senhas novas — isso também prova o envio pelo Resend em produção.
 
 O cardápio e os QR das mesas ficam públicos; o painel, só com você.
@@ -97,6 +104,8 @@ O cardápio e os QR das mesas ficam públicos; o painel, só com você.
   done
   ```
   e, logo depois, o login de **outro aparelho** (no 4G) funciona. As duas coisas juntas provam que o Cloudflare sobrescreve o header e que a chave é por cliente. **Se qualquer uma falhar, pare**: a chave do limite precisa ser revista antes de divulgar o link.
+- [ ] O e-mail de recuperação de senha chega (passo 7.3) — sem isso, nenhum cadastro novo consegue verificar a loja.
+- [ ] Login com `senha-de-exemplo-123` nas duas lojas de demonstração **falha**.
 - [ ] `https://api.menuclick.gguip.dev/docs` responde 404.
 - [ ] No dia seguinte, o histórico do cron-job.org mostra chamadas só entre 06:00 e 23:00.
 

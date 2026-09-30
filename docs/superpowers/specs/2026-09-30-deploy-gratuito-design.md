@@ -103,7 +103,7 @@ E `TRUST_PROXY=true` usa o primeiro endereço da lista, que o cliente escreve.
 | `CORS_ORIGINS` | `https://menuclick.gguip.dev,https://painel.menuclick.gguip.dev` |
 | `MENU_BASE_URL` | `https://menuclick.gguip.dev` |
 | `EMAIL_DRIVER` | `smtp` |
-| `SMTP_URL` | `smtps://resend:<chave "menuclick">@smtp.resend.com:465` — segredo |
+| `SMTP_URL` | `smtps://resend:<chave "menuclick">@smtp.resend.com:2465` — segredo (a 465 e a 587 são bloqueadas no Render gratuito) |
 | `EMAIL_FROM` | `MenuClick <menuclick@gguip.dev>` |
 | `PASSWORD_RESET_URL` | `https://painel.menuclick.gguip.dev/recuperar-senha` |
 | `EMAIL_VERIFICATION_URL` | `https://painel.menuclick.gguip.dev/verificar-email` |

@@ -15,8 +15,10 @@ describe("render.yaml", () => {
     expect(yaml).toMatch(/region: virginia/);
   });
 
-  it("roda as migrations antes do servidor", () => {
-    expect(yaml).toMatch(/startCommand: .*migrate:up.*&&.*start/);
+  // revisão final: subir pelo pnpm dependia dos atalhos do corepack existirem
+  // na hora de rodar, e punha o pnpm entre o Render e o Node no SIGTERM (F26)
+  it("roda as migrations antes do servidor, direto pelo node", () => {
+    expect(yaml).toMatch(/startCommand: cd apps\/api && node src\/db\/migrate\.ts up && node src\/server\.ts/);
   });
 
   it("segredos nunca têm valor no arquivo", () => {

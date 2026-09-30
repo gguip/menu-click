@@ -11,8 +11,11 @@ services:
     rootDir: ./
     buildCommand: corepack enable && pnpm install --frozen-lockfile --filter "@menuclick/api..."
     # migrations antes do listen: uma instância só, sem subida concorrente
-    # (o gancho de pré-deploy do Render é pago)
-    startCommand: pnpm --filter @menuclick/api migrate:up && pnpm --filter @menuclick/api start
+    # (o gancho de pré-deploy do Render é pago). Direto pelo node, sem pnpm:
+    # não depende dos atalhos do corepack existirem na hora de rodar, e o
+    # SIGTERM do Render chega ao Node sem intermediário (F26). As variáveis
+    # vêm do Render, então o --env-file dos scripts não faz falta
+    startCommand: cd apps/api && node src/db/migrate.ts up && node src/server.ts
     healthCheckPath: /health
     # publica só depois do CI verde no GitHub
     autoDeployTrigger: checksPass

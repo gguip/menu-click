@@ -57,6 +57,16 @@ describe("IP do cliente pelo header do proxy", () => {
     expect(codes.at(-1)).toBe(429);
   });
 
+  // revisão final I2: um endereço IPv6 residencial ou móvel controla um /64
+  // inteiro — sem agrupar, dá para trocar de endereço a cada tentativa
+  it("endereços IPv6 do mesmo /64 dividem o limite", async () => {
+    const codes: number[] = [];
+    for (let i = 0; i <= LOGIN_RATE_LIMIT_MAX; i++) {
+      codes.push((await login({ "cf-connecting-ip": `2001:db8:0:1::${i + 1}` }, "10.0.2.1")).statusCode);
+    }
+    expect(codes.at(-1)).toBe(429);
+  });
+
   // um describe de topo só por arquivo: o app.close() fecha o pool singleton
   describe("CLIENT_IP_HEADER", () => {
     it("vazio ou ausente é desligado; o nome vai para minúsculas", () => {
