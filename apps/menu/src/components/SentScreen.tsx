@@ -22,7 +22,7 @@ export function SentScreen({
 }) {
   return (
     <main className="flex min-h-dvh flex-col px-5 pb-28 pt-12">
-      <span className="sent-badge flex size-[60px] items-center justify-center rounded-full bg-success-soft text-success" aria-hidden="true">
+      <span className="sent-badge relative flex size-[60px] items-center justify-center rounded-full bg-success-soft text-success" aria-hidden="true">
         <CheckIcon size={30} />
       </span>
       <h1 className="mt-5 text-[26px] font-semibold leading-[1.15] tracking-[-0.03em]">Pedido enviado para a cozinha</h1>
