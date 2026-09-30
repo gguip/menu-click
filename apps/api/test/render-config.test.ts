@@ -21,6 +21,18 @@ describe("render.yaml", () => {
     expect(yaml).toMatch(/startCommand: cd apps\/api && node src\/db\/migrate\.ts up && node src\/server\.ts/);
   });
 
+  // primeiro deploy: `corepack enable` quebrou com EROFS — ele troca o atalho
+  // /usr/bin/pnpm, e no Render /usr é só leitura. `corepack pnpm` roda a versão
+  // do packageManager sem criar atalho; sem o prompt, o download não espera
+  // resposta num build sem terminal
+  it("instala pelo corepack sem gravar atalho em /usr", () => {
+    const build = yaml.split("\n").find((line) => line.trim().startsWith("buildCommand:"));
+    expect(build).not.toMatch(/corepack enable/);
+    expect(build).toMatch(
+      /buildCommand: COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile --filter "@menuclick\/api\.\.\."/,
+    );
+  });
+
   it("segredos nunca têm valor no arquivo", () => {
     for (const key of ["DATABASE_URL", "SMTP_URL"]) {
       // da chave até a próxima variável — o recorte não pode pegar o `value:` vizinho
