@@ -38,7 +38,13 @@ html {
   color: var(--color-ink);
 }
 
-:focus-visible {
-  outline: 2px solid var(--brand-action);
-  outline-offset: 2px;
+/* Em @layer base, e não solto: CSS fora de camada ganha de qualquer camada, e
+   o `focus:outline-none` dos campos (que têm anel próprio) mora em @layer
+   utilities — solto, este contorno desenhava um segundo anel dentro do deles. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--brand-action);
+    outline-offset: 2px;
+  }
 }
+
