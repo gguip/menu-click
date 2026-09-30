@@ -6,6 +6,9 @@ export type StoreForm = {
   cuisineType: string;
   timezone: string;
   logoUrl: string;
+  coverUrl: string;
+  /** #RRGGBB, ou vazio (= azul padrão do app do cliente). */
+  brandColor: string;
   street: string;
   number: string;
   neighborhood: string;
@@ -20,6 +23,8 @@ export function fromRestaurant(restaurant: Restaurant): StoreForm {
     cuisineType: restaurant.cuisineType,
     timezone: restaurant.timezone,
     logoUrl: restaurant.logoUrl ?? "",
+    coverUrl: restaurant.coverUrl ?? "",
+    brandColor: restaurant.brandColor ?? "",
     street: restaurant.address.street,
     number: restaurant.address.number,
     neighborhood: restaurant.address.neighborhood,
@@ -47,8 +52,13 @@ export function validateStoreForm(form: StoreForm): string | null {
     return "Preencha o endereço completo da loja.";
   }
   const logoUrl = form.logoUrl.trim();
-  if (logoUrl !== "" && !isHttpUrl(logoUrl)) {
+  const coverUrl = form.coverUrl.trim();
+  if ((logoUrl !== "" && !isHttpUrl(logoUrl)) || (coverUrl !== "" && !isHttpUrl(coverUrl))) {
     return "Cole um endereço completo de imagem, começando com https://.";
+  }
+  const brandColor = form.brandColor.trim();
+  if (brandColor !== "" && !/^#[0-9A-Fa-f]{6}$/.test(brandColor)) {
+    return "Use a cor no formato #RRGGBB, por exemplo #1E5AE8.";
   }
   return null;
 }
@@ -66,6 +76,13 @@ export function changedPatch(form: StoreForm, initial: StoreForm): RestaurantPat
   // Esvaziar o campo tira o logo: a API aceita `null` (string vazia seria 400
   // pelo `format: uri`).
   if (logoUrl !== initial.logoUrl) patch.logoUrl = logoUrl === "" ? null : logoUrl;
+  const coverUrl = form.coverUrl.trim();
+  if (coverUrl !== initial.coverUrl) patch.coverUrl = coverUrl === "" ? null : coverUrl;
+  // maiúsculas antes de comparar: "#0b7a48" e "#0B7A48" são a mesma cor
+  const brandColor = form.brandColor.trim().toUpperCase();
+  if (brandColor !== initial.brandColor.toUpperCase()) {
+    patch.brandColor = brandColor === "" ? null : brandColor;
+  }
   // `state` é comparado já em maiúsculas: é o valor que de fato vai no PATCH
   // (`toUpperCase()` abaixo). Comparar o cru deixava "rj" ficar para sempre
   // "diferente" de "RJ", mesmo depois de salvar.

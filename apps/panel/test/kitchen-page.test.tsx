@@ -69,6 +69,8 @@ describe("KitchenPage", () => {
     renderInPanel(routes, "/cozinha");
     // os itens chegam do detalhe: espere-os, e aí nada em reais pode ter vindo junto
     expect((await screen.findAllByText("Pizza Grande")).length).toBeGreaterThan(0);
+    // a observação chega à bancada — é justamente ela que a cozinha precisa ler
+    expect(screen.getAllByText("Obs.: sem gelo").length).toBeGreaterThan(0);
     expect(document.body.textContent).not.toMatch(/R\$/);
     expect(document.body.textContent).not.toContain("Marcela");
   });

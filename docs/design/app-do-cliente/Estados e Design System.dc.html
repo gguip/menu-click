@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="" />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #DDE2EC; font-family: Sora, system-ui, sans-serif; }
+  a { color: #1E5AE8; }
+  a:hover { color: #1442AE; }
+  @keyframes shimmer { 0% { opacity: 0.55; } 50% { opacity: 1; } 100% { opacity: 0.55; } }
+</style>
+</helmet>
+
+<div style="padding: 40px; display: flex; flex-direction: column; gap: 56px; color: #0B0D12;">
+
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; align-items: baseline; gap: 12px;">
+      <div style="font-size: 28px; font-weight: 600; letter-spacing: -0.03em;">Mini design system</div>
+      <div style="font-size: 13px; color: #5C6474;">Direção Balcão</div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+
+      <div style="background: #FFFFFF; border-radius: 14px; padding: 20px;">
+        <div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #8B93A5;">Cor</div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
+          <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; border-radius: 8px; background: #1E5AE8; flex: none;"></div><div><div style="font-size: 14px; font-weight: 600;">Ação</div><div style="font-size: 12px; color: #8B93A5;">#1E5AE8</div></div></div>
+          <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; border-radius: 8px; background: #0B0D12; flex: none;"></div><div><div style="font-size: 14px; font-weight: 600;">Tinta</div><div style="font-size: 12px; color: #8B93A5;">#0B0D12 · #5C6474 · #8B93A5</div></div></div>
+          <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; border: 1px solid #ECEFF5; flex: none;"></div><div><div style="font-size: 14px; font-weight: 600;">Papel</div><div style="font-size: 12px; color: #8B93A5;">#FFFFFF · #F4F6FA · #ECEFF5</div></div></div>
+          <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; border-radius: 8px; background: #0B7A48; flex: none;"></div><div><div style="font-size: 14px; font-weight: 600;">Sucesso</div><div style="font-size: 12px; color: #8B93A5;">#0B7A48</div></div></div>
+          <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; border-radius: 8px; background: #FFF4DB; border: 1px solid #FFE3A3; flex: none;"></div><div><div style="font-size: 14px; font-weight: 600;">Atenção</div><div style="font-size: 12px; color: #8B93A5;">#FFF4DB / #7A4E00</div></div></div>
+          <div style="display: flex; align-items: center; gap: 12px;"><div style="width: 40px; height: 40px; border-radius: 8px; background: #A62B21; flex: none;"></div><div><div style="font-size: 14px; font-weight: 600;">Erro</div><div style="font-size: 12px; color: #8B93A5;">#A62B21</div></div></div>
+        </div>
+        <div style="font-size: 12px; color: #5C6474; line-height: 1.5; margin-top: 16px; border-top: 1px solid #ECEFF5; padding-top: 12px;">Temável: o restaurante troca logo, capa e a cor de ação. Tinta, papel e semânticas ficam fixas — é o que garante o contraste AA.</div>
+      </div>
+
+      <div style="background: #FFFFFF; border-radius: 14px; padding: 20px;">
+        <div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #8B93A5;">Tipografia · Sora</div>
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+          <div><div style="font-size: 26px; font-weight: 600; letter-spacing: -0.03em;">Pedido enviado</div><div style="font-size: 11px; color: #8B93A5;">Display 26 / 600 / -3%</div></div>
+          <div><div style="font-size: 19px; font-weight: 600; letter-spacing: -0.02em;">Cantina do Porto</div><div style="font-size: 11px; color: #8B93A5;">Título 19 / 600</div></div>
+          <div><div style="font-size: 16px; font-weight: 600;">Adicionar ao carrinho</div><div style="font-size: 11px; color: #8B93A5;">Ação 16 / 600</div></div>
+          <div><div style="font-size: 15px;">Molho de tomate e muçarela</div><div style="font-size: 11px; color: #8B93A5;">Corpo 15 / 400</div></div>
+          <div><div style="font-size: 13px; color: #5C6474;">Sem cadastro, sem senha</div><div style="font-size: 11px; color: #8B93A5;">Apoio 13 / 400</div></div>
+          <div><div style="font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #8B93A5;">Resumo</div><div style="font-size: 11px; color: #8B93A5;">Rótulo 13 / 600 / caixa alta</div></div>
+        </div>
+      </div>
+
+      <div style="background: #FFFFFF; border-radius: 14px; padding: 20px;">
+        <div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #8B93A5;">Espaço e forma</div>
+        <div style="display: flex; align-items: flex-end; gap: 10px; margin-top: 16px;">
+          <div style="width: 4px; height: 4px; background: #1E5AE8;"></div>
+          <div style="width: 8px; height: 8px; background: #1E5AE8;"></div>
+          <div style="width: 12px; height: 12px; background: #1E5AE8;"></div>
+          <div style="width: 16px; height: 16px; background: #1E5AE8;"></div>
+          <div style="width: 24px; height: 24px; background: #1E5AE8;"></div>
+          <div style="width: 32px; height: 32px; background: #1E5AE8;"></div>
+        </div>
+        <div style="font-size: 12px; color: #5C6474; margin-top: 10px;">Escala 4 · 8 · 12 · 16 · 24 · 32. Margem lateral sempre 16.</div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <div style="flex: 1; height: 54px; border-radius: 5px; border: 1px solid #D5DBE7; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #5C6474;">5 chip</div>
+          <div style="flex: 1; height: 54px; border-radius: 10px; border: 1px solid #D5DBE7; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #5C6474;">10 campo</div>
+          <div style="flex: 1; height: 54px; border-radius: 12px; border: 1px solid #D5DBE7; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #5C6474;">12 card</div>
+        </div>
+        <div style="font-size: 12px; color: #5C6474; line-height: 1.5; margin-top: 16px; border-top: 1px solid #ECEFF5; padding-top: 12px;">Alvo de toque mínimo 44px. Toda ação primária mora na faixa inferior, no alcance do polegar.</div>
+      </div>
+
+      <div style="background: #FFFFFF; border-radius: 14px; padding: 20px;">
+        <div style="font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #8B93A5;">Componentes base</div>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 14px;">
+          <div style="background: #1E5AE8; color: #FFFFFF; border-radius: 10px; padding: 15px; text-align: center; font-size: 15px; font-weight: 600;">Primário</div>
+          <div style="border: 1px solid #1E5AE8; color: #1E5AE8; border-radius: 10px; padding: 14px; text-align: center; font-size: 15px; font-weight: 600;">Secundário</div>
+          <div style="background: #EEF1F7; color: #5C6474; border-radius: 10px; padding: 15px; text-align: center; font-size: 14px; font-weight: 600;">Travado — diz o motivo</div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+            <div style="font-size: 12px; font-weight: 600; color: #0B7A48; border: 1px solid #B6E3CC; padding: 5px 10px; border-radius: 99px;">Aberto</div>
+            <div style="font-size: 12px; font-weight: 600; color: #1442AE; border: 1px solid #C3D3F8; padding: 5px 10px; border-radius: 99px;">Mínimo R$ 30</div>
+            <div style="font-size: 12px; font-weight: 600; color: #5C6474; border: 1px solid #D5DBE7; padding: 5px 10px; border-radius: 99px;">Indisponível</div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; background: #F4F6FA; border-radius: 10px; padding: 13px 14px; font-size: 14px; color: #8B93A5;">Campo de busca</div>
+          <div style="display: flex; align-items: center; gap: 4px; border: 1px solid #D5DBE7; border-radius: 10px; padding: 4px; width: fit-content;">
+            <div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #5C6474;">−</div>
+            <div style="min-width: 26px; text-align: center; font-size: 16px; font-weight: 600;">1</div>
+            <div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: #5C6474;">+</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div style="display: flex; align-items: baseline; gap: 12px;">
+      <div style="font-size: 28px; font-weight: 600; letter-spacing: -0.03em;">Board de estados</div>
+      <div style="font-size: 13px; color: #5C6474;">Todos em mobile, 390px</div>
+    </div>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Carregando · skeleton</div>
+        <div style="width: 390px; height: 560px; background: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 26px rgba(11,13,18,0.12);">
+          <div style="height: 118px; background: #EDF0F6; animation: shimmer 1.4s ease-in-out infinite;"></div>
+          <div style="padding: 14px 16px; display: flex; gap: 12px; align-items: center;">
+            <div style="width: 52px; height: 52px; border-radius: 10px; background: #EDF0F6; animation: shimmer 1.4s ease-in-out infinite;"></div>
+            <div style="display: flex; flex-direction: column; gap: 7px; flex: 1;">
+              <div style="height: 15px; width: 62%; border-radius: 5px; background: #EDF0F6; animation: shimmer 1.4s ease-in-out infinite;"></div>
+              <div style="height: 11px; width: 40%; border-radius: 5px; background: #F1F4F9; animation: shimmer 1.4s ease-in-out infinite;"></div>
+            </div>
+          </div>
+          <div style="padding: 0 16px;"><div style="height: 44px; border-radius: 10px; background: #F1F4F9; animation: shimmer 1.4s ease-in-out infinite;"></div></div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 20px 16px;">
+            <div style="display: flex; flex-direction: column; gap: 8px;"><div style="height: 112px; border-radius: 12px; background: #EDF0F6; animation: shimmer 1.4s ease-in-out infinite;"></div><div style="height: 13px; width: 70%; border-radius: 5px; background: #F1F4F9;"></div><div style="height: 13px; width: 40%; border-radius: 5px; background: #F1F4F9;"></div></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><div style="height: 112px; border-radius: 12px; background: #EDF0F6; animation: shimmer 1.4s ease-in-out infinite;"></div><div style="height: 13px; width: 60%; border-radius: 5px; background: #F1F4F9;"></div><div style="height: 13px; width: 45%; border-radius: 5px; background: #F1F4F9;"></div></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><div style="height: 112px; border-radius: 12px; background: #EDF0F6; animation: shimmer 1.4s ease-in-out infinite;"></div><div style="height: 13px; width: 66%; border-radius: 5px; background: #F1F4F9;"></div></div>
+            <div style="display: flex; flex-direction: column; gap: 8px;"><div style="height: 112px; border-radius: 12px; background: #EDF0F6; animation: shimmer 1.4s ease-in-out infinite;"></div><div style="height: 13px; width: 52%; border-radius: 5px; background: #F1F4F9;"></div></div>
+          </div>
+        </div>
+        <div style="width: 390px; font-size: 12px; color: #5C6474; line-height: 1.5;">A grade do skeleton é a grade real, para a página não pular quando os dados chegam. Foto entra progressiva, com o bloco já reservado.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Fora do horário · com a grade da semana</div>
+        <div style="width: 390px; height: 560px; background: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 26px rgba(11,13,18,0.12); display: flex; flex-direction: column;">
+          <div style="height: 88px; background: #E7EAF1;"></div>
+          <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; gap: 12px; align-items: center;">
+              <div style="width: 44px; height: 44px; border-radius: 9px; background: #EEF1F7; border: 1px solid #E1E5EE; flex: none;"></div>
+              <div><div style="font-size: 17px; font-weight: 600; letter-spacing: -0.02em;">Cantina do Porto</div><div style="font-size: 12px; font-weight: 600; color: #5C6474; margin-top: 2px;">Fechado agora</div></div>
+            </div>
+            <div style="background: #F4F6FA; border-radius: 12px; padding: 16px;">
+              <div style="font-size: 17px; font-weight: 600; letter-spacing: -0.02em;">Fechado. Abre amanhã às 18h</div>
+              <div style="display: flex; flex-direction: column; gap: 7px; margin-top: 14px;">
+                <div style="display: flex; font-size: 13px;"><div style="color: #5C6474;">Segunda</div><div style="margin-left: auto; font-weight: 500;">Fechado</div></div>
+                <div style="display: flex; font-size: 13px;"><div style="color: #5C6474;">Terça a quinta</div><div style="margin-left: auto; font-weight: 500;">18h – 23h</div></div>
+                <div style="display: flex; font-size: 13px;"><div style="color: #5C6474;">Sexta e sábado</div><div style="margin-left: auto; font-weight: 500;">18h – 00h30</div></div>
+                <div style="display: flex; font-size: 13px;"><div style="color: #5C6474;">Domingo</div><div style="margin-left: auto; font-weight: 500;">12h – 22h</div></div>
+              </div>
+            </div>
+            <div style="font-size: 13px; color: #5C6474; line-height: 1.5;">O cardápio continua visível abaixo — só não dá para pedir.</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; opacity: 0.5;">
+              <div style="border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden;"><div style="height: 78px; background: #E7EAF1;"></div><div style="padding: 9px 10px 11px; font-size: 13px; font-weight: 600;">Margherita</div></div>
+              <div style="border: 1px solid #ECEFF5; border-radius: 12px; overflow: hidden;"><div style="height: 78px; background: #E7EAF1;"></div><div style="padding: 9px 10px 11px; font-size: 13px; font-weight: 600;">Calabresa</div></div>
+            </div>
+          </div>
+        </div>
+        <div style="width: 390px; font-size: 12px; color: #5C6474; line-height: 1.5;">Quem escaneou o QR às 23h precisa saber quando voltar. A grade é a saída, não o aviso.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Loja pausou os pedidos</div>
+        <div style="width: 390px; height: 300px; background: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 26px rgba(11,13,18,0.12);">
+          <div style="height: 88px; background: #E7EAF1;"></div>
+          <div style="padding: 16px;">
+            <div style="background: #FFF4DB; border: 1px solid #FFE3A3; border-radius: 12px; padding: 16px;">
+              <div style="font-size: 16px; font-weight: 600; color: #7A4E00; line-height: 1.35;">A loja não está aceitando pedidos no momento</div>
+              <div style="font-size: 13px; color: #7A4E00; line-height: 1.5; margin-top: 8px;">Pode ser uma pausa curta. Vale tentar de novo em alguns minutos.</div>
+            </div>
+          </div>
+        </div>
+        <div style="width: 390px; font-size: 12px; color: #5C6474; line-height: 1.5;">Texto diferente do "fora do horário": aqui não se sabe quando volta, então não prometemos hora.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Mesa não resolveu · segue sem mesa</div>
+        <div style="width: 390px; height: 300px; background: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 26px rgba(11,13,18,0.12);">
+          <div style="display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; background: #FFF9EC; border-bottom: 1px solid #FFE3A3;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#7A4E00" stroke-width="2" style="flex: none; margin-top: 1px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4M12 16h.01"></path></svg>
+            <div style="font-size: 13px; color: #7A4E00; line-height: 1.45;">Não reconhecemos esta mesa. Você pode pedir normalmente — a loja vai confirmar sua mesa.</div>
+          </div>
+          <div style="height: 88px; background: #E7EAF1;"></div>
+          <div style="padding: 14px 16px; display: flex; gap: 12px; align-items: center;">
+            <div style="width: 44px; height: 44px; border-radius: 9px; background: #EEF1F7; border: 1px solid #E1E5EE; flex: none;"></div>
+            <div><div style="font-size: 17px; font-weight: 600; letter-spacing: -0.02em;">Cantina do Porto</div><div style="font-size: 12px; font-weight: 600; color: #0B7A48; margin-top: 2px;">Aberto até 23h</div></div>
+          </div>
+        </div>
+        <div style="width: 390px; font-size: 12px; color: #5C6474; line-height: 1.5;">Nunca uma tela de erro: o cardápio funciona, o que se perdeu foi só a mesa.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Loja não existe</div>
+        <div style="width: 390px; height: 300px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 8px 26px rgba(11,13,18,0.12); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 12px;">
+          <div style="width: 52px; height: 52px; border-radius: 99px; background: #F4F6FA; display: flex; align-items: center; justify-content: center;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B93A5" stroke-width="1.8"><circle cx="12" cy="12" r="9"></circle><path d="M9 9l6 6M15 9l-6 6"></path></svg>
+          </div>
+          <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.02em;">Este link não existe mais</div>
+          <div style="font-size: 14px; color: #5C6474; line-height: 1.5;">Confira o endereço com o restaurante ou escaneie o QR code da mesa outra vez.</div>
+        </div>
+        <div style="width: 390px; font-size: 12px; color: #5C6474; line-height: 1.5;">Não há para onde navegar — o app não tem home. Então a tela orienta, não oferece botão falso.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Cardápio vazio</div>
+        <div style="width: 390px; height: 300px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 8px 26px rgba(11,13,18,0.12); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 32px; gap: 12px;">
+          <div style="width: 52px; height: 52px; border-radius: 99px; background: #F4F6FA; display: flex; align-items: center; justify-content: center;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#8B93A5" stroke-width="1.8"><path d="M5 4h14v16H5z"></path><path d="M9 9h6M9 13h4"></path></svg>
+          </div>
+          <div style="font-size: 18px; font-weight: 600; letter-spacing: -0.02em;">Cardápio ainda não publicado</div>
+          <div style="font-size: 14px; color: #5C6474; line-height: 1.5;">A loja está montando os pratos. Volte em breve.</div>
+        </div>
+        <div style="width: 390px; font-size: 12px; color: #5C6474; line-height: 1.5;">Estado de loja nova. Distinto de busca sem resultado.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Opção obrigatória faltando · abaixo do mínimo</div>
+        <div style="width: 390px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 8px 26px rgba(11,13,18,0.12); padding: 20px 16px; display: flex; flex-direction: column; gap: 18px;">
+          <div>
+            <div style="display: flex; align-items: flex-start; gap: 10px;">
+              <div><div style="font-size: 16px; font-weight: 600;">Escolha 2 sabores</div><div style="font-size: 12px; color: #5C6474; margin-top: 3px;">Cobramos o sabor mais caro</div></div>
+              <div style="margin-left: auto; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 5px; background: #F4F6FA; color: #5C6474;">1 de 2</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid #ECEFF5; margin-top: 12px;">
+              <div style="width: 20px; height: 20px; border-radius: 6px; background: #1E5AE8; flex: none; display: flex; align-items: center; justify-content: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.2"><path d="M4 12l5 5L20 6"></path></svg></div>
+              <div style="font-size: 15px; font-weight: 500;">Margherita</div>
+              <div style="margin-left: auto; font-size: 13px; font-weight: 600; color: #1442AE;">até + R$ 45,00</div>
+            </div>
+            <div style="background: #EEF1F7; color: #5C6474; border-radius: 10px; padding: 15px; text-align: center; font-size: 15px; font-weight: 600; margin-top: 8px;">Escolha 2 sabores</div>
+            <div style="font-size: 12px; color: #5C6474; line-height: 1.5; margin-top: 8px;">O botão travado diz o que falta. Nunca só apagado.</div>
+          </div>
+          <div style="border-top: 1px solid #ECEFF5; padding-top: 18px;">
+            <div style="display: flex; align-items: baseline; gap: 10px;"><div style="font-size: 14px; color: #5C6474;">Itens</div><div style="margin-left: auto; font-size: 18px; font-weight: 600;">R$ 18,00</div></div>
+            <div style="background: #FFF4DB; border: 1px solid #FFE3A3; color: #7A4E00; border-radius: 10px; padding: 12px 14px; font-size: 13px; font-weight: 600; margin-top: 12px;">Faltam R$ 12,00 para o pedido mínimo</div>
+            <div style="background: #EEF1F7; color: #8B93A5; border-radius: 10px; padding: 15px; text-align: center; font-size: 15px; font-weight: 600; margin-top: 10px;">Finalizar pedido</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Frete · as quatro respostas</div>
+        <div style="width: 390px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 8px 26px rgba(11,13,18,0.12); padding: 18px 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px; background: #F2F6FF; border: 1px solid #DCE7FF; border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600; color: #1442AE;">Entrega: R$ 9,00</div>
+          <div style="display: flex; align-items: center; gap: 10px; background: #EAF7F0; border: 1px solid #B6E3CC; border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600; color: #0B7A48;">Entrega grátis neste pedido</div>
+          <div style="background: #FFF4DB; border: 1px solid #FFE3A3; border-radius: 10px; padding: 14px; font-size: 14px; font-weight: 600; color: #7A4E00;">A loja combina a entrega com você</div>
+          <div style="background: #FDEDEC; border: 1px solid #F5C6C1; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-size: 14px; font-weight: 600; color: #A62B21; line-height: 1.4;">Esta loja não entrega no seu bairro</div>
+            <div style="align-self: flex-start; background: #FFFFFF; border: 1px solid #A62B21; color: #A62B21; border-radius: 9px; padding: 11px 16px; font-size: 14px; font-weight: 600;">Trocar para retirada</div>
+          </div>
+          <div style="font-size: 12px; color: #5C6474; line-height: 1.5;">A cotação roda ao escolher o bairro, não no último botão. "Fora da área" sempre vem com a saída.</div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Conexão perdida · acompanhamento</div>
+        <div style="width: 390px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 8px 26px rgba(11,13,18,0.12); overflow: hidden;">
+          <div style="display: flex; align-items: center; gap: 9px; padding: 11px 16px; background: #F4F6FA; border-bottom: 1px solid #ECEFF5;">
+            <div style="width: 7px; height: 7px; border-radius: 99px; background: #8B93A5;"></div>
+            <div style="font-size: 12px; font-weight: 600; color: #5C6474;">Sem conexão. Reconectando…</div>
+            <div style="margin-left: auto; font-size: 12px; font-weight: 600; color: #1E5AE8;">Atualizar</div>
+          </div>
+          <div style="padding: 20px 16px;">
+            <div style="font-size: 22px; font-weight: 600; letter-spacing: -0.03em;">Preparando</div>
+            <div style="font-size: 13px; color: #8B93A5; margin-top: 6px;">Último estado recebido às 19:07</div>
+          </div>
+        </div>
+        <div style="width: 390px; font-size: 12px; color: #5C6474; line-height: 1.5;">Mantém o último estado na tela e a hora dele. Nunca um "carregando" eterno; cai para consulta periódica quando a rede bloqueia conexão persistente.</div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 600;">Pedido cancelado pela loja · estoque acabou</div>
+        <div style="width: 390px; background: #FFFFFF; border-radius: 16px; box-shadow: 0 8px 26px rgba(11,13,18,0.12); padding: 24px 20px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="width: 52px; height: 52px; border-radius: 99px; background: #FDEDEC; display: flex; align-items: center; justify-content: center;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#A62B21" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M9 9l6 6M15 9l-6 6"></path></svg>
+          </div>
+          <div style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2;">A loja não pôde aceitar seu pedido</div>
+          <div style="font-size: 14px; color: #5C6474; line-height: 1.5;">Motivo informado: <strong style="font-weight: 600; color: #0B0D12;">Quatro queijos acabou hoje</strong>. Nada foi cobrado.</div>
+          <div style="background: #1E5AE8; color: #FFFFFF; border-radius: 10px; padding: 15px; text-align: center; font-size: 15px; font-weight: 600;">Montar outro pedido</div>
+        </div>
+        <div style="width: 390px; font-size: 12px; color: #5C6474; line-height: 1.5;">O estoque pode acabar depois do envio. O cancelamento precisa de motivo e de uma saída.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

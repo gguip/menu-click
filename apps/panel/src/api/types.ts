@@ -43,6 +43,10 @@ export type Restaurant = {
   freeDeliveryAboveInCents?: number;
   deliveryFeeToArrange: boolean;
   minimumOrderInCents: number;
+  /** Capa do cardápio do cliente; ausente = sem capa. */
+  coverUrl?: string;
+  /** Cor da ação no app do cliente (#RRGGBB); ausente = azul padrão. */
+  brandColor?: string;
   /**
    * Só o GET traz (PATCH não calcula): se a loja está dentro da grade agora.
    * Ausente enquanto não houve GET — e o cache preserva o último valor.
@@ -114,6 +118,8 @@ export type OrderItem = {
   unitPriceInCents: number;
   quantity: number;
   options: OrderItemOption[];
+  /** Observação do cliente ("sem cebola"); `null` = nenhuma. */
+  note: string | null;
 };
 
 export type OrderStatusEvent = { status: OrderStatus; at: string };

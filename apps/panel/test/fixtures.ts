@@ -109,6 +109,7 @@ export function makeOrderDetail(overrides: Partial<OrderDetail> = {}): OrderDeta
           { optionId: "o2", groupName: "Sabores", name: "Portuguesa", priceInCents: 3800, quantity: 1 },
           { optionId: "o3", groupName: "Borda", name: "Catupiry", priceInCents: 800, quantity: 1 },
         ],
+        note: null,
       },
       {
         id: "i2",
@@ -118,6 +119,7 @@ export function makeOrderDetail(overrides: Partial<OrderDetail> = {}): OrderDeta
         unitPriceInCents: 1200,
         quantity: 1,
         options: [],
+        note: "sem gelo",
       },
     ],
     statusHistory: [{ status: "pending", at: "2026-09-19T22:58:00.000Z" }],

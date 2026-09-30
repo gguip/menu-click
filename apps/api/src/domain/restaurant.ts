@@ -105,11 +105,19 @@ export type UpdateRestaurantInput = Partial<
   freeDeliveryAboveInCents?: number | null;
   /** `null` TIRA o logo; mesma razão de mão única do campo acima. */
   logoUrl?: string | null;
+  /** Capa do cardápio do cliente; `null` tira. */
+  coverUrl?: string | null;
+  /** Cor da ação no app do cliente (#RRGGBB); `null` volta ao azul padrão. */
+  brandColor?: string | null;
 };
 
 /** Restaurante completo, como é guardado e devolvido na resposta. */
 export type Restaurant = CreateRestaurantInput & {
   id: string;
+  /** Capa do cardápio do cliente; ausente quando NULL. Só por PATCH. */
+  coverUrl?: string;
+  /** Cor da ação no app do cliente (#RRGGBB); ausente = azul padrão. */
+  brandColor?: string;
   /** Sempre presente na leitura, mesmo quando não foi enviado na criação. */
   slug: string;
   /** Idem: a coluna é `not null`, então a leitura sempre traz um fuso. */

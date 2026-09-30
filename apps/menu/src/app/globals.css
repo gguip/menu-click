@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+/* Direção Balcão. Só a AÇÃO é temável (a loja troca pela cor da marca);
+   tinta, papel e semânticas ficam fixas — é o que garante o contraste AA. */
+:root {
+  --brand-action: #1e5ae8;
+}
+
+@theme inline {
+  --color-action: var(--brand-action);
+  --font-sans: var(--font-sora), system-ui, sans-serif;
+}
+
+@theme {
+  --color-ink: #0b0d12;
+  --color-ink-2: #5c6474;
+  --color-ink-3: #8b93a5;
+  --color-paper: #ffffff;
+  --color-paper-2: #f4f6fa;
+  --color-paper-3: #eceff5;
+  --color-paper-soft: #fafbfd;
+  --color-line: #e1e5ee;
+  --color-line-strong: #d5dbe7;
+  --color-line-control: #c6ccda;
+  --color-paper-muted: #eef1f7;
+  --color-success: #0b7a48;
+  --color-success-soft: #e8f5ee;
+  --color-warn-soft: #fff4db;
+  --color-warn: #7a4e00;
+  --color-danger: #a62b21;
+  --radius-chip: 5px;
+  --radius-field: 10px;
+  --radius-card: 12px;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* Em @layer base, e não solto: CSS fora de camada ganha de qualquer camada, e
+   o `focus:outline-none` dos campos (que têm anel próprio) mora em @layer
+   utilities — solto, este contorno desenhava um segundo anel dentro do deles. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--brand-action);
+    outline-offset: 2px;
+  }
+}
+
+/* O check do pedido enviado: o círculo cresce e o traço se desenha. Só com
+   movimento liberado — quem pediu menos movimento vê o check parado. */
+@keyframes sent-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Depois da entrada, um anel sai do check três vezes e para: movimento
+   automático acima de 5 s precisaria de botão de pausa (WCAG 2.2.2). */
+@keyframes sent-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  to {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes sent-draw {
+  from {
+    stroke-dashoffset: 22;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sent-badge {
+    animation: sent-pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .sent-badge::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border: 2px solid var(--color-success);
+    opacity: 0;
+    animation: sent-ring 1.4s 700ms ease-out 3;
+  }
+  .sent-badge path {
+    stroke-dasharray: 22;
+    animation: sent-draw 360ms 240ms ease-out both;
+  }
+}

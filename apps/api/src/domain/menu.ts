@@ -39,6 +39,8 @@ export type MenuRestaurant = Pick<
   | "name"
   | "cuisineType"
   | "logoUrl"
+  | "coverUrl"
+  | "brandColor"
   | "address"
   | "isDelivery"
   | "isTakeaway"
@@ -46,6 +48,10 @@ export type MenuRestaurant = Pick<
   | "deliveryFeeMode"
   | "freeDeliveryAboveInCents"
   | "minimumOrderInCents"
+  // o app diz "Aberto até 23h" no fuso DA LOJA, não no do celular. Ficou de
+  // fora do cardápio por um tempo (S10: nada sai sem decisão); esta é a
+  // decisão — fuso não é dado sensível, e sem ele a hora sairia errada
+  | "timezone"
 > & {
   /**
    * A loja está aceitando pedido AGORA: a grade **e** a pausa, juntas. É o que
@@ -57,6 +63,10 @@ export type MenuRestaurant = Pick<
    * "a loja pausou os pedidos". São mensagens diferentes para o cliente.
    */
   acceptingOrders: boolean;
+  /** Fim do trecho aberto da GRADE; ausente se aberta direto ou fechada. */
+  closesAt?: string;
+  /** Próxima abertura da GRADE; ausente se aberta ou sem grade. */
+  opensAt?: string;
   /**
    * A grade da semana, para a tela conseguir dizer QUANDO abre. Sem ela,
    * "fechado" é um beco sem saída para quem escaneou o QR code.

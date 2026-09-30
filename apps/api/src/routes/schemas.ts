@@ -1,4 +1,5 @@
 import { SLUG_MAX_LENGTH } from "../domain/slug.ts";
+import { HEX_COLOR_PATTERN } from "../domain/color.ts";
 import { SELECTABLE_DELIVERY_FEE_MODES } from "../domain/delivery.ts";
 
 /**
@@ -152,6 +153,10 @@ export const updateRestaurantBodySchema = {
     // `null` tira o logo (F12: `nullable`, não `anyOf`); string vazia continua
     // 400 pelo `format`, então "tirar" tem um jeito só de ser dito
     logoUrl: { type: "string", format: "uri", nullable: true },
+    // capa do topo do cardápio do cliente; `null` tira (F12)
+    coverUrl: { type: "string", format: "uri", nullable: true },
+    // cor da ação no app do cliente (#RRGGBB); o serviço recusa sem contraste
+    brandColor: { type: "string", pattern: HEX_COLOR_PATTERN, nullable: true },
     address: addressSchema,
     isDelivery: { type: "boolean" },
     // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada
@@ -195,6 +200,8 @@ export const restaurantResponseSchema = {
     name: { type: "string" },
     cuisineType: { type: "string" },
     logoUrl: { type: "string" },
+    coverUrl: { type: "string" },
+    brandColor: { type: "string" },
     address: { type: "object", properties: addressProperties },
     isDelivery: { type: "boolean" },
     // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada

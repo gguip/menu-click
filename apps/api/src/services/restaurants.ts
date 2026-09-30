@@ -13,6 +13,7 @@ import { SLUG_MAX_LENGTH, slugify } from "../domain/slug.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { isValidTimezone } from "../domain/timezone.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
+import { contrastWithWhite, MIN_ACTION_CONTRAST } from "../domain/color.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
 import * as deliveryNeighborhoodsRepository from "../repositories/delivery-neighborhoods.ts";
 import * as tablesRepository from "../repositories/tables.ts";
@@ -290,12 +291,28 @@ export async function getDetail(
   return { ...restaurant, openingStatus };
 }
 
+/**
+ * A cor da marca é o FUNDO do botão de ação, e o texto do botão é branco: sem
+ * contraste AA (4.5:1), uma loja amarela deixaria "Adicionar ao carrinho"
+ * ilegível. Tinta, papel e semânticas do app são fixas; só a ação é da loja.
+ */
+function assertCorLegivel(cor: string | null | undefined): void {
+  if (typeof cor !== "string") return;
+  const contraste = contrastWithWhite(cor);
+  if (contraste < MIN_ACTION_CONTRAST) {
+    throw new ValidationError(
+      `A cor ${cor} tem contraste de ${contraste.toFixed(2)}:1 com o texto branco do botão; o mínimo é ${MIN_ACTION_CONTRAST}:1. Escolha um tom mais escuro.`,
+    );
+  }
+}
+
 export async function update(
   id: string,
   input: UpdateRestaurantInput,
 ): Promise<Restaurant> {
   if (!isUuid(id)) throw restaurantNotFound(id);
   assertTimezoneValida(input.timezone);
+  assertCorLegivel(input.brandColor);
 
   const restaurant = await restaurantsRepository.update(id, input);
   if (restaurant === null) throw restaurantNotFound(id);

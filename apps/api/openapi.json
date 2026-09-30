@@ -117,6 +117,12 @@
                           "logoUrl": {
                             "type": "string"
                           },
+                          "coverUrl": {
+                            "type": "string"
+                          },
+                          "brandColor": {
+                            "type": "string"
+                          },
                           "address": {
                             "type": "object",
                             "properties": {
@@ -258,6 +264,12 @@
                       "type": "string"
                     },
                     "logoUrl": {
+                      "type": "string"
+                    },
+                    "coverUrl": {
+                      "type": "string"
+                    },
+                    "brandColor": {
                       "type": "string"
                     },
                     "address": {
@@ -408,6 +420,16 @@
                     "format": "uri",
                     "nullable": true
                   },
+                  "coverUrl": {
+                    "type": "string",
+                    "format": "uri",
+                    "nullable": true
+                  },
+                  "brandColor": {
+                    "type": "string",
+                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                    "nullable": true
+                  },
                   "address": {
                     "type": "object",
                     "additionalProperties": false,
@@ -539,6 +561,12 @@
                       "type": "string"
                     },
                     "logoUrl": {
+                      "type": "string"
+                    },
+                    "coverUrl": {
+                      "type": "string"
+                    },
+                    "brandColor": {
                       "type": "string"
                     },
                     "address": {
@@ -4521,6 +4549,10 @@
                           "type": "integer",
                           "minimum": 1
                         },
+                        "note": {
+                          "type": "string",
+                          "maxLength": 140
+                        },
                         "options": {
                           "type": "array",
                           "items": {
@@ -4768,6 +4800,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -5494,6 +5530,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -5732,6 +5772,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -5970,6 +6014,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6208,6 +6256,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6446,6 +6498,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6684,6 +6740,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6922,6 +6982,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -7160,6 +7224,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -7377,6 +7445,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -7467,6 +7539,12 @@
                     "logoUrl": {
                       "type": "string"
                     },
+                    "coverUrl": {
+                      "type": "string"
+                    },
+                    "brandColor": {
+                      "type": "string"
+                    },
                     "address": {
                       "type": "object",
                       "properties": {
@@ -7517,6 +7595,12 @@
                     "isOpen": {
                       "type": "boolean"
                     },
+                    "closesAt": {
+                      "type": "string"
+                    },
+                    "opensAt": {
+                      "type": "string"
+                    },
                     "acceptingOrders": {
                       "type": "boolean"
                     },
@@ -7542,6 +7626,9 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "timezone": {
+                      "type": "string"
                     }
                   }
                 }
@@ -8051,6 +8138,10 @@
                                 }
                               }
                             }
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -8310,6 +8401,12 @@
                           "type": "string"
                         },
                         "logoUrl": {
+                          "type": "string"
+                        },
+                        "coverUrl": {
+                          "type": "string"
+                        },
+                        "brandColor": {
                           "type": "string"
                         },
                         "address": {

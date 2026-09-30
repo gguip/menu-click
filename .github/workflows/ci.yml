@@ -65,5 +65,14 @@ jobs:
       - name: Test (painel)
         run: pnpm --filter @menuclick/panel run test
 
+      - name: Build (app do cliente)
+        run: pnpm --filter @menuclick/menu run build
+
+      - name: Test (app do cliente)
+        run: pnpm --filter @menuclick/menu run test
+
+      - name: Test (pricing)
+        run: pnpm --filter @menuclick/pricing run test
+
       - name: Test
         run: pnpm --filter @menuclick/api run test

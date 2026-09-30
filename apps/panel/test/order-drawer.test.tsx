@@ -65,6 +65,8 @@ describe("OrderDrawer", () => {
     expect(await within(view).findByText("Pizza Grande")).toBeTruthy();
     expect(within(view).getByText("Sabores: Calabresa, Portuguesa")).toBeTruthy();
     expect(within(view).getByText("Borda: Catupiry")).toBeTruthy();
+    // a observação do cliente, que o app do cliente passou a mandar
+    expect(within(view).getByText("Obs.: sem gelo")).toBeTruthy();
     expect(within(view).getByText("R$ 80,00")).toBeTruthy(); // 2 × R$ 40,00
     expect(within(view).getByText("R$ 92,00")).toBeTruthy(); // Itens
     expect(within(view).getByText("Frete")).toBeTruthy();

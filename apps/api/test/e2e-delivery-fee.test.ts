@@ -153,10 +153,10 @@ describe("e2e: taxa de entrega", () => {
     const menu = menuResponse.json();
     expect(menu.deliveryFeeMode).toBe("neighborhood");
     expect(menu.freeDeliveryAboveInCents).toBe(5000);
-    // a configuração crua e o timezone não vazam para o cliente (S10)
+    // a configuração crua de frete não vaza para o cliente (S10); o timezone
+    // sai por decisão, desde o app do cliente (ver test/menu-opening.test.ts)
     expect(menu.deliveryFixedFeeInCents).toBeUndefined();
     expect(menu.deliveryFeeToArrange).toBeUndefined();
-    expect(menu.timezone).toBeUndefined();
 
     // ---- 3. O CLIENTE cota ANTES de montar o carrinho ----
 

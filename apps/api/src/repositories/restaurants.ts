@@ -28,6 +28,8 @@ type RestaurantRow = {
   slug: string;
   cuisine_type: string;
   logo_url: string | null;
+  cover_url: string | null;
+  brand_color: string | null;
   street: string;
   number: string;
   neighborhood: string;
@@ -62,6 +64,8 @@ function toRestaurant(row: RestaurantRow): Restaurant {
     cuisineType: row.cuisine_type,
     // logoUrl é opcional: quando é NULL no banco, a chave nem entra na resposta.
     ...(row.logo_url === null ? {} : { logoUrl: row.logo_url }),
+    ...(row.cover_url === null ? {} : { coverUrl: row.cover_url }),
+    ...(row.brand_color === null ? {} : { brandColor: row.brand_color }),
     address: {
       street: row.street,
       number: row.number,
@@ -103,6 +107,8 @@ const restaurantColumns = {
   name: "name",
   cuisineType: "cuisine_type",
   logoUrl: "logo_url",
+  coverUrl: "cover_url",
+  brandColor: "brand_color",
   isDelivery: "is_delivery",
   isTakeaway: "is_takeaway",
   isQrcode: "is_qrcode",

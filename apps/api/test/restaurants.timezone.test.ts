@@ -98,12 +98,13 @@ describe("fuso horário do restaurante", () => {
   });
 
   /**
-   * S10: coluna nova não entra na superfície pública por reflexo. O fuso é
-   * detalhe de operação do restaurante — o cliente do QR code não precisa dele
-   * enquanto não houver horário de funcionamento.
+   * S10: coluna nova não entra na superfície pública por reflexo — e o fuso
+   * ficou de fora enquanto o cliente não tinha horário para ler. Com o app do
+   * cliente dizendo "Aberto até 23h", ele entrou por DECISÃO: sem o fuso da
+   * loja, a hora sairia no fuso do celular.
    */
-  it("não vaza no cardápio público", async () => {
-    await createRestaurant(app, { slug: "tokyo-fuso" });
+  it("sai no cardápio público, por decisão", async () => {
+    await createRestaurant(app, { slug: "tokyo-fuso", timezone: "Asia/Tokyo" });
 
     const response = await app.inject({
       method: "GET",
@@ -111,6 +112,6 @@ describe("fuso horário do restaurante", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().timezone).toBeUndefined();
+    expect(response.json().timezone).toBe("Asia/Tokyo");
   });
 });
