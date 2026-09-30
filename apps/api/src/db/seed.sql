@@ -26,10 +26,15 @@
 -- `delivery_fee_mode = 'neighborhood'` não usa (`delivery_fixed_fee_in_cents`)
 -- ficam com o `0` do default, e não é enganoso: naquele modo elas são
 -- ignoradas pelo cálculo (`quoteDelivery`), não uma taxa escondida.
+-- `email_verified_at` preenchido: loja do seed é loja de demonstração, e num
+-- banco novo (produção incluída) sem isto ela nasceria bloqueada — 403 no
+-- painel e 404 no cardápio. Banco que já tinha as lojas não muda (o
+-- `on conflict do nothing` não toca na linha).
 insert into restaurants
   (id, name, slug, cuisine_type, street, number, neighborhood, city, state, zip_code,
    is_delivery, is_takeaway, is_qrcode,
-   delivery_fee_mode, delivery_fixed_fee_in_cents, free_delivery_above_in_cents)
+   delivery_fee_mode, delivery_fixed_fee_in_cents, free_delivery_above_in_cents,
+   email_verified_at)
 values
   -- O Tokyo aceita as três modalidades (dá para exercitar as três trilhas de
   -- status sem cadastrar nada) e a Cantina recusa retirada (dá para ver o 409
@@ -39,12 +44,12 @@ values
   -- deixou. É o certo — o seed não sobrescreve dado que já está lá.
   ('cb95db58-0ea1-4157-a6fd-64f775f24a6e', 'Tokyo Ramen House', 'tokyo-ramen-house', 'Japonesa',
    'Avenida Paulista', '2300', 'Bela Vista', 'São Paulo', 'SP', '01310-300', true, true, true,
-   'neighborhood', 0, null),
+   'neighborhood', 0, null, now()),
   -- a Cantina não faz retirada: serve para ver o 409 de modalidade recusada.
   -- Taxa fixa de R$ 8,00, grátis para pedido de R$ 60,00 ou mais.
   ('d05591dd-4c74-4d9e-9f62-cb8191d86ec8', 'Cantina da Nona', 'cantina-da-nona', 'Italiana',
    'Rua Oscar Freire', '1042', 'Jardim Paulista', 'São Paulo', 'SP', '01426-001', true, false, true,
-   'fixed', 800, 6000)
+   'fixed', 800, 6000, now())
 on conflict (id) do nothing;
 
 -- Os bairros que o Tokyo atende, só ele (a Cantina está em modo `fixed`, que
