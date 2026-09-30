@@ -173,5 +173,55 @@ describe("finalizar pelo link", () => {
     fireEvent.click(screen.getByRole("button", { name: "Enviar pedido" }));
     expect(await screen.findByText("A loja não entrega neste endereço")).toBeTruthy();
     expect(screen.getByLabelText("Rua")).toBeTruthy();
+    // revisão final I2: sem sair do laço, a pessoa reenviava para o mesmo 409
+    expect(screen.getByRole("button", { name: "Trocar para retirada" })).toBeTruthy();
+    expect(cta().disabled).toBe(true);
+    expect(screen.queryByText("Entrega: R$ 9,00")).toBeNull();
+  });
+
+  // revisão final I1: loja só de entrega pulava o passo que mostra o mínimo, e a
+  // pessoa preenchia tudo para levar 409 no "Enviar"
+  it("loja só de entrega abaixo do mínimo: trava logo no primeiro passo, com o motivo", () => {
+    api();
+    render(<Harness restaurant={makeRestaurant({ isTakeaway: false, minimumOrderInCents: 6000 })} />);
+    expect(cta().disabled).toBe(true);
+    expect(cta().textContent).toBe("Pedido mínimo para entrega: R$ 60,00");
+  });
+
+  // revisão final I3: a cotação ainda no ar não pode escrever frete num
+  // endereço que ficou incompleto; e digitar não dispara uma cotação por tecla
+  it("cotação que chega depois de o endereço ficar incompleto é descartada", async () => {
+    let release!: (r: Response) => void;
+    const fetchMock = vi.fn(
+      (url: string) =>
+        new Promise<Response>((resolve) => {
+          if (url.endsWith("/delivery-quote")) release = resolve;
+          else resolve(json(RECEIPT, 201));
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /Entrega/ }));
+    fillDetails();
+    fillAddress();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText("CEP"), { target: { value: "0130" } });
+    release(json({ deliversTo: true, feeInCents: 900, isFree: false, toArrange: false, servedNeighborhoods: [] }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText("Entrega: R$ 9,00")).toBeNull();
+  });
+
+  it("digitar o endereço completo não dispara uma cotação por tecla", async () => {
+    const fetchMock = api();
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: /Entrega/ }));
+    fillDetails();
+    fillAddress();
+    for (const street of ["Rua Ab", "Rua Abc", "Rua Abcd"]) {
+      fireEvent.change(screen.getByLabelText("Rua"), { target: { value: street } });
+    }
+    await screen.findByText("Entrega: R$ 9,00");
+    const quotes = (fetchMock.mock.calls as unknown as [string][]).filter(([url]) => url.endsWith("/delivery-quote"));
+    expect(quotes).toHaveLength(1);
   });
 });

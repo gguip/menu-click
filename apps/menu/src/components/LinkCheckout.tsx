@@ -30,6 +30,12 @@ import { ScreenHeader } from "./ScreenHeader.tsx";
 
 const FIELD = `w-full px-3.5 py-3.5 ${FIELD_BOX} ${FIELD_FOCUS} ${FIELD_TEXT}`;
 
+/**
+ * Espera entre a última tecla e a cotação: sem ela, cada letra da rua dispara
+ * um POST, contra o teto de 100/min por IP que a rede móvel divide.
+ */
+export const QUOTE_DEBOUNCE_MS = 400;
+
 export type LinkSent = { receipt: OrderReceipt; modality: Modality };
 
 /**
@@ -86,12 +92,26 @@ export function LinkCheckout({
       return;
     }
     setQuote({ kind: "loading" });
-    void latest(fetchQuote(restaurant.slug, JSON.parse(quoteKey), items)).then((result) => {
-      if (result.current) setQuote(result.value);
-    });
+    // `alive` fecha o que o `latestOnly` não fecha: o endereço que ficou
+    // incompleto não pede cotação nova, e a velha ainda no ar era "a última"
+    let alive = true;
+    const timer = setTimeout(() => {
+      void latest(fetchQuote(restaurant.slug, JSON.parse(quoteKey), items)).then((result) => {
+        if (alive && result.current) setQuote(result.value);
+      });
+    }, QUOTE_DEBOUNCE_MS);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
   }, [quoteKey, items, quoteRetry, restaurant.slug, latest]);
 
+  // o mínimo vale na entrega em QUALQUER passo: numa loja só de entrega o
+  // passo da modalidade (onde a opção fica desabilitada) nem aparece
+  const minimum = modality === "delivery" ? deliveryBlock(restaurant, items) : null;
+
   const block = (): string | null => {
+    if (current !== "modality" && minimum) return minimum;
     switch (current) {
       case "modality":
         return modality === null ? "Escolha entrega ou retirada" : null;
@@ -125,6 +145,9 @@ export function LinkCheckout({
       setSending(false);
       if (failure.status === 409 && failure.message === NOT_SERVED_MESSAGE) {
         setAddressError(failure.message);
+        // a cotação de antes dizia que entregava; sem desdizê-la o "Continuar"
+        // reenviava para o mesmo 409, e o "Trocar para retirada" não aparecia
+        setQuote({ kind: "none" });
         onStep(steps.indexOf("address"));
         return;
       }
