@@ -116,6 +116,9 @@ const menuRestaurantResponseSchema = {
     // a lista pronta, não as quatro flags: o cliente escolhe entre opções,
     // não lê booleanos. `acceptsCash` e companhia NÃO entram aqui.
     paymentMethods: { type: "array", items: { type: "string" } },
+    // os nomes dos bairros atendidos, para o seletor do endereço; os valores
+    // saem só pela cotação (S10)
+    deliveryNeighborhoods: { type: "array", items: { type: "string" } },
     // o fuso da loja: o app formata "23h" nele, não no fuso do celular.
     // Entrou por decisão (S10), no app do cliente — não é dado sensível.
     timezone: { type: "string" },

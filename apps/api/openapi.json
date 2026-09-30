@@ -7750,6 +7750,12 @@
                         "type": "string"
                       }
                     },
+                    "deliveryNeighborhoods": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "timezone": {
                       "type": "string"
                     }
