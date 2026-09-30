@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createDineInOrder, OrderError, type OrderReceipt } from "@/lib/api.ts";
 import { type CartLine, subtotal, toOrderItems } from "@/lib/cart.ts";
-import { checkoutBlock, type DineInPayment, dineInPayments } from "@/lib/checkout.ts";
+import { checkoutBlock, type DineInPayment, dineInPayments, formatPhone } from "@/lib/checkout.ts";
 import { formatCents } from "@/lib/money.ts";
 import type { MenuRestaurant } from "@/lib/types.ts";
 import { ScreenHeader } from "./ScreenHeader.tsx";
@@ -99,7 +99,7 @@ export function CheckoutScreen({
             autoComplete="tel"
             placeholder="(11) 90000-0000"
             value={phone}
-            onChange={(event) => setPhone(event.currentTarget.value)}
+            onChange={(event) => setPhone(formatPhone(event.currentTarget.value))}
             className={FIELD}
           />
         </label>

@@ -34,7 +34,8 @@ describe("pedido no salão", () => {
     const send = () => screen.getByRole("button", { name: /Enviar para a cozinha|Informe|Escolha/ });
     expect(send().textContent).toBe("Informe seu nome");
     fireEvent.change(screen.getByLabelText("Nome"), { target: { value: "Ana" } });
-    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "(11) 99999-0000" } });
+    fireEvent.change(screen.getByLabelText("Telefone"), { target: { value: "11999990000123" } });
+    expect((screen.getByLabelText("Telefone") as HTMLInputElement).value).toBe("(11) 99999-0000");
     fireEvent.click(screen.getByRole("radio", { name: "Pix" }));
     fireEvent.click(screen.getByRole("button", { name: "Enviar para a cozinha" }));
 
