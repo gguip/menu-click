@@ -23,6 +23,8 @@ Ele tem o domínio `gguip.dev` e uma conta no Resend com esse domínio verificad
 | API acordada | Ping no `GET /health` pelo **cron-job.org**, a cada 10 min das 06:00 às 23:00 (horário de Brasília); de madrugada a API dorme |
 | E-mail | **Resend do TirzeFlow**, com chave de API própria ("menuclick") e remetente próprio |
 | Painel ↔ API | O painel chama a API **direto** (CORS), sem reescrita da Vercel — ver "IP do cliente" |
+| IP do cliente | `CLIENT_IP_HEADER=cf-connecting-ip` (revisado no plano; ver "IP do cliente") |
+| Regiões | Render em **Virginia** e Neon em **AWS us-east-1**: API e banco perto um do outro; só o navegador cruza até os EUA |
 | Dados de demonstração | Seed uma vez em produção, com os e-mails dos donos trocados para endereços do dono do projeto e senhas novas definidas pelo "Esqueci a senha" |
 
 ## Onde fica cada peça
@@ -52,18 +54,33 @@ Fatos dos planos gratuitos, conferidos em 2026-09-30:
 
 ## IP do cliente (e o limite de requisições)
 
-O `TRUST_PROXY` é, hoje, só `true`/`false`. Com `true`, o Fastify usa o
-**primeiro** endereço do `X-Forwarded-For` — e esse é o que o cliente escreve.
-Atrás do Render, alguém forjaria o header e escolheria o próprio IP, e o teto de
-5 tentativas de login por minuto (S25) deixaria de valer.
+⚠️ **Revisado ao escrever o plano** — a versão aprovada propunha `TRUST_PROXY=1`
+(confiar em um salto de proxy), e isso não funciona no Render. Lá o
+`X-Forwarded-For` chega como `cliente, borda-do-Cloudflare, interno-do-Render`,
+e o endereço interno **muda a cada requisição**: com `TRUST_PROXY=1`, o limite
+de login contaria cada tentativa num endereço diferente e **nunca** daria 429
+([relato do mesmo defeito num projeto no Render](https://github.com/Vihanga-JM/LeaveFlow/pull/27)).
+E `TRUST_PROXY=true` usa o primeiro endereço da lista, que o cliente escreve.
 
-- `TRUST_PROXY` passa a aceitar **um número de saltos**, além de `true`/`false`: `TRUST_PROXY=1` confia só no proxy imediatamente à frente (o do Render) e usa o endereço que **ele** escreveu. `true` continua existindo para quem precisar, com o mesmo aviso de hoje no `.env.example`.
-- **O painel chama a API direto**, como o app do cliente: com a reescrita `/api/*` da Vercel, as chamadas do painel teriam dois saltos (Vercel + Render) e as do app um, e nenhum número só serviria para os dois. O token vai no header `Authorization`, sem cookie, então CORS basta.
+- O Render fica atrás do Cloudflare, e o Cloudflare **sobrescreve** o header
+  `CF-Connecting-IP` na borda com o IP de quem conectou: um valor só, que o
+  cliente não consegue forjar. A API passa a aceitar
+  **`CLIENT_IP_HEADER=cf-connecting-ip`**: quando configurado, a chave do limite
+  de requisições é esse header (e, se ele faltar, o `request.ip` de sempre).
+- `TRUST_PROXY` fica `false` em produção — o `request.ip` só sobra como reserva.
+- Nome de header inválido em `CLIENT_IP_HEADER` derruba o boot, como `MENU_BASE_URL`.
+- ⚠️ Só é seguro onde **toda** requisição passa por um proxy que sobrescreve o
+  header. No Render é assim (o domínio próprio e o `.onrender.com` passam pelo
+  Cloudflare); em outra hospedagem, a variável tem que ficar vazia.
+- **O painel chama a API direto**, como o app do cliente: por uma reescrita da
+  Vercel, o `CF-Connecting-IP` que chegaria à API seria o da Vercel, e todos os
+  lojistas dividiriam um teto só. O token vai no header `Authorization`, sem
+  cookie, então CORS basta.
 - `CORS_ORIGINS=https://menuclick.gguip.dev,https://painel.menuclick.gguip.dev`.
 
 ## O que muda no código
 
-- `apps/api/src/limits.ts`: `TRUST_PROXY` lê `true`, `false` ou um inteiro de saltos (valor inválido derruba o boot, como `MENU_BASE_URL`).
+- `apps/api/src/limits.ts` + `src/client-ip.ts`: `CLIENT_IP_HEADER` (nome de header, validado no boot) e a chave do limite de requisições lida dele; `TRUST_PROXY` não muda.
 - `apps/api/src/db/seed.sql`: as lojas nascem com `email_verified_at = now()`.
 - `apps/panel/vercel.json`: toda rota que não é arquivo volta para o `index.html` (a SPA). O painel já lê `VITE_API_URL`; em produção ela é `https://api.menuclick.gguip.dev`.
 - `apps/menu`: nenhuma mudança de código — `NEXT_PUBLIC_API_URL=https://api.menuclick.gguip.dev` no projeto da Vercel.
@@ -79,7 +96,8 @@ Atrás do Render, alguém forjaria o header e escolheria o próprio IP, e o teto
 | Variável | Valor |
 | --- | --- |
 | `NODE_ENV` | `production` (desliga o `/docs`, recusa o e-mail de console) |
-| `TRUST_PROXY` | `1` |
+| `TRUST_PROXY` | `false` |
+| `CLIENT_IP_HEADER` | `cf-connecting-ip` |
 | `DATABASE_URL` | a do Neon, com `sslmode=require` — segredo |
 | `DB_POOL_MAX` | `5` |
 | `CORS_ORIGINS` | `https://menuclick.gguip.dev,https://painel.menuclick.gguip.dev` |
@@ -119,14 +137,14 @@ Exige as contas dele, e o plano traz o roteiro passo a passo:
 - `curl https://api.menuclick.gguip.dev/health` responde 200.
 - `https://menuclick.gguip.dev/tokyo-ramen-house` abre; o QR de uma mesa no painel aponta para o domínio do app.
 - Um pedido de entrega com acompanhamento em tempo real (WebSocket pelo Render).
-- O login responde 429 na sexta tentativa por minuto — prova de que o `TRUST_PROXY=1` enxerga o IP de verdade.
+- O login responde 429 na sexta tentativa por minuto, **mesmo mandando um `CF-Connecting-IP` forjado a cada tentativa** — prova de que o Cloudflare sobrescreve o header; e um segundo aparelho (4G) continua conseguindo entrar — prova de que a chave é por cliente.
 - `https://api.menuclick.gguip.dev/docs` responde 404.
 - O cron-job.org registra as chamadas, e nenhuma de madrugada.
 
 ## Testes automáticos
 
-- `TRUST_PROXY` com número de saltos: um teste de integração forja o `X-Forwarded-For` e confirma que o limite de login continua valendo, e outro confirma que o IP do proxy imediato é o usado.
-- Valor inválido de `TRUST_PROXY` derruba o boot.
+- `CLIENT_IP_HEADER`: com ele configurado, seis logins com o mesmo header vindos de endereços diferentes dão 429 na sexta; headers diferentes contam separado; sem o header na requisição, vale o `request.ip`.
+- Nome inválido de `CLIENT_IP_HEADER` derruba o boot.
 - O seed marca as lojas como verificadas.
 - O `vercel.json` do painel volta as rotas para o `index.html`.
 - O `/health` responde 200 com o banco inacessível (prende que ele não toca no banco).
