@@ -113,6 +113,18 @@ const trackedOrderResponseSchema = {
     },
     // o porquê do cancelamento, escrito pela loja para quem pediu
     cancellationReason: { type: "string", nullable: true },
+    // os horários de cada etapa do PRÓPRIO pedido — a trilha do acompanhamento
+    statusHistory: {
+      type: "array",
+      items: { type: "object", properties: { status: { type: "string" }, at: { type: "string" } } },
+    },
+    // `null` antes da loja aceitar, depois do fim ou sem tempo configurado:
+    // a tela não inventa hora. Retirada traz `readyAt`; entrega, `from`/`to`
+    estimate: {
+      type: "object",
+      nullable: true,
+      properties: { readyAt: { type: "string" }, from: { type: "string" }, to: { type: "string" } },
+    },
     deliveryAddress: {
       type: "object",
       properties: { ...addressProperties, complement: { type: "string", nullable: true } },
@@ -162,7 +174,7 @@ export async function trackingRoutes(app: FastifyInstance) {
         operationId: "getTrackedOrder",
         summary: "Lê o pedido pelo token de acompanhamento",
         description:
-          "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante.",
+          "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante. Traz `statusHistory` (a hora de cada etapa) e `estimate` (a previsão a partir da confirmação, com os tempos configurados pela loja; `null` quando não há o que prever).",
         params: paramsSchema,
         querystring: querystringSchema,
         response: {

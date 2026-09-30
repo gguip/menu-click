@@ -8168,7 +8168,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante.",
+        "description": "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante. Traz `statusHistory` (a hora de cada etapa) e `estimate` (a previsão a partir da confirmação, com os tempos configurados pela loja; `null` quando não há o que prever).",
         "parameters": [
           {
             "schema": {
@@ -8272,6 +8272,35 @@
                     "cancellationReason": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "statusHistory": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "estimate": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "readyAt": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      }
                     },
                     "deliveryAddress": {
                       "type": "object",

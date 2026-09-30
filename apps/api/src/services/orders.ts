@@ -14,7 +14,7 @@ import type {
   OrderSummary,
   OrderType,
 } from "../domain/order.ts";
-import type { OrderSummaryTotals } from "../domain/order.ts";
+import type { OrderSummaryTotals, TrackedOrder } from "../domain/order.ts";
 import {
   ORDER_STATUSES,
   REVENUE_STATUSES,
@@ -41,6 +41,8 @@ import { generateToken, hashToken } from "../tokens.ts";
 import * as orderEvents from "../events/orders.ts";
 import * as deliveryService from "./delivery.ts";
 import * as restaurantsService from "./restaurants.ts";
+import * as restaurantsRepository from "../repositories/restaurants.ts";
+import { estimateFor } from "../domain/estimate.ts";
 
 /**
  * Serviço de pedidos: **a regra de negócio**.
@@ -769,12 +771,22 @@ export async function findByTrackingToken(
 export async function getByTrackingToken(
   orderId: string,
   token: string,
-): Promise<Order> {
+): Promise<TrackedOrder> {
   const order = await findByTrackingToken(token);
   if (order === null || order.id !== orderId) {
     throw new NotFoundError("Pedido não encontrado");
   }
-  return order;
+  const [statusHistory, restaurant] = await Promise.all([
+    ordersRepository.findStatusHistory(order.id),
+    // restaurante removido não derruba o acompanhamento: pedido é histórico
+    // (sem cascata), só fica sem previsão
+    restaurantsRepository.findById(order.restaurantId),
+  ]);
+  return {
+    ...order,
+    statusHistory,
+    estimate: restaurant === null ? null : estimateFor(order, statusHistory, restaurant),
+  };
 }
 
 /** O detalhe do painel: o pedido com o histórico de status (`OrderDetail`). */

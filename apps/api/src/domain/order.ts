@@ -8,6 +8,7 @@
  */
 import type { Customer, CreateCustomerInput } from "./customer.ts";
 import type { Address } from "./restaurant.ts";
+import type { Estimate } from "./estimate.ts";
 import type { PaymentMethod } from "./payment.ts";
 
 /**
@@ -329,6 +330,12 @@ export type OrderStatusEvent = { status: OrderStatus; at: string };
  * andamento; o acompanhamento público fica com o app do cliente decidir.
  */
 export type OrderDetail = Order & { statusHistory: OrderStatusEvent[] };
+
+/**
+ * O pedido como quem o fez vê pelo acompanhamento: os horários de cada etapa
+ * (os do próprio pedido, nada da loja) e a previsão calculada.
+ */
+export type TrackedOrder = Order & { statusHistory: OrderStatusEvent[]; estimate: Estimate | null };
 
 /**
  * O que a criação devolve: o pedido mais o token de acompanhamento.
