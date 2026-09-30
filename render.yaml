@@ -9,7 +9,9 @@ services:
     # perto do Neon (AWS us-east-1): API e banco no mesmo lado do oceano
     region: virginia
     rootDir: ./
-    buildCommand: corepack enable && pnpm install --frozen-lockfile --filter "@menuclick/api..."
+    # `corepack pnpm`, não `corepack enable`: o enable troca o atalho
+    # /usr/bin/pnpm, e no Render /usr é só leitura (EROFS no primeiro deploy)
+    buildCommand: COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack pnpm install --frozen-lockfile --filter "@menuclick/api..."
     # migrations antes do listen: uma instância só, sem subida concorrente
     # (o gancho de pré-deploy do Render é pago). Direto pelo node, sem pnpm:
     # não depende dos atalhos do corepack existirem na hora de rodar, e o
