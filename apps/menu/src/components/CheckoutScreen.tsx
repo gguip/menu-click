@@ -145,12 +145,9 @@ export function CheckoutScreen({
 
       <section className="border-t border-paper-3 px-4 py-5">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.1em] text-ink-3">Resumo</h2>
+        {/* uma linha só: sem frete no salão, "Itens" repetiria o TOTAL */}
         <dl className="mt-2.5 flex flex-col gap-2 text-sm">
           <div className="flex">
-            <dt className="text-ink-2">Itens</dt>
-            <dd className="ml-auto font-medium tabular-nums">{formatCents(total)}</dd>
-          </div>
-          <div className="flex border-t border-paper-3 pt-2.5">
             <dt className="text-sm font-semibold">TOTAL</dt>
             <dd className="ml-auto text-lg font-semibold tabular-nums">{formatCents(total)}</dd>
           </div>

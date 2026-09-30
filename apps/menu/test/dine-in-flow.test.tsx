@@ -151,6 +151,19 @@ describe("pedido no salão", () => {
     expect(JSON.parse(posts[1][1]?.body as string)).not.toHaveProperty("tableHash");
   });
 
+  // no salão não há frete: o valor do carrinho já é o total, e "Itens" ao lado
+  // de "TOTAL" com o mesmo número só repetia a conta
+  it("salão mostra Total no carrinho e uma linha só no resumo do finalizar", async () => {
+    withCart();
+    fireEvent.click(await screen.findByRole("button", { name: /Ver carrinho/ }));
+    expect(screen.getByText("Total")).toBeTruthy();
+    expect(screen.queryByText("Itens")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Finalizar pedido" }));
+    expect(screen.getByText("TOTAL")).toBeTruthy();
+    expect(screen.queryByText("Itens")).toBeNull();
+    expect(screen.getAllByText("R$ 104,00")).toHaveLength(1);
+  });
+
   it("carrinho vazio orienta de volta ao cardápio", async () => {
     render(<MenuApp menu={menu} table={{ kind: "found", hash: "a7f3", label: "Mesa 7" }} initialScreen="cart" />);
     expect(screen.getByText("Carrinho vazio")).toBeTruthy();

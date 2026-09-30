@@ -107,8 +107,10 @@ export function CartScreen({
         + Adicionar mais itens
       </button>
 
+      {/* No salão não há frete: o valor do carrinho já é o total. A entrega
+          (parte 2) volta a separar "Itens" de "Entrega", como no handoff. */}
       <dl className="mx-4 mt-4 flex border-t border-paper-3 pt-4 text-[15px]">
-        <dt className="text-ink-2">Itens</dt>
+        <dt className="text-ink-2">Total</dt>
         <dd className="ml-auto font-semibold tabular-nums">{formatCents(subtotal(lines))}</dd>
       </dl>
 
