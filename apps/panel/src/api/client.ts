@@ -1,6 +1,15 @@
 import { clearSession, readSession } from "./session.ts";
 
-const BASE_URL = import.meta.env.VITE_API_URL ?? "/api";
+/**
+ * O endereço da API sem barra no fim: com ela, "/auth/me" viraria "//auth/me",
+ * que não bate com rota nenhuma e sai 401 — lido aqui como sessão expirada.
+ */
+export function apiBaseUrl(raw: string | undefined): string {
+  const url = (raw ?? "").trim().replace(/\/+$/, "");
+  return url === "" ? "/api" : url;
+}
+
+const BASE_URL = apiBaseUrl(import.meta.env.VITE_API_URL);
 
 /** Erro com status HTTP. A `message` vem da API, já em pt-BR para quem lê. */
 export class ApiError extends Error {

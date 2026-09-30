@@ -1,7 +1,16 @@
 import type { TableLookup } from "./table.ts";
 import type { Address, Menu, MenuOptionGroup, MenuRestaurant, MenuSection, PaymentMethod } from "./types.ts";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
+/**
+ * O endereço da API sem barra no fim: com ela, "/menu/x" viraria "//menu/x", que
+ * não bate com rota nenhuma e sai 401 (foi o primeiro deploy na Vercel).
+ */
+export function apiBaseUrl(raw: string | undefined): string {
+  const url = (raw ?? "").trim().replace(/\/+$/, "");
+  return url === "" ? "http://localhost:3333" : url;
+}
+
+export const API_URL = apiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 
 /** Revalidação do cardápio no servidor (ISR). Preço visto com até 60 s de atraso é aceito. */
 export const MENU_REVALIDATE_SECONDS = 60;
