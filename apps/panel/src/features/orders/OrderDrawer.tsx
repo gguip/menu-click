@@ -111,6 +111,9 @@ function OrderDetailView({
             {describeError(togglePaid.error)}
           </p>
         )}
+        {order.status === "cancelled" && order.cancellationReason && (
+          <p className={classes.payment}>Motivo do cancelamento: {order.cancellationReason}</p>
+        )}
 
         <section className={classes.progress}>
           <span className="eyebrow">Andamento</span>

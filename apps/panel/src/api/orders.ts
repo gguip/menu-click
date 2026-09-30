@@ -63,10 +63,11 @@ export function transitionOrder(
   restaurantId: string,
   orderId: string,
   transition: OrderTransition,
+  body?: { reason?: string },
 ): Promise<OrderDetail> {
   return apiRequest<OrderDetail>(
     `/restaurants/${restaurantId}/orders/${orderId}/${ENDPOINT[transition]}`,
-    { method: "POST" },
+    { method: "POST", ...(body === undefined ? {} : { body }) },
   );
 }
 

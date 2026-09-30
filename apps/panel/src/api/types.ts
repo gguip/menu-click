@@ -5,6 +5,8 @@ export type Address = {
   city: string;
   state: string;
   zipCode: string;
+  /** Só no endereço de entrega do pedido; `null` = sem complemento. */
+  complement?: string | null;
 };
 
 export type UserRole = "owner" | "staff";
@@ -125,7 +127,12 @@ export type OrderItem = {
 export type OrderStatusEvent = { status: OrderStatus; at: string };
 
 /** O detalhe traz o histórico; pedido anterior ao registro tem só chegada e status atual. */
-export type OrderDetail = Order & { items: OrderItem[]; statusHistory: OrderStatusEvent[] };
+export type OrderDetail = Order & {
+  items: OrderItem[];
+  statusHistory: OrderStatusEvent[];
+  /** O que a loja escreveu ao cancelar; `null` fora de cancelado ou sem motivo. */
+  cancellationReason?: string | null;
+};
 
 export type OrdersSummary = {
   period: { from: string; to: string };
