@@ -18,7 +18,11 @@ cartão, estourar um limite suspende o serviço em vez de cobrar.
 ## 1. Neon (banco)
 
 1. Criar o projeto `menuclick`, região **AWS us-east-1** (perto da API no Render).
-2. Copiar a connection string **direta** (não a "pooled"), com `sslmode=require` no fim. É o `DATABASE_URL`.
+2. Em "Connect", com **"Connection pooling" desligado** (o host sem `-pooler`), copiar a connection string. É o `DATABASE_URL`, com dois ajustes no fim dela:
+   - **tirar o `&channel_binding=require`** que o Neon acrescenta;
+   - trocar `sslmode=require` por **`sslmode=verify-full`**. O `pg` já trata `require` como `verify-full` e avisa disso no log a cada subida; escrever `verify-full` mantém a mesma segurança sem o aviso.
+
+   A caixa do Neon é só leitura: copie ("Copy snippet") e ajuste num arquivo ignorado pelo git (`apps/api/.env.neon` casa com o `.env.*` do `.gitignore`). A URL tem a senha do banco: não a cole em chat nem em issue.
 
 ## 2. Resend (e-mail)
 
@@ -29,26 +33,38 @@ cartão, estourar um limite suspende o serviço em vez de cobrar.
 
 ## 3. Render (API)
 
-1. "New → Blueprint" apontando para o repositório: o `render.yaml` da raiz cria o serviço `menuclick-api`.
-2. Preencher `DATABASE_URL` e `SMTP_URL` quando o Render pedir (são os dois segredos, `sync: false`).
-3. Nos logs do primeiro deploy, conferir que as migrations rodaram antes do servidor subir.
-4. Em "Settings → Custom Domains", adicionar `api.menuclick.gguip.dev` e anotar o alvo `.onrender.com` que o Render mostrar.
+1. **Workspace só do MenuClick** (menu do workspace → "New Workspace", plano **Hobby, $0**; a tela vem com o Pro de $25 marcado). As 750 h gratuitas são por workspace, e serviço gratuito antigo acordado no mesmo workspace as divide.
+2. No GitHub, "Settings → Applications → Render → Configure": dar acesso ao repositório `gguip/menu-click`. Sem isso o Render clona (o repositório é público), mas não recebe o aviso do CI verde e o deploy automático não dispara.
+3. "New → Blueprint" apontando para o repositório: o `render.yaml` da raiz cria o serviço `menuclick-api`.
+4. Preencher `DATABASE_URL` e `SMTP_URL` quando o Render pedir (são os dois segredos, `sync: false`). Para não passar o segredo por chat nem histórico do terminal, ponha cada um na área de transferência a partir do arquivo local e cole direto no campo.
+5. Nos logs do primeiro deploy, conferir que as migrations rodaram antes do servidor subir.
+6. Em "Settings → Custom Domains", adicionar `api.menuclick.gguip.dev` e anotar o alvo `.onrender.com` que o Render mostrar.
+
+⚠️ **O Blueprint grava o comando de build e o de subida no serviço quando o cria.** Mudou o `render.yaml`? "Manual Deploy" publica o código novo com o comando **antigo**. Quem relê o arquivo é o **"Manual sync"** do Blueprint ("Blueprints" → `menuclick`). Foi assim que o primeiro build falhou duas vezes com o mesmo erro, o segundo já com a correção na `main`.
+
+O build usa `corepack pnpm install`, e não `corepack enable`: o `enable` troca o atalho `/usr/bin/pnpm`, e no Render `/usr` é só leitura (`EROFS: read-only file system, unlink '/usr/bin/pnpm'`).
 
 O deploy automático só publica **depois do CI verde** (`autoDeployTrigger: checksPass`).
 
 ## 4. Vercel — app do cliente
 
 1. Novo projeto a partir do repositório, **Root Directory `apps/menu`**, framework Next.js.
-2. Variável `NEXT_PUBLIC_API_URL=https://api.menuclick.gguip.dev`.
+2. Variáveis, **antes do primeiro Deploy** e com Type **Config** (a Vercel recusa Secret com prefixo `NEXT_PUBLIC_`, e Secret não vira Config depois — tem que apagar e recriar):
+   - `NEXT_PUBLIC_API_URL=https://api.menuclick.gguip.dev` — **sem barra no fim**. Com ela, o app pedia `//menu/<slug>`, a API respondia 401 e todo cardápio saía 500 (os apps agora tiram a barra sozinhos, mas o valor certo continua sendo sem ela);
+   - `ENABLE_EXPERIMENTAL_COREPACK=1` — a Vercel usa o pnpm do `packageManager`, e não um escolhido pela versão do lockfile.
+
+   O valor entra no build: trocou a variável, **Redeploy sem o cache**.
 3. Domínio `menuclick.gguip.dev`; anotar o alvo de CNAME que a Vercel mostrar.
 
 ## 5. Vercel — painel
 
 1. Novo projeto a partir do repositório, **Root Directory `apps/panel`**, framework Vite, output `dist`.
-2. Variável `VITE_API_URL=https://api.menuclick.gguip.dev`.
+2. Variáveis, Type **Config**, antes do primeiro Deploy: `VITE_API_URL=https://api.menuclick.gguip.dev` (sem barra no fim) e `ENABLE_EXPERIMENTAL_COREPACK=1`.
 3. Domínio `painel.menuclick.gguip.dev`; anotar o alvo de CNAME.
 
 O `apps/panel/vercel.json` devolve toda rota que não é arquivo para o `index.html` — sem ele, `/pedidos` recarregado daria 404.
+
+Pelo endereço `*.vercel.app` o login falha com erro de rede, e é o esperado: o CORS da API só libera `painel.menuclick.gguip.dev`.
 
 ## 6. DNS do `gguip.dev`
 
@@ -60,13 +76,15 @@ Três registros **explícitos** — o curinga `*.gguip.dev` não pode decidir pa
 | CNAME | `painel.menuclick` | o alvo que a Vercel mostrou para o painel |
 | CNAME | `api.menuclick` | o `.onrender.com` do serviço |
 
-Nada nos registros do TirzeFlow (`api.gguip.dev`) nem nos do Resend.
+Nada nos registros do TirzeFlow (`api.gguip.dev`) nem nos do Resend. Depois de "Valid Configuration", a Vercel ainda leva alguns minutos para emitir o certificado; até lá o HTTPS falha no aperto de mão TLS.
 
 ## 7. Dados de demonstração
 
-1. Da máquina local, rodar o seed contra o Neon (a variável de ambiente tem prioridade sobre o `.env`):
+1. Da máquina local, as migrations e o seed contra o Neon (pode ser antes de a API existir — a senha do seed nunca chega a valer em produção):
    ```bash
-   DATABASE_URL='<connection string do Neon>' pnpm --filter @menuclick/api db:seed
+   cd apps/api
+   node --env-file=.env.neon src/db/migrate.ts up
+   node --env-file=.env.neon src/db/seed.ts
    ```
 2. No editor SQL do Neon, trocar o e-mail dos donos para endereços seus com "+" (o e-mail é único no banco; o "+" chega na mesma caixa) **e, na mesma instrução, invalidar a senha do seed** — `senha-de-exemplo-123` está no repositório público, e a loja não pode ficar com ela nem até o passo seguinte:
    ```sql
@@ -88,7 +106,7 @@ O cardápio e os QR das mesas ficam públicos; o painel, só com você.
 
 - Job `GET https://api.menuclick.gguip.dev/health`.
 - Agenda `*/10 6-22 * * *`, fuso **`America/Sao_Paulo`** (a cada 10 min, das 06:00 às 22:50).
-- Aviso por e-mail em falha.
+- Aviso por e-mail em falha **depois de 3 seguidas**: às 06:00 a API está dormindo e leva ~50 s para acordar, acima dos 30 s de timeout, então o primeiro ping do dia falha todo dia. Com 1, seria um alarme falso por manhã.
 
 ## 9. Verificação
 
@@ -104,9 +122,12 @@ O cardápio e os QR das mesas ficam públicos; o painel, só com você.
   done
   ```
   e, logo depois, o login de **outro aparelho** (no 4G) funciona. As duas coisas juntas provam que o Cloudflare sobrescreve o header e que a chave é por cliente. **Se qualquer uma falhar, pare**: a chave do limite precisa ser revista antes de divulgar o link.
+
+  Medido na primeira subida: o Cloudflare **recusa** a requisição que já chega com `CF-Connecting-IP` (`403`, `error code: 1000`) — o laço acima responde 403 seis vezes, e isso é melhor que o esperado: ninguém escolhe o próprio IP. O teto se prova sem o header: seis logins errados da mesma máquina dão `401 401 401 401 401 429`.
 - [ ] O e-mail de recuperação de senha chega (passo 7.3) — sem isso, nenhum cadastro novo consegue verificar a loja.
 - [ ] Login com `senha-de-exemplo-123` nas duas lojas de demonstração **falha**.
-- [ ] `https://api.menuclick.gguip.dev/docs` responde 404.
+- [ ] `https://api.menuclick.gguip.dev/docs` **não** abre o Swagger (responde 401: em produção a rota não existe, e o que não existe cai na autenticação).
+- [ ] "Novo código" nas mesas da demonstração: os códigos do seed estão no repositório público.
 - [ ] No dia seguinte, o histórico do cron-job.org mostra chamadas só entre 06:00 e 23:00.
 
 ## Cuidados
