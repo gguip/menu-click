@@ -1,6 +1,6 @@
 # App do cliente, parte 2 — entrega, retirada e acompanhamento — desenho
 
-**Data:** 2026-09-30 · **Estado:** aprovado, a implementar (branch `feat/app-cliente-parte-2`)
+**Data:** 2026-09-30 · **Estado:** implementado (branch `feat/app-cliente-parte-2`)
 
 ## O problema
 

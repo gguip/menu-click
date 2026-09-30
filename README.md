@@ -384,7 +384,7 @@ As regras completas para escrever SQL novo — filtro obrigatório, índices par
 - [ ] Recuperação de senha e papéis dentro do restaurante (dono vs. garçom)
 - [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
 - [ ] Histórico do cliente (`GET /customers/:id/orders`) e CRUD próprio de clientes
-- [ ] App do cliente, parte 2: entrega, retirada e acompanhamento do pedido
+- [ ] Hospedagem e deploy (em plano gratuito)
 - [ ] Redis: contador de rate limit e emissor de eventos compartilhados, quando houver mais de uma instância
 # menu-click
 # menu-click
