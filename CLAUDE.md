@@ -720,6 +720,7 @@ O que a pessoa abre ao escanear o QR. Next.js 16 (App Router) + Tailwind 4 + Rea
 - **O cardápio público ganhou campos, cada um por decisão (S10):** `timezone` (a hora de "abre às 18h" é a da loja, não a do celular), `closesAt`/`opensAt` (de `findOpeningStatus()`, a mesma conta do painel; `isOpen` ali já é grade **e** pausa), `coverUrl` e `brandColor`.
 - 🚨 **`MENU_BASE_URL` é a origem deste app** (`http://localhost:3000` em dev), e essa origem precisa estar em `CORS_ORIGINS` — o app chama a API direto do navegador para o status ao vivo, a mesa e o pedido.
 - **Testes:** o `fetch` global é trocado por um que **rejeita** em todo teste (`test/setup.ts`): nenhum teste sai para a rede sem mock explícito. `localStorage` é limpo depois de cada um.
+- **Campo de texto tem um padrão só** (`components/field.ts`): caixa branca, borda fina, borda e anel na cor de ação no foco, texto em 16px — abaixo disso o Safari do iPhone dá zoom ao focar. O handoff desenhava a busca como pílula cinza e os campos do finalizar como caixa branca; vale a caixa branca. `test/field.test.tsx` confere os quatro campos (busca, observação, nome, telefone), e o contorno global de foco mora em `@layer base` para não desenhar um segundo anel por cima do deles.
 - ⚠️ **Opção de produto é checkbox visualmente escondido, em todo grupo** (inclusive o de uma escolha só): o `toggleOption` permite desmarcar, e radio nativo não desmarca. Automação de navegador que clicar no `input` falha — clique no texto da opção, como a pessoa faria.
 
 ### Monorepo

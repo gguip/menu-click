@@ -6,10 +6,10 @@ import { type CartLine, subtotal, toOrderItems } from "@/lib/cart.ts";
 import { checkoutBlock, type DineInPayment, dineInPayments, formatPhone } from "@/lib/checkout.ts";
 import { formatCents } from "@/lib/money.ts";
 import type { MenuRestaurant } from "@/lib/types.ts";
+import { FIELD_BOX, FIELD_FOCUS, FIELD_TEXT } from "./field.ts";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
-const FIELD =
-  "w-full rounded-field border border-line-strong px-3.5 py-3.5 text-base text-ink placeholder:text-ink-3 focus:border-action focus:outline-none";
+const FIELD = `w-full px-3.5 py-3.5 ${FIELD_BOX} ${FIELD_FOCUS} ${FIELD_TEXT}`;
 
 /**
  * Finalizar no salão: passo único. Sem troco e sem vale-refeição — a pessoa

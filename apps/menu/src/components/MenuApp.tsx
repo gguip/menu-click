@@ -14,6 +14,7 @@ import { ProductScreen } from "./ProductScreen.tsx";
 import { ProductGrid, sectionAnchor } from "./ProductGrid.tsx";
 import { SentScreen } from "./SentScreen.tsx";
 import { StoreNotice } from "./StoreNotice.tsx";
+import { FIELD_BOX, FIELD_FOCUS_WITHIN, FIELD_TEXT } from "./field.ts";
 import { useTable } from "./useTable.ts";
 
 export type Screen = "menu" | "product" | "cart" | "checkout" | "sent";
@@ -197,7 +198,7 @@ export function MenuApp({
           ) : (
             <>
               <div className="px-4 pt-3.5">
-                <label className="flex items-center gap-2.5 rounded-field bg-paper-2 px-3.5 text-ink-3 focus-within:ring-2 focus-within:ring-action">
+                <label data-field className={`flex items-center gap-2.5 px-3.5 text-ink-3 ${FIELD_BOX} ${FIELD_FOCUS_WITHIN}`}>
                   <SearchIcon size={17} />
                   <input
                     type="search"
@@ -205,7 +206,7 @@ export function MenuApp({
                     placeholder="Buscar no cardápio"
                     value={query}
                     onChange={(event) => setQuery(event.currentTarget.value)}
-                    className="h-12 w-full bg-transparent text-[15px] text-ink placeholder:text-ink-3 focus:outline-none"
+                    className={`w-full bg-transparent py-3.5 focus:outline-none ${FIELD_TEXT}`}
                   />
                 </label>
               </div>

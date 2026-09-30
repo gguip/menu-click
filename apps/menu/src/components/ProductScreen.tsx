@@ -15,6 +15,7 @@ import {
   toggleOption,
 } from "@/lib/selection.ts";
 import type { MenuOptionGroup, MenuProduct } from "@/lib/types.ts";
+import { FIELD_BOX, FIELD_FOCUS, FIELD_TEXT } from "./field.ts";
 import { BackIcon, CheckIcon, MinusIcon, PlusIcon } from "./icons.tsx";
 
 export const NOTE_MAX_LENGTH = 140;
@@ -144,7 +145,7 @@ export function ProductScreen({
           placeholder="ex.: sem cebola"
           value={note}
           onChange={(event) => setNote(event.currentTarget.value)}
-          className="mt-2.5 w-full resize-none rounded-field border border-line-strong px-3.5 py-3 text-[15px] placeholder:text-ink-3 focus:border-action focus:outline-none"
+          className={`mt-2.5 w-full resize-none px-3.5 py-3 ${FIELD_BOX} ${FIELD_FOCUS} ${FIELD_TEXT}`}
         />
       </div>
 
