@@ -658,6 +658,8 @@ Todos os números vivem em `src/limits.ts`, cada um com o porquê ao lado, e **n
 
 ⚠️ **O rate limit roda DEPOIS da autenticação**, e isso não é escolha nossa: o plugin instala a checagem como hook de rota, e hook de rota roda depois dos hooks de instância. Instalar um hook de instância por fora não resolve — o plugin marca a requisição e roda no máximo uma vez, então o hook global engoliria o limite específico do login. Na prática custa pouco: no login (rota pública) a autenticação devolve na primeira linha e o limitador roda antes do bcrypt, e em rota protegida a recusa sem token não custa consulta ao banco.
 
+⚠️ **Atrás do Render, a chave do limite é o `CF-Connecting-IP` (`CLIENT_IP_HEADER`), não o `X-Forwarded-For`.** Lá o `X-Forwarded-For` chega como "cliente, borda do Cloudflare, interno do Render", com o interno mudando a cada requisição: nem `TRUST_PROXY=true` (usa o primeiro endereço, que o cliente escreve) nem um número de saltos dão uma chave estável — com `1`, cada tentativa de login contaria num endereço diferente e o 429 nunca viria. O Cloudflare **sobrescreve** o `CF-Connecting-IP` na borda, com um valor só; `clientIpKey` (`src/client-ip.ts`) o usa quando `CLIENT_IP_HEADER` está configurado e cai no `request.ip` quando ele não veio. As rotas com limite próprio herdam o `keyGenerator` global porque o `@fastify/rate-limit` mescla as opções delas (`mergeParams`). Só é seguro onde **toda** requisição passa pelo Cloudflare; nome inválido derruba o boot. Em produção, `TRUST_PROXY=false`.
+
 **CORS:** `CORS_ORIGINS` separado por vírgula; **vazio = nenhuma origem cruzada**. Sem `credentials`, porque a API usa header e não cookie.
 
 ⚠️ **O CORS é registrado ANTES do `installAuth()`.** O preflight `OPTIONS` não carrega `Authorization` — é anônimo por definição —, então o hook de negação por padrão responderia 401 e o navegador reportaria "erro de CORS", apontando para o lugar errado. Inverter a ordem quebra dois testes.
@@ -737,6 +739,24 @@ O que a pessoa abre ao escanear o QR. Next.js 16 (App Router) + Tailwind 4 + Rea
 - **O acompanhamento** (`/:slug/pedido/:orderId?t=`) é página **dinâmica e `noindex`**: o token é credencial (S27). O servidor busca só a loja; o pedido é lido no navegador, com o token da querystring. O transporte (`lib/tracker.ts`) abre o WebSocket e, a cada mensagem, relê o `GET` (uma fonte só); socket que cai → consulta a cada 20 s e socket de novo a cada 60 s; pedido terminado ou 404 → **para tudo**. Em dev, o aviso "WebSocket is closed before the connection is established" é o modo estrito do React montando o efeito duas vezes.
 - **Pedido em andamento no aparelho** (`lib/active-order.ts`, `order:<slug>`, um por loja, 24 h): a faixa "Você tem um pedido em andamento" confere o pedido antes de aparecer, e quem descobre que terminou (a faixa ou a página) o tira do aparelho — **nunca vira histórico**. O endereço da entrega entra no lembrado de `customer.ts`; pedido sem endereço não apaga o que havia.
 - ⚠️ **Opção de produto é checkbox visualmente escondido, em todo grupo** (inclusive o de uma escolha só): o `toggleOption` permite desmarcar, e radio nativo não desmarca. Automação de navegador que clicar no `input` falha — clique no texto da opção, como a pessoa faria.
+
+### Deploy (plano gratuito)
+
+Roteiro em `docs/deploy.md`; desenho em `docs/superpowers/specs/2026-09-30-deploy-gratuito-design.md`. **Custo zero, isolado do TirzeFlow** (que roda num Lightsail pago, com usuários reais — nada do MenuClick vai para lá).
+
+| Peça | Onde | Endereço |
+| --- | --- | --- |
+| App do cliente | Vercel Hobby (`apps/menu`) | `menuclick.gguip.dev` — a raiz do QR |
+| Painel | Vercel Hobby (`apps/panel`, `vercel.json` devolve as rotas ao `index.html`) | `painel.menuclick.gguip.dev` |
+| API | Render gratuito, uma instância, Virginia (`render.yaml`) | `api.menuclick.gguip.dev` |
+| Postgres | Neon gratuito, AWS us-east-1 | — |
+| E-mail | Resend do TirzeFlow, chave "menuclick" | `menuclick@gguip.dev` |
+
+- **O painel chama a API direto** (CORS com as duas origens), sem reescrita da Vercel: por ela, o `CF-Connecting-IP` que chegaria seria o da Vercel, e todos os lojistas dividiriam um teto só.
+- **Migrations na subida** (`startCommand`: `migrate:up` e depois o servidor) — o gancho de pré-deploy do Render é pago, e com uma instância não há corrida. O Render só publica **depois do CI verde**.
+- **Ping do cron-job.org no `/health`, a cada 10 min das 06:00 às 23:00** (Brasília): o Render dorme depois de 15 min parado e leva ~1 min para acordar; de madrugada a API dorme de propósito (~530 das 750 h/mês). 🚨 **O `/health` não toca no banco** (há teste): senão o Neon ficaria acordado o dia todo e estouraria as 100 CU-h/mês.
+- **O seed cria lojas já verificadas** (`email_verified_at = now()`): num banco novo, sem isso, elas nasceriam bloqueadas.
+- ⚠️ **Custo zero depende de não cadastrar cartão** no Render e no Neon: sem cartão, estourar limite suspende em vez de cobrar.
 
 ### Monorepo
 

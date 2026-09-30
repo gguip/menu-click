@@ -1,6 +1,6 @@
 # Deploy do MenuClick em plano gratuito — desenho
 
-**Data:** 2026-09-30 · **Estado:** aprovado, a implementar (branch `feat/deploy`)
+**Data:** 2026-09-30 · **Estado:** implementado (subida pendente do roteiro em `docs/deploy.md`) (branch `feat/deploy`)
 
 ## O problema
 

@@ -379,12 +379,15 @@ Apagar um restaurante marca os produtos dele junto, na mesma transação. Restau
 
 As regras completas para escrever SQL novo — filtro obrigatório, índices parciais, unicidade parcial, como migrar o schema — estão em [`.claude/rules/database.md`](.claude/rules/database.md).
 
+## Deploy
+
+No ar em plano gratuito: app do cliente em `https://menuclick.gguip.dev`, painel em `https://painel.menuclick.gguip.dev` e API em `https://api.menuclick.gguip.dev` (Vercel, Render e Neon). O roteiro de subida e verificação está em [`docs/deploy.md`](docs/deploy.md).
+
 ## Próximos passos
 
 - [ ] Recuperação de senha e papéis dentro do restaurante (dono vs. garçom)
 - [ ] Domínio: categorias de cardápio (hoje `category` é texto livre no produto)
 - [ ] Histórico do cliente (`GET /customers/:id/orders`) e CRUD próprio de clientes
-- [ ] Hospedagem e deploy (em plano gratuito)
 - [ ] Redis: contador de rate limit e emissor de eventos compartilhados, quando houver mais de uma instância
 # menu-click
 # menu-click
