@@ -47,7 +47,8 @@ export function paymentLabel(
 export function whereLabel(order: Pick<Order, "type" | "deliveryAddress" | "table">): string {
   if (order.type === "delivery" && order.deliveryAddress) {
     const a = order.deliveryAddress;
-    return `${a.street}, ${a.number} — ${a.neighborhood}, ${a.city}`;
+    const complement = a.complement ? ` (${a.complement})` : "";
+    return `${a.street}, ${a.number}${complement} — ${a.neighborhood}, ${a.city}`;
   }
   if (order.type === "dine_in") return order.table ? order.table.label : "Salão · sem mesa";
   return "Retirada no balcão";

@@ -11,6 +11,7 @@ import { acceptedPaymentMethods } from "../domain/payment.ts";
 import type { Product } from "../domain/product.ts";
 import type { Restaurant } from "../domain/restaurant.ts";
 import type { OpeningHour, OpeningStatus } from "../domain/opening-hours.ts";
+import * as deliveryNeighborhoodsRepository from "../repositories/delivery-neighborhoods.ts";
 import * as openingHoursRepository from "../repositories/opening-hours.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as categoriesService from "./categories.ts";
@@ -49,6 +50,7 @@ function toMenuRestaurant(
   isOpen: boolean,
   openingHours: OpeningHour[],
   status: OpeningStatus,
+  deliveryNeighborhoods: string[],
 ): MenuRestaurant {
   return {
     id: restaurant.id,
@@ -85,6 +87,7 @@ function toMenuRestaurant(
       closesAt,
     })),
     paymentMethods: acceptedPaymentMethods(restaurant),
+    deliveryNeighborhoods,
   };
 }
 
@@ -160,9 +163,13 @@ function toMenuProduct(
 export async function getRestaurant(slug: string): Promise<MenuRestaurant> {
   const restaurant = await restaurantsService.getBySlug(slug);
 
-  const [status, grade] = await Promise.all([
+  const [status, grade, neighborhoods] = await Promise.all([
     openingHoursRepository.findOpeningStatus(restaurant.id, restaurant.timezone),
     openingHoursRepository.findByRestaurant(restaurant.id),
+    // só o modo por bairro tem lista a oferecer; nos outros, nem consulta
+    restaurant.deliveryFeeMode === "neighborhood"
+      ? deliveryNeighborhoodsRepository.findByRestaurant(restaurant.id)
+      : Promise.resolve([]),
   ]);
 
   // a loja só está aberta se a grade permite E ninguém pausou; a mesma conta
@@ -172,6 +179,7 @@ export async function getRestaurant(slug: string): Promise<MenuRestaurant> {
     status.isOpen && restaurant.acceptingOrders,
     grade,
     status,
+    neighborhoods.map((n) => n.name),
   );
 }
 

@@ -36,4 +36,17 @@ describe("quem pede, lembrado no aparelho", () => {
     expect(loadCustomer(NOW)).toBeNull();
     expect(() => saveCustomer({ name: "Ana", phone: "1" }, NOW)).not.toThrow();
   });
+
+  const ADDRESS = { neighborhood: "Centro", street: "Rua A", number: "10", complement: "apto 2", zip: "01304-001" };
+
+  it("guarda o endereço junto, e um pedido sem endereço não apaga o que havia", () => {
+    saveCustomer({ name: "Ana", phone: "(11) 98888-7777", address: ADDRESS }, NOW);
+    saveCustomer({ name: "Ana", phone: "(11) 98888-7777" }, NOW + 1000);
+    expect(loadCustomer(NOW + 2000)).toEqual({ name: "Ana", phone: "(11) 98888-7777", address: ADDRESS });
+  });
+
+  it("endereço adulterado é descartado, sem perder nome e telefone", () => {
+    localStorage.setItem(CUSTOMER_KEY, JSON.stringify({ name: "Ana", phone: "1", savedAt: NOW, address: { street: 42 } }));
+    expect(loadCustomer(NOW)).toEqual({ name: "Ana", phone: "1" });
+  });
 });

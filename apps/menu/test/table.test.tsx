@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MenuApp } from "../src/components/MenuApp.tsx";
 import { saveCart } from "../src/lib/cart.ts";
@@ -74,11 +74,13 @@ describe("a mesa do QR", () => {
     expect(await screen.findByRole("button", { name: /Ver carrinho/ })).toBeTruthy();
   });
 
-  it("sem ?mesa=: não é salão, não monta pedido", async () => {
+  // desde a parte 2, sem mesa é o pedido pelo link: entrega ou retirada
+  it("sem ?mesa=: não é salão — sem faixa da mesa, e o carrinho é de entrega ou retirada", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => json({}, 404)));
     cartAt("link");
     render(<MenuApp menu={menu} />);
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Cantina do Porto" })).toBeTruthy());
-    expect(screen.queryByRole("button", { name: /Ver carrinho/ })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: /Ver carrinho/ }));
+    expect(screen.queryByText("Pedido no salão")).toBeNull();
+    expect(screen.getByText("Entrega ou retirada")).toBeTruthy();
   });
 });

@@ -5,6 +5,8 @@ export type Address = {
   city: string;
   state: string;
   zipCode: string;
+  /** Só no endereço de entrega do pedido; `null` = sem complemento. */
+  complement?: string | null;
 };
 
 export type UserRole = "owner" | "staff";
@@ -52,6 +54,11 @@ export type Restaurant = {
    * Ausente enquanto não houve GET — e o cache preserva o último valor.
    */
   openingStatus?: { isOpen: boolean; closesAt?: string; opensAt?: string };
+  /** Minutos de preparo para a retirada; ausente = sem previsão. */
+  prepTimeMinutes?: number;
+  /** Faixa de entrega em minutos; os dois juntos ou nenhum. */
+  deliveryTimeMinMinutes?: number;
+  deliveryTimeMaxMinutes?: number;
 };
 
 export type OrderType = "dine_in" | "takeaway" | "delivery";
@@ -125,7 +132,12 @@ export type OrderItem = {
 export type OrderStatusEvent = { status: OrderStatus; at: string };
 
 /** O detalhe traz o histórico; pedido anterior ao registro tem só chegada e status atual. */
-export type OrderDetail = Order & { items: OrderItem[]; statusHistory: OrderStatusEvent[] };
+export type OrderDetail = Order & {
+  items: OrderItem[];
+  statusHistory: OrderStatusEvent[];
+  /** O que a loja escreveu ao cancelar; `null` fora de cancelado ou sem motivo. */
+  cancellationReason?: string | null;
+};
 
 export type OrdersSummary = {
   period: { from: string; to: string };

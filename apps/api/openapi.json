@@ -123,6 +123,15 @@
                           "brandColor": {
                             "type": "string"
                           },
+                          "prepTimeMinutes": {
+                            "type": "integer"
+                          },
+                          "deliveryTimeMinMinutes": {
+                            "type": "integer"
+                          },
+                          "deliveryTimeMaxMinutes": {
+                            "type": "integer"
+                          },
                           "address": {
                             "type": "object",
                             "properties": {
@@ -271,6 +280,15 @@
                     },
                     "brandColor": {
                       "type": "string"
+                    },
+                    "prepTimeMinutes": {
+                      "type": "integer"
+                    },
+                    "deliveryTimeMinMinutes": {
+                      "type": "integer"
+                    },
+                    "deliveryTimeMaxMinutes": {
+                      "type": "integer"
                     },
                     "address": {
                       "type": "object",
@@ -519,7 +537,33 @@
                   "minimumOrderInCents": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "prepTimeMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240,
+                    "nullable": true
+                  },
+                  "deliveryTimeMinMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240,
+                    "nullable": true
+                  },
+                  "deliveryTimeMaxMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240,
+                    "nullable": true
                   }
+                },
+                "dependencies": {
+                  "deliveryTimeMinMinutes": [
+                    "deliveryTimeMaxMinutes"
+                  ],
+                  "deliveryTimeMaxMinutes": [
+                    "deliveryTimeMinMinutes"
+                  ]
                 }
               }
             }
@@ -568,6 +612,15 @@
                     },
                     "brandColor": {
                       "type": "string"
+                    },
+                    "prepTimeMinutes": {
+                      "type": "integer"
+                    },
+                    "deliveryTimeMinMinutes": {
+                      "type": "integer"
+                    },
+                    "deliveryTimeMaxMinutes": {
+                      "type": "integer"
                     },
                     "address": {
                       "type": "object",
@@ -4612,6 +4665,10 @@
                       "zipCode": {
                         "type": "string",
                         "minLength": 1
+                      },
+                      "complement": {
+                        "type": "string",
+                        "maxLength": 120
                       }
                     }
                   },
@@ -4724,6 +4781,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -5089,6 +5150,10 @@
                               "zipCode": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "complement": {
+                                "type": "string",
+                                "nullable": true
                               }
                             }
                           },
@@ -5454,6 +5519,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -5696,6 +5765,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -5938,6 +6011,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -6180,6 +6257,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -6422,6 +6503,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -6563,7 +6648,25 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "Cancela a partir de qualquer estado não terminal. O estoque volta quando o pedido ainda estava em `confirmed` ou `preparing`; depois que saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha.",
+        "description": "Cancela a partir de qualquer estado não terminal. O estoque volta quando o pedido ainda estava em `confirmed` ou `preparing`; depois que saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha. Aceita `reason` opcional (até 200 caracteres), que o cliente lê no acompanhamento; sem corpo, cancela sem motivo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "nullable": true,
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 200
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -6664,6 +6767,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -6906,6 +7013,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -7148,6 +7259,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -7369,6 +7484,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -7452,6 +7571,10 @@
                           }
                         }
                       }
+                    },
+                    "cancellationReason": {
+                      "type": "string",
+                      "nullable": true
                     },
                     "statusHistory": {
                       "type": "array",
@@ -7622,6 +7745,12 @@
                       }
                     },
                     "paymentMethods": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "deliveryNeighborhoods": {
                       "type": "array",
                       "items": {
                         "type": "string"
@@ -8045,7 +8174,7 @@
         "tags": [
           "Pedidos"
         ],
-        "description": "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante.",
+        "description": "A leitura HTTP do mesmo pedido que o WebSocket acompanha, e com os **itens** — que o canal não transmite. Serve para a tela sobreviver a um reload e como alternativa quando o socket não conecta. Autoriza pelo `token` devolvido na criação; pedido de salão não recebe token e não é legível por aqui. Não devolve os dados do cliente nem do restaurante. Traz `statusHistory` (a hora de cada etapa) e `estimate` (a previsão a partir da confirmação, com os tempos configurados pela loja; `null` quando não há o que prever).",
         "parameters": [
           {
             "schema": {
@@ -8146,6 +8275,39 @@
                         }
                       }
                     },
+                    "cancellationReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "statusHistory": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "estimate": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "readyAt": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        }
+                      }
+                    },
                     "deliveryAddress": {
                       "type": "object",
                       "properties": {
@@ -8172,6 +8334,10 @@
                         "zipCode": {
                           "type": "string",
                           "minLength": 1
+                        },
+                        "complement": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     },
@@ -8408,6 +8574,15 @@
                         },
                         "brandColor": {
                           "type": "string"
+                        },
+                        "prepTimeMinutes": {
+                          "type": "integer"
+                        },
+                        "deliveryTimeMinMinutes": {
+                          "type": "integer"
+                        },
+                        "deliveryTimeMaxMinutes": {
+                          "type": "integer"
                         },
                         "address": {
                           "type": "object",

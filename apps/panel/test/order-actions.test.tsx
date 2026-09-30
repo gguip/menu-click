@@ -46,6 +46,28 @@ describe("ações do pedido", () => {
     expect(screen.queryByTestId("location")).toBeNull();
     fireEvent.click(within(dialog).getByRole("button", { name: "Recusar pedido" }));
     await waitFor(() => expect(api.calls.some((call) => call.path === `${LIST}/${ID}/cancel`)).toBe(true));
+    expect(api.calls.find((c) => c.path === `${LIST}/${ID}/cancel`)?.body).toBeUndefined();
+  });
+
+  it("cancelar manda o motivo que a loja escreveu, aparado; vazio não manda corpo", async () => {
+    signIn();
+    const api = mockApi([
+      { method: "POST", path: `${LIST}/${ID}/cancel`, body: makeOrderDetail({ id: ID, number: 1042, status: "cancelled" }) },
+      listHandler([makeOrder({ id: ID, number: 1042, status: "pending" })]),
+      noTables,
+      ...panelHandlers(),
+    ]);
+    renderInPanel(routes, "/pedidos");
+    fireEvent.click(within(await cardOf("#1042")).getByRole("button", { name: "Recusar" }));
+    const dialog = await screen.findByRole("dialog", { name: "Recusar o pedido #1042?" });
+    fireEvent.change(within(dialog).getByLabelText("Motivo (o cliente vê)"), {
+      target: { value: "  Acabou o salmão  " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Recusar pedido" }));
+    await waitFor(() => {
+      const call = api.calls.find((c) => c.path === `${LIST}/${ID}/cancel`);
+      expect(call?.body).toEqual({ reason: "Acabou o salmão" });
+    });
   });
 
   it("aceitar confirma e encadeia o preparo; se o preparo falhar, 'Começar preparo' é a rede", async () => {

@@ -8,7 +8,15 @@
  */
 import type { Customer, CreateCustomerInput } from "./customer.ts";
 import type { Address } from "./restaurant.ts";
+import type { Estimate } from "./estimate.ts";
 import type { PaymentMethod } from "./payment.ts";
+
+/**
+ * O endereço de entrega **do pedido**: o value object `Address` mais o
+ * complemento. O complemento mora só aqui — o `Address` é compartilhado com o
+ * cadastro da loja e a cotação, e lá ele não significa nada.
+ */
+export type DeliveryAddress = Address & { complement: string | null };
 
 /**
  * Modalidade do pedido.
@@ -195,7 +203,7 @@ export type CreateOrderInput = {
   customer: CreateCustomerInput;
   items: CreateOrderItemInput[];
   /** Obrigatório em `delivery`, proibido nas outras duas modalidades. */
-  deliveryAddress?: Address;
+  deliveryAddress?: Address & { complement?: string };
   /** Como o pedido será pago. Sempre na entrega — o sistema registra, não cobra. */
   paymentMethod: PaymentMethod;
   /**
@@ -286,12 +294,14 @@ export type OrderSummary = {
    */
   deliveryFeeInCents: number | null;
   /** Preenchido só em `delivery`; `null` nas outras duas modalidades. */
-  deliveryAddress: Address | null;
+  deliveryAddress: DeliveryAddress | null;
   paymentMethod: PaymentMethod;
   /** Ausente = "tenho o valor certo". Só faz sentido junto de `paymentMethod: "cash"`. */
   changeForInCents?: number;
   /** Quando a loja marcou como pago; `null` = não marcado. Sempre presente (F12). */
   paidAt: string | null;
+  /** O porquê do cancelamento, para o cliente ler; `null` fora de `cancelled` ou sem motivo. */
+  cancellationReason: string | null;
   /**
    * A mesa de onde o pedido veio, com o rótulo **congelado** na criação —
    * nunca lido de `tables`. Renomear a mesa não reescreve pedido antigo, e
@@ -320,6 +330,12 @@ export type OrderStatusEvent = { status: OrderStatus; at: string };
  * andamento; o acompanhamento público fica com o app do cliente decidir.
  */
 export type OrderDetail = Order & { statusHistory: OrderStatusEvent[] };
+
+/**
+ * O pedido como quem o fez vê pelo acompanhamento: os horários de cada etapa
+ * (os do próprio pedido, nada da loja) e a previsão calculada.
+ */
+export type TrackedOrder = Order & { statusHistory: OrderStatusEvent[]; estimate: Estimate | null };
 
 /**
  * O que a criação devolve: o pedido mais o token de acompanhamento.

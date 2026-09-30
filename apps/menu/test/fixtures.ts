@@ -30,6 +30,16 @@ export function makeRestaurant(overrides: Partial<MenuRestaurant> = {}): MenuRes
       { weekday: 0, opensAt: "12:00", closesAt: "22:00" },
     ],
     paymentMethods: ["cash", "card_on_delivery", "pix"],
+    address: {
+      street: "Rua do Porto",
+      number: "120",
+      neighborhood: "Centro",
+      city: "São Paulo",
+      state: "SP",
+      zipCode: "01010-000",
+    },
+    deliveryFeeMode: "fixed",
+    deliveryNeighborhoods: [],
     ...overrides,
   };
 }

@@ -1,4 +1,4 @@
-import { Button, Modal } from "@mantine/core";
+import { Button, Modal, Textarea } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createContext, type ReactNode, useContext, useState } from "react";
 import { useNavigate } from "react-router";
@@ -11,7 +11,7 @@ import dialog from "../../ui/ConfirmDialog.module.css";
 import type { ConfirmCopy } from "../../ui/confirmCopy.ts";
 import { acceptCopy, cancelCopy, kitchenAcceptCopy } from "./orderRules.ts";
 
-type ActionRequest = { order: Order; transition: OrderTransition };
+type ActionRequest = { order: Order; transition: OrderTransition; reason?: string };
 type Failure = { order: Order; message: string; stock: boolean };
 
 type OrderActionValue = {
@@ -58,11 +58,18 @@ export function OrderActionProvider({
   const navigate = useNavigate();
   const [confirming, setConfirming] = useState<ActionRequest | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
+  const [reason, setReason] = useState("");
 
   const mutation = useMutation({
-    mutationFn: async ({ order, transition }: ActionRequest) => {
+    mutationFn: async ({ order, transition, reason }: ActionRequest) => {
       if (transition !== "accept") {
-        await transitionOrder(restaurantId, order.id, transition);
+        const trimmed = reason?.trim() ?? "";
+        await transitionOrder(
+          restaurantId,
+          order.id,
+          transition,
+          transition === "cancel" && trimmed !== "" ? { reason: trimmed } : undefined,
+        );
         return;
       }
       // O handoff tem UM clique entre Novo e Em preparo; a API tem duas etapas.
@@ -89,7 +96,10 @@ export function OrderActionProvider({
   const request = (order: Order, transition: OrderTransition) => {
     if (disabled || mutation.isPending) return;
     setFailure(null);
-    if (transition === "accept" || transition === "cancel") setConfirming({ order, transition });
+    if (transition === "accept" || transition === "cancel") {
+      setReason("");
+      setConfirming({ order, transition });
+    }
     else mutation.mutate({ order, transition });
   };
 
@@ -112,9 +122,21 @@ export function OrderActionProvider({
         busy={mutation.isPending}
         onClose={() => setConfirming(null)}
         onConfirm={() => {
-          if (confirming !== null) mutation.mutate(confirming);
+          if (confirming !== null) mutation.mutate({ ...confirming, reason });
         }}
-      />
+      >
+        {confirming?.transition === "cancel" && (
+          <Textarea
+            label="Motivo (o cliente vê)"
+            placeholder="Ex.: acabou o salmão"
+            maxLength={200}
+            rows={2}
+            value={reason}
+            disabled={mutation.isPending}
+            onChange={(event) => setReason(event.currentTarget.value)}
+          />
+        )}
+      </ConfirmDialog>
       <Modal
         opened={failure !== null}
         onClose={() => setFailure(null)}

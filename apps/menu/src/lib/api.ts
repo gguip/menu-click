@@ -1,5 +1,5 @@
 import type { TableLookup } from "./table.ts";
-import type { Menu, MenuOptionGroup, MenuRestaurant, MenuSection } from "./types.ts";
+import type { Address, Menu, MenuOptionGroup, MenuRestaurant, MenuSection, PaymentMethod } from "./types.ts";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
@@ -29,6 +29,14 @@ export async function getMenu(slug: string): Promise<Menu | null> {
     if (offset + 100 >= page.total) break;
   }
   return { restaurant, sections, optionGroups: [...groups.values()] };
+}
+
+/** Só o restaurante do cardápio, no SERVIDOR (a página de acompanhamento). */
+export async function getMenuRestaurant(slug: string): Promise<MenuRestaurant | null> {
+  const res = await fetch(`${API_URL}/menu/${encodeURIComponent(slug)}`, { next: { revalidate: MENU_REVALIDATE_SECONDS } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`restaurante ${slug}: ${res.status}`);
+  return (await res.json()) as MenuRestaurant;
 }
 
 /** Horário e pausa AGORA, no navegador e sem cache: o da página tem até 60 s. */
@@ -72,6 +80,15 @@ export type OrderItemBody = {
   note?: string;
 };
 
+export type LinkOrderBody = {
+  type: "delivery" | "takeaway";
+  customer: { name: string; phone: string };
+  items: OrderItemBody[];
+  paymentMethod: PaymentMethod;
+  changeForInCents?: number;
+  deliveryAddress?: Address & { complement?: string };
+};
+
 export type DineInOrderBody = {
   type: "dine_in";
   customer: { name: string; phone: string };
@@ -97,12 +114,17 @@ export class OrderError extends Error {
 export type OrderReceipt = {
   id: string;
   number: number;
+  type: "dine_in" | "takeaway" | "delivery";
   totalInCents: number;
+  /** `null` fora da entrega e no "a combinar"; `0` = grátis. */
+  deliveryFeeInCents: number | null;
+  /** Só em entrega e retirada: a credencial do acompanhamento (S27). */
+  trackingToken?: string;
   table: { id: string; label: string } | null;
   items: { name: string; quantity: number; unitPriceInCents: number; note: string | null }[];
 };
 
-export async function createDineInOrder(restaurantId: string, body: DineInOrderBody): Promise<OrderReceipt> {
+export async function createOrder(restaurantId: string, body: DineInOrderBody | LinkOrderBody): Promise<OrderReceipt> {
   let res: Response;
   try {
     res = await fetch(`${API_URL}/restaurants/${restaurantId}/orders`, {
@@ -118,8 +140,13 @@ export async function createDineInOrder(restaurantId: string, body: DineInOrderB
   return {
     id: payload?.id as string,
     number: payload?.number as number,
+    type: payload?.type ?? body.type,
     totalInCents: payload?.totalInCents ?? 0,
+    deliveryFeeInCents: payload?.deliveryFeeInCents ?? null,
+    ...(payload?.trackingToken ? { trackingToken: payload.trackingToken } : {}),
     table: payload?.table ?? null,
     items: payload?.items ?? [],
   };
 }
+
+export const createDineInOrder = (restaurantId: string, body: DineInOrderBody) => createOrder(restaurantId, body);

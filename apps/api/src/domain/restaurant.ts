@@ -109,6 +109,11 @@ export type UpdateRestaurantInput = Partial<
   coverUrl?: string | null;
   /** Cor da ação no app do cliente (#RRGGBB); `null` volta ao azul padrão. */
   brandColor?: string | null;
+  /** `null` desliga a previsão da retirada. */
+  prepTimeMinutes?: number | null;
+  /** `null` nos dois desliga a previsão da entrega. */
+  deliveryTimeMinMinutes?: number | null;
+  deliveryTimeMaxMinutes?: number | null;
 };
 
 /** Restaurante completo, como é guardado e devolvido na resposta. */
@@ -118,6 +123,11 @@ export type Restaurant = CreateRestaurantInput & {
   coverUrl?: string;
   /** Cor da ação no app do cliente (#RRGGBB); ausente = azul padrão. */
   brandColor?: string;
+  /** Minutos de preparo para a retirada; ausente = sem previsão. Só por PATCH. */
+  prepTimeMinutes?: number;
+  /** Faixa de entrega em minutos; os dois juntos ou nenhum. Só por PATCH. */
+  deliveryTimeMinMinutes?: number;
+  deliveryTimeMaxMinutes?: number;
   /** Sempre presente na leitura, mesmo quando não foi enviado na criação. */
   slug: string;
   /** Idem: a coluna é `not null`, então a leitura sempre traz um fuso. */

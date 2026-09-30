@@ -1,6 +1,15 @@
 export type PriceRule = "sum" | "highest" | "average";
 export type PaymentMethod = "cash" | "card_on_delivery" | "pix" | "meal_voucher";
 
+export type Address = {
+  street: string;
+  number: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  zipCode: string;
+};
+
 export type OpeningHour = { weekday: number; opensAt: string; closesAt: string };
 
 export type MenuRestaurant = {
@@ -23,6 +32,11 @@ export type MenuRestaurant = {
   timezone: string;
   openingHours: OpeningHour[];
   paymentMethods: PaymentMethod[];
+  /** O endereço da loja: onde se retira, e de onde saem cidade e UF da entrega. */
+  address: Address;
+  deliveryFeeMode: "neighborhood" | "fixed" | "distance";
+  /** Nomes dos bairros atendidos no modo por bairro; vazia nos outros. */
+  deliveryNeighborhoods: string[];
 };
 
 export type MenuOption = { id: string; name: string; priceInCents: number; maxQuantity: number };

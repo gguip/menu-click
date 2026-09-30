@@ -10,6 +10,7 @@ import { DeliveryAlert } from "../orders/OrdersNotices.tsx";
 import { useDeliveryAlert } from "../orders/useOrders.ts";
 import { useRestaurant, useToggleRestaurantFlag } from "../restaurant/useRestaurant.ts";
 import classes from "./ModalitiesPage.module.css";
+import { TimesCard } from "./TimesCard.tsx";
 
 type FlagField = keyof Pick<
   Restaurant,
@@ -152,6 +153,13 @@ export function ModalitiesPage() {
         <h2 className={classes.cardTitle}>Pagamento</h2>
         {PAYMENTS.map(renderFlag)}
       </section>
+
+      {/* a key sai dos próprios tempos: salvar (ou outro aparelho salvar)
+          recomeça o formulário do que está gravado */}
+      <TimesCard
+        key={`${data.prepTimeMinutes}-${data.deliveryTimeMinMinutes}-${data.deliveryTimeMaxMinutes}`}
+        restaurant={data}
+      />
     </div>
   );
 }

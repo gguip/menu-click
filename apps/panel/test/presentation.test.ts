@@ -40,6 +40,13 @@ describe("apresentação do pedido", () => {
   it("onde o pedido vai", () => {
     expect(whereLabel(makeOrder({ type: "delivery" }))).toBe("Rua Harmonia, 45 — Vila Madalena, São Paulo");
     expect(whereLabel(makeOrder({ type: "takeaway", deliveryAddress: null }))).toBe("Retirada no balcão");
+    const address = makeOrder({ type: "delivery" }).deliveryAddress!;
+    expect(whereLabel(makeOrder({ type: "delivery", deliveryAddress: { ...address, complement: "apto 42" } }))).toBe(
+      "Rua Harmonia, 45 (apto 42) — Vila Madalena, São Paulo",
+    );
+    expect(whereLabel(makeOrder({ type: "delivery", deliveryAddress: { ...address, complement: null } }))).toBe(
+      "Rua Harmonia, 45 — Vila Madalena, São Paulo",
+    );
     expect(
       whereLabel(makeOrder({ type: "dine_in", deliveryAddress: null, table: { id: "t", label: "Mesa 7" } })),
     ).toBe("Mesa 7");

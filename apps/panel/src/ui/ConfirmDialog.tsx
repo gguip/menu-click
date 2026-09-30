@@ -1,4 +1,5 @@
 import { Button, Modal } from "@mantine/core";
+import type { ReactNode } from "react";
 import buttons from "./buttons.module.css";
 import classes from "./ConfirmDialog.module.css";
 import type { ConfirmCopy } from "./confirmCopy.ts";
@@ -8,11 +9,14 @@ export function ConfirmDialog({
   busy = false,
   onConfirm,
   onClose,
+  children,
 }: {
   copy: ConfirmCopy | null;
   busy?: boolean;
   onConfirm: () => void;
   onClose: () => void;
+  /** Campo extra entre o texto e os botões (o motivo do cancelamento). */
+  children?: ReactNode;
 }) {
   return (
     <Modal
@@ -34,6 +38,7 @@ export function ConfirmDialog({
         <div className={classes.body}>
           <p className={classes.text}>{copy.body}</p>
           {copy.warn && <p className={classes.warn}>{copy.warn}</p>}
+          {children}
           <div className={classes.actions}>
             <Button variant="default" h={40} disabled={busy} onClick={onClose}>
               Voltar

@@ -14,7 +14,7 @@ import type {
   OrderSummary,
   OrderType,
 } from "../domain/order.ts";
-import type { OrderSummaryTotals } from "../domain/order.ts";
+import type { OrderSummaryTotals, TrackedOrder } from "../domain/order.ts";
 import {
   ORDER_STATUSES,
   REVENUE_STATUSES,
@@ -41,6 +41,8 @@ import { generateToken, hashToken } from "../tokens.ts";
 import * as orderEvents from "../events/orders.ts";
 import * as deliveryService from "./delivery.ts";
 import * as restaurantsService from "./restaurants.ts";
+import * as restaurantsRepository from "../repositories/restaurants.ts";
+import { estimateFor } from "../domain/estimate.ts";
 
 /**
  * Serviço de pedidos: **a regra de negócio**.
@@ -536,7 +538,12 @@ export async function create(
         // congelado no momento da criação; nunca recalculado a partir do
         // cadastro atual do restaurante numa leitura futura
         deliveryFeeInCents: frete.feeInCents,
-        deliveryAddress: input.deliveryAddress,
+        // o complemento é aparado e "só espaços" vira null — a mesma regra da
+        // observação do item: o que não diz nada não é gravado
+        deliveryAddress:
+          input.deliveryAddress === undefined
+            ? undefined
+            : { ...input.deliveryAddress, complement: normalizeText(input.deliveryAddress.complement) },
         trackingTokenHash:
           trackingToken === null ? null : hashToken(trackingToken),
         paymentMethod: input.paymentMethod,
@@ -764,12 +771,22 @@ export async function findByTrackingToken(
 export async function getByTrackingToken(
   orderId: string,
   token: string,
-): Promise<Order> {
+): Promise<TrackedOrder> {
   const order = await findByTrackingToken(token);
   if (order === null || order.id !== orderId) {
     throw new NotFoundError("Pedido não encontrado");
   }
-  return order;
+  const [statusHistory, restaurant] = await Promise.all([
+    ordersRepository.findStatusHistory(order.id),
+    // restaurante removido não derruba o acompanhamento: pedido é histórico
+    // (sem cascata), só fica sem previsão
+    restaurantsRepository.findById(order.restaurantId),
+  ]);
+  return {
+    ...order,
+    statusHistory,
+    estimate: restaurant === null ? null : estimateFor(order, statusHistory, restaurant),
+  };
 }
 
 /** O detalhe do painel: o pedido com o histórico de status (`OrderDetail`). */
@@ -889,6 +906,7 @@ async function transitionTo(
   restaurantId: string,
   orderId: string,
   to: OrderStatus,
+  cancellationReason: string | null = null,
 ): Promise<Order> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(orderId)) throw orderNotFound(orderId);
@@ -919,7 +937,7 @@ async function transitionTo(
       await devolverEstoque(orderId, client);
     }
 
-    await ordersRepository.updateStatus(orderId, to, client);
+    await ordersRepository.updateStatus(orderId, to, client, cancellationReason);
 
     const order = await ordersRepository.findById(restaurantId, orderId, client);
     return order as Order;
@@ -937,8 +955,9 @@ async function transitionAndPublish(
   restaurantId: string,
   orderId: string,
   to: OrderStatus,
+  cancellationReason: string | null = null,
 ): Promise<Order> {
-  const order = await transitionTo(restaurantId, orderId, to);
+  const order = await transitionTo(restaurantId, orderId, to, cancellationReason);
   orderEvents.publish(order);
   return order;
 }
@@ -1002,8 +1021,9 @@ export async function complete(
 export async function cancel(
   restaurantId: string,
   orderId: string,
+  reason?: string,
 ): Promise<Order> {
-  return transitionAndPublish(restaurantId, orderId, "cancelled");
+  return transitionAndPublish(restaurantId, orderId, "cancelled", normalizeText(reason));
 }
 
 /**
@@ -1039,4 +1059,10 @@ export async function markPaid(restaurantId: string, orderId: string): Promise<O
 /** Vale em qualquer status: existe para corrigir um clique errado. */
 export async function markUnpaid(restaurantId: string, orderId: string): Promise<Order> {
   return setPaid(restaurantId, orderId, false);
+}
+
+/** Texto livre do cliente: aparado, e vazio vira `null`. */
+function normalizeText(value: string | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed === "" ? null : trimmed;
 }

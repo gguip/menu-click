@@ -42,4 +42,11 @@ describe("HTML do servidor", () => {
     const friday = renderToString(<MenuApp menu={menu} />);
     expect(monday).toBe(friday);
   });
+  // o token é credencial: a página não pode ir para cache nem para buscador
+  it("a página de acompanhamento é dinâmica e noindex", () => {
+    const page = readFileSync(resolve(process.cwd(), "src/app/[slug]/pedido/[orderId]/page.tsx"), "utf8");
+    expect(page).toMatch(/export const dynamic = "force-dynamic"/);
+    expect(page).toMatch(/robots: \{ index: false, follow: false \}/);
+    expect(page).not.toMatch(/searchParams/);
+  });
 });

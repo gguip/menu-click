@@ -2,13 +2,16 @@
 
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchLiveRestaurant, type OrderReceipt } from "@/lib/api.ts";
+import { canOrderByLink, linkModalities, minimumHint } from "@/lib/link-order.ts";
 import { addLine, type CartLine, cartStorageKey, loadCart, reconcileCart, saveCart, subtotal } from "@/lib/cart.ts";
 import { formatCents } from "@/lib/money.ts";
 import { orderTableHash, type TableState, tableHashOf, tableLabelOf } from "@/lib/table.ts";
 import type { Menu, MenuProduct, MenuRestaurant, MenuSection } from "@/lib/types.ts";
 import { SearchIcon, TableIcon } from "./icons.tsx";
+import { ActiveOrderBanner } from "./ActiveOrderBanner.tsx";
 import { CartScreen } from "./CartScreen.tsx";
 import { CheckoutScreen } from "./CheckoutScreen.tsx";
+import { LinkCheckout } from "./LinkCheckout.tsx";
 import { MenuHeader } from "./MenuHeader.tsx";
 import { ProductScreen } from "./ProductScreen.tsx";
 import { ProductGrid } from "./ProductGrid.tsx";
@@ -25,7 +28,7 @@ export type Screen = "menu" | "product" | "cart" | "checkout" | "sent";
  * para dentro do nosso no `pushState` (e trata o `popstate` como a mesma
  * página), então as telas convivem com o roteador.
  */
-type HistoryState = { menuScreen?: Screen; productId?: string } | null;
+type HistoryState = { menuScreen?: Screen; productId?: string; step?: number } | null;
 
 /** Sem acento e sem caixa: "calab" acha "Calabresa", "acai" acha "Açaí". */
 function fold(text: string): string {
@@ -73,6 +76,7 @@ export function MenuApp({
     if (fixedNow === undefined) setNow(Date.now());
   }, [fixedNow]);
   const [screen, setScreen] = useState<Screen>(initialScreen);
+  const [checkoutStep, setCheckoutStep] = useState(0);
   const [query, setQuery] = useState("");
   // a chave vem do cardápio da página, que não muda: o status ao vivo não mexe nela
   const storageKey = cartStorageKey(menu.restaurant.slug, tableHash);
@@ -97,6 +101,8 @@ export function MenuApp({
         // o interruptor de salão também é do momento: desligado depois do
         // cache, a pessoa montaria o carrinho para levar 409 no "Enviar"
         isQrcode: typeof live.isQrcode === "boolean" ? live.isQrcode : current.isQrcode,
+        isDelivery: typeof live.isDelivery === "boolean" ? live.isDelivery : current.isDelivery,
+        isTakeaway: typeof live.isTakeaway === "boolean" ? live.isTakeaway : current.isTakeaway,
       }));
     });
     return () => {
@@ -122,7 +128,8 @@ export function MenuApp({
   const sections = useMemo(() => filterSections(menu.sections, query), [menu.sections, query]);
   const inDineIn = tableHash !== null;
   // Na parte 1 só o salão monta pedido: o link (entrega/retirada) é a parte 2.
-  const canOrder = inDineIn && restaurant.isOpen && restaurant.isQrcode;
+  // mesa: o salão; link: entrega ou retirada
+  const canOrder = inDineIn ? restaurant.isOpen && restaurant.isQrcode : canOrderByLink(restaurant);
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
   const brand = { "--brand-action": restaurant.brandColor ?? "#1E5AE8" } as CSSProperties;
 
@@ -131,7 +138,8 @@ export function MenuApp({
   const menuScroll = useRef<number | null>(null);
   const products = useMemo(() => menu.sections.flatMap((section) => section.products), [menu.sections]);
 
-  const show = (next: Screen, productId?: string) => {
+  const show = (next: Screen, productId?: string, step = 0) => {
+    setCheckoutStep(step);
     const chosen = productId ? products.find((p) => p.id === productId) : undefined;
     if (next === "product" && !chosen) {
       setScreen("menu");
@@ -143,17 +151,34 @@ export function MenuApp({
 
   const go = (next: Screen, productId?: string) => {
     if (screen === "menu") menuScroll.current = window.scrollY;
-    window.history.pushState({ menuScreen: next, productId } satisfies HistoryState, "");
+    window.history.pushState({ menuScreen: next, productId, step: 0 } satisfies HistoryState, "");
     show(next, productId);
     window.scrollTo?.(0, 0);
   };
 
   const back = () => window.history.back();
 
+  // cada passo do finalizar é uma entrada do histórico: o voltar do celular
+  // volta um passo, e o voltar da tela (history.back) faz o mesmo
+  const goStep = (step: number) => {
+    window.history.pushState({ menuScreen: "checkout", step } satisfies HistoryState, "");
+    setCheckoutStep(step);
+    window.scrollTo?.(0, 0);
+  };
+
+  const finish = (receipt: OrderReceipt) => {
+    setSent({ receipt, expectedTotal: subtotal(lines) + (receipt.deliveryFeeInCents ?? 0) });
+    updateLines([]);
+    // o finalizar vira o comprovante: voltar não reabre um pedido enviado
+    window.history.replaceState({ menuScreen: "sent" } satisfies HistoryState, "");
+    setScreen("sent");
+    window.scrollTo?.(0, 0);
+  };
+
   useEffect(() => {
     const onPop = (event: PopStateEvent) => {
       const state = event.state as HistoryState;
-      show(state?.menuScreen ?? "menu", state?.productId);
+      show(state?.menuScreen ?? "menu", state?.productId, state?.step ?? 0);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -187,8 +212,10 @@ export function MenuApp({
             restaurant={restaurant}
             tableUnknown={table.kind === "not-found"}
             dineInOff={inDineIn && !restaurant.isQrcode}
+            linkOff={!inDineIn && linkModalities(restaurant).length === 0}
             now={now}
           />
+          {!inDineIn && <ActiveOrderBanner slug={menu.restaurant.slug} />}
 
           {menu.sections.length === 0 ? (
             <section className="px-4 pt-8">
@@ -239,7 +266,9 @@ export function MenuApp({
       {screen === "cart" && (
         <CartScreen
           lines={lines}
-          context={tableLabel ?? ""}
+          context={tableLabel ?? (inDineIn ? "" : "Entrega ou retirada")}
+          totalLabel={inDineIn ? "Total" : "Itens"}
+          hint={inDineIn ? null : minimumHint(restaurant, subtotal(lines))}
           notice={cartUpdated ? "Atualizamos seu carrinho com o cardápio de agora." : null}
           onChange={updateLines}
           onBack={back}
@@ -247,20 +276,24 @@ export function MenuApp({
         />
       )}
 
-      {screen === "checkout" && (
+      {screen === "checkout" && inDineIn && (
         <CheckoutScreen
           restaurant={restaurant}
           lines={lines}
           tableHash={orderTableHash(table)}
           onBack={back}
-          onSent={(receipt) => {
-            setSent({ receipt, expectedTotal: subtotal(lines) });
-            updateLines([]);
-            // o finalizar vira o comprovante: voltar não reabre um pedido enviado
-            window.history.replaceState({ menuScreen: "sent" } satisfies HistoryState, "");
-            setScreen("sent");
-            window.scrollTo?.(0, 0);
-          }}
+          onSent={finish}
+        />
+      )}
+
+      {screen === "checkout" && !inDineIn && (
+        <LinkCheckout
+          restaurant={restaurant}
+          lines={lines}
+          step={checkoutStep}
+          onStep={goStep}
+          onBack={back}
+          onSent={({ receipt }) => finish(receipt)}
         />
       )}
 
@@ -268,6 +301,7 @@ export function MenuApp({
         <SentScreen
           receipt={sent.receipt}
           expectedTotal={sent.expectedTotal}
+          slug={menu.restaurant.slug}
           onRestart={() => {
             window.history.replaceState({ menuScreen: "menu" } satisfies HistoryState, "");
             setScreen("menu");

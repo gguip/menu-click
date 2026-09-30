@@ -123,6 +123,7 @@ export function makeOrderDetail(overrides: Partial<OrderDetail> = {}): OrderDeta
       },
     ],
     statusHistory: [{ status: "pending", at: "2026-09-19T22:58:00.000Z" }],
+    cancellationReason: null,
     ...overrides,
   };
 }

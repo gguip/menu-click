@@ -31,6 +31,19 @@ import {
 
 // ===================== JSON Schemas =====================
 
+/**
+ * O endereço de entrega do PEDIDO: o value object compartilhado mais o
+ * complemento. Schema próprio, e não uma mudança no `addressSchema`: aquele é
+ * também o do cadastro da loja e o da cotação, onde complemento não existe.
+ */
+const orderAddressSchema = {
+  ...addressSchema,
+  properties: {
+    ...addressProperties,
+    complement: { type: "string", maxLength: 120 },
+  },
+};
+
 const createOrderBodySchema = {
   type: "object",
   additionalProperties: false,
@@ -83,7 +96,7 @@ const createOrderBodySchema = {
       },
     },
     // obrigatório em `delivery`, recusado nas outras duas (400)
-    deliveryAddress: addressSchema,
+    deliveryAddress: orderAddressSchema,
     // como o pedido será pago; o restaurante que não aceitar a forma responde
     // 409 (mesma pergunta que já recusa modalidade)
     paymentMethod: { type: "string", enum: [...PAYMENT_METHODS] },
@@ -159,7 +172,11 @@ const orderSummaryProperties = {
   deliveryAddress: {
     type: "object",
     nullable: true,
-    properties: addressProperties,
+    properties: {
+      ...addressProperties,
+      // `nullable` (F12): sempre presente no endereço, `null` = sem complemento
+      complement: { type: "string", nullable: true },
+    },
   },
   paymentMethod: { type: "string" },
   // ausente = "tenho o valor certo"; por isso não é `nullable` (F12) — a
@@ -203,6 +220,8 @@ const orderDetailResponseSchema = {
   type: "object",
   properties: {
     ...orderResponseSchema.properties,
+    // só o detalhe e o acompanhamento; a listagem não precisa (S10)
+    cancellationReason: { type: "string", nullable: true },
     statusHistory: {
       type: "array",
       items: {
@@ -548,7 +567,7 @@ export async function orderRoutes(app: FastifyInstance) {
   );
 
   // Cancelar. Devolve estoque conforme o estado de origem.
-  app.post<{ Params: { restaurantId: string; orderId: string } }>(
+  app.post<{ Params: { restaurantId: string; orderId: string }; Body: { reason?: string } | null }>(
     "/restaurants/:restaurantId/orders/:orderId/cancel",
     {
       schema: {
@@ -556,8 +575,21 @@ export async function orderRoutes(app: FastifyInstance) {
         operationId: "cancelOrder",
         summary: "Cancela o pedido",
         description:
-          "Cancela a partir de qualquer estado não terminal. O estoque volta quando o pedido ainda estava em `confirmed` ou `preparing`; depois que saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha.",
+          "Cancela a partir de qualquer estado não terminal. O estoque volta quando o pedido ainda estava em `confirmed` ou `preparing`; depois que saiu para entrega ou ficou pronto no balcão, não — o prato já existe, e devolvê-lo ao estoque seria mentir sobre o que há na cozinha. Aceita `reason` opcional (até 200 caracteres), que o cliente lê no acompanhamento; sem corpo, cancela sem motivo.",
         params: orderParamsSchema,
+        body: {
+          type: "object",
+          // ⚠️ `nullable` é o que deixa o POST SEM corpo passar: o Fastify
+          // valida corpo ausente como `null` (`validateParam` em
+          // `fastify/lib/validation.js`), e sem isto o "Recusar" do painel de
+          // hoje, que não manda corpo, viraria 400
+          nullable: true,
+          additionalProperties: false,
+          properties: {
+            // o cliente lê no acompanhamento; sem motivo, a tela usa um texto genérico
+            reason: { type: "string", maxLength: 200 },
+          },
+        },
         response: {
           200: orderResponseSchema,
           404: errorResponseSchema,
@@ -567,7 +599,7 @@ export async function orderRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const { restaurantId, orderId } = request.params;
-      return ordersService.cancel(restaurantId, orderId);
+      return ordersService.cancel(restaurantId, orderId, request.body?.reason);
     },
   );
 

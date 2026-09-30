@@ -243,4 +243,34 @@ describe("ModalitiesPage", () => {
     // A mensagem do A continua lá, intocada pelo sucesso do B.
     expect(deliveryRow?.querySelector('[role="alert"]')?.textContent).toBe("Falha no A");
   });
+  it("salva os tempos estimados, mandando a faixa de entrega em par", async () => {
+    signIn();
+    const api = mockApi([
+      {
+        method: "PATCH",
+        path: `/restaurants/${RESTAURANT_ID}`,
+        body: makeRestaurant({ prepTimeMinutes: 25, deliveryTimeMinMinutes: 40, deliveryTimeMaxMinutes: 55 }),
+      },
+      ...panelHandlers(),
+    ]);
+    renderInPanel(routes, "/modalidades");
+    fireEvent.change(await screen.findByLabelText("Preparo para retirada (min)"), { target: { value: "25" } });
+    fireEvent.change(screen.getByLabelText("Entrega a partir de (min)"), { target: { value: "40" } });
+    fireEvent.change(screen.getByLabelText("Entrega até (min)"), { target: { value: "55" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar tempos" }));
+    await waitFor(() => {
+      const call = api.calls.find((c) => c.method === "PATCH");
+      expect(call?.body).toEqual({ prepTimeMinutes: 25, deliveryTimeMinMinutes: 40, deliveryTimeMaxMinutes: 55 });
+    });
+  });
+
+  it("não salva faixa de entrega pela metade, e diz por quê", async () => {
+    signIn();
+    const api = mockApi([...panelHandlers()]);
+    renderInPanel(routes, "/modalidades");
+    fireEvent.change(await screen.findByLabelText("Entrega a partir de (min)"), { target: { value: "40" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar tempos" }));
+    expect(await screen.findByText("Preencha os dois tempos da entrega, ou deixe os dois vazios.")).toBeTruthy();
+    expect(api.calls.some((c) => c.method === "PATCH")).toBe(false);
+  });
 });

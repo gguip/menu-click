@@ -7,6 +7,7 @@ import type { Pagination } from "../domain/pagination.ts";
 import type { OrderPeriod, PeriodFilter } from "../domain/period.ts";
 import type { OrderSortField, SortDirection } from "../domain/order.ts";
 import type {
+  DeliveryAddress,
   Order,
   OrderItem,
   OrderItemOption,
@@ -44,6 +45,8 @@ type OrderRow = {
   city: string | null;
   state: string | null;
   zip_code: string | null;
+  /** "Apto 42"; só existe com endereço (check `orders_complement_check`). */
+  complement: string | null;
   payment_method: PaymentMethod;
   change_for_in_cents: number | null;
   /** `null` fora de `dine_in` e no pedido de salão sem mesa informada. */
@@ -52,6 +55,7 @@ type OrderRow = {
   /** O número do pedido na loja. `number`, acima, é o do endereço. */
   order_number: number;
   paid_at: Date | null;
+  cancellation_reason: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -106,7 +110,7 @@ const selectOrderWithCustomer = `
     from orders o
     join customers c on c.id = o.customer_id`;
 
-function toAddress(row: OrderRow): Address | null {
+function toAddress(row: OrderRow): DeliveryAddress | null {
   // o check `orders_address_check` garante tudo-ou-nada; testar uma coluna basta
   if (row.street === null) return null;
   return {
@@ -116,6 +120,7 @@ function toAddress(row: OrderRow): Address | null {
     city: row.city as string,
     state: row.state as string,
     zipCode: row.zip_code as string,
+    complement: row.complement,
   };
 }
 
@@ -149,6 +154,7 @@ function toOrderSummary(row: OrderWithCustomerRow): OrderSummary {
       ? {}
       : { changeForInCents: row.change_for_in_cents }),
     paidAt: row.paid_at === null ? null : row.paid_at.toISOString(),
+    cancellationReason: row.cancellation_reason,
     // presente e `null` quando não há mesa, como `deliveryFeeInCents` — o
     // `check` do banco garante que as duas colunas andam juntas
     table:
@@ -191,7 +197,7 @@ export type InsertOrderData = {
   totalInCents: number;
   /** O frete já decidido pelo serviço. `null` fora de `delivery` e no "a combinar". */
   deliveryFeeInCents: number | null;
-  deliveryAddress?: Address;
+  deliveryAddress?: Address & { complement: string | null };
   /** Hash do token de acompanhamento. `null` em `dine_in`. */
   trackingTokenHash: string | null;
   paymentMethod: PaymentMethod;
@@ -264,8 +270,9 @@ export async function insertOrder(
     `insert into orders
        (restaurant_id, customer_id, type, total_in_cents, delivery_fee_in_cents,
         tracking_token_hash, street, number, neighborhood, city, state, zip_code,
-        payment_method, change_for_in_cents, table_id, table_label, order_number)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        payment_method, change_for_in_cents, table_id, table_label, order_number,
+        complement)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      returning id`,
     [
       restaurantId,
@@ -291,6 +298,7 @@ export async function insertOrder(
       data.table?.id ?? null,
       data.table?.label ?? null,
       data.orderNumber,
+      address?.complement ?? null,
     ],
   );
   return rows[0].id;
@@ -481,11 +489,13 @@ export async function updateStatus(
   orderId: string,
   status: OrderStatus,
   client: PoolClient,
+  cancellationReason: string | null = null,
 ): Promise<void> {
+  // o motivo só vale no cancelamento; o check do banco recusa em outro status
   await client.query(
-    `update orders set status = $1, updated_at = now()
+    `update orders set status = $1, cancellation_reason = $3, updated_at = now()
       where id = $2 and deleted_at is null`,
-    [status, orderId],
+    [status, orderId, status === "cancelled" ? cancellationReason : null],
   );
   // o evento vai na mesma transação da mudança: rollback desfaz os dois
   await insertStatusEvent(orderId, status, client);

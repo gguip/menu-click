@@ -10,12 +10,15 @@ export function StoreNotice({
   restaurant,
   tableUnknown,
   dineInOff = false,
+  linkOff = false,
   now,
 }: {
   restaurant: MenuRestaurant;
   tableUnknown: boolean;
   /** Na mesa, com o salão desligado pela loja (`isQrcode`). */
   dineInOff?: boolean;
+  /** Pelo link, com a entrega e a retirada desligadas pela loja. */
+  linkOff?: boolean;
   now: number | null;
 }) {
   const paused = !restaurant.acceptingOrders;
@@ -32,6 +35,12 @@ export function StoreNotice({
       {dineInOff && !paused && (
         <p role="status" className="mx-4 mt-3 rounded-field bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn">
           Esta loja não está recebendo pedidos pela mesa agora. Chame o garçom.
+        </p>
+      )}
+
+      {linkOff && !paused && (
+        <p role="status" className="mx-4 mt-3 rounded-field bg-warn-soft px-3.5 py-2.5 text-[13px] text-warn">
+          Esta loja não está recebendo pedidos pelo app agora.
         </p>
       )}
 

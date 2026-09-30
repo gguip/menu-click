@@ -11,6 +11,8 @@ export function CartScreen({
   lines,
   context,
   notice = null,
+  totalLabel = "Total",
+  hint = null,
   onChange,
   onBack,
   onCheckout,
@@ -20,6 +22,10 @@ export function CartScreen({
   context: string;
   /** O carrinho guardado mudou ao ser conferido com o cardápio. */
   notice?: string | null;
+  /** "Total" no salão (sem frete); "Itens" no link (o frete vem no finalizar). */
+  totalLabel?: "Total" | "Itens";
+  /** O aviso de pedido mínimo da entrega; não trava o botão. */
+  hint?: string | null;
   onChange: (next: CartLine[]) => void;
   onBack: () => void;
   onCheckout: () => void;
@@ -107,12 +113,13 @@ export function CartScreen({
         + Adicionar mais itens
       </button>
 
-      {/* No salão não há frete: o valor do carrinho já é o total. A entrega
-          (parte 2) volta a separar "Itens" de "Entrega", como no handoff. */}
+      {/* No salão o valor já é o total; pelo link, o frete entra no finalizar,
+          e aqui o valor é só dos itens. */}
       <dl className="mx-4 mt-4 flex border-t border-paper-3 pt-4 text-[15px]">
-        <dt className="text-ink-2">Total</dt>
+        <dt className="text-ink-2">{totalLabel}</dt>
         <dd className="ml-auto font-semibold tabular-nums">{formatCents(subtotal(lines))}</dd>
       </dl>
+      {hint && <p className="mx-4 mt-2 text-[13px] text-warn">{hint}</p>}
 
       <div className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[480px] border-t border-paper-3 bg-paper px-4 pb-[18px] pt-3">
         <button type="button" onClick={onCheckout} className="min-h-[52px] w-full rounded-field bg-action text-base font-semibold text-white">

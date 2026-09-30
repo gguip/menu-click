@@ -78,6 +78,13 @@ export type MenuRestaurant = Pick<
    * entram aqui: são o formato de quem edita, não o de quem escolhe.
    */
   paymentMethods: PaymentMethod[];
+  /**
+   * Os NOMES dos bairros atendidos, no modo por bairro — para a tela oferecer
+   * um seletor antes de a pessoa digitar o endereço. Os valores continuam
+   * saindo só pela cotação, para o endereço de cada um (S10). Vazia nos outros
+   * modos.
+   */
+  deliveryNeighborhoods: string[];
 };
 
 /**

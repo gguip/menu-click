@@ -1,3 +1,4 @@
+import { formatCents } from "./money.ts";
 import type { PaymentMethod } from "./types.ts";
 
 export type DineInPayment = "cash" | "card_on_delivery" | "pix";
@@ -36,4 +37,24 @@ export function formatPhone(raw: string): string {
   // fixo tem 4+4; o hífen só vai para depois do 5º quando o 11º dígito chega
   const split = d.length === 11 ? 5 : 4;
   return `(${ddd}) ${rest.slice(0, split)}-${rest.slice(split)}`;
+}
+
+/** "01304-001" enquanto digita; teto de 8 dígitos. */
+export function formatZip(raw: string): string {
+  const d = raw.replace(/\D/g, "").slice(0, 8);
+  return d.length <= 5 ? d : `${d.slice(0, 5)}-${d.slice(5)}`;
+}
+
+/**
+ * O troco como a pessoa digita: os dígitos são centavos, e a tela mostra
+ * "R$ 50,00". Sete dígitos no máximo (R$ 99.999,99) — troco maior é engano.
+ */
+export function formatMoneyInput(raw: string): string {
+  const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "").slice(0, 7);
+  return digits === "" ? "" : formatCents(Number(digits));
+}
+
+export function centsFromMoneyInput(text: string): number | null {
+  const digits = text.replace(/\D/g, "");
+  return digits === "" ? null : Number(digits);
 }

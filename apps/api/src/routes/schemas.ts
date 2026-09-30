@@ -189,6 +189,17 @@ export const updateRestaurantBodySchema = {
     deliveryFeeToArrange: { type: "boolean" },
     // zero é "sem mínimo", então desligar não precisa de `nullable`
     minimumOrderInCents: { type: "integer", minimum: 0 },
+    // os tempos estimados; `null` desliga a previsão (F12). Não saem no
+    // cardápio público: viram a previsão calculada no acompanhamento
+    prepTimeMinutes: { type: "integer", minimum: 1, maximum: 240, nullable: true },
+    deliveryTimeMinMinutes: { type: "integer", minimum: 1, maximum: 240, nullable: true },
+    deliveryTimeMaxMinutes: { type: "integer", minimum: 1, maximum: 240, nullable: true },
+  },
+  // a faixa de entrega é um par: mandar só a ponta de baixo deixaria uma faixa
+  // sem teto, e o banco recusaria com erro de constraint em vez de 400
+  dependencies: {
+    deliveryTimeMinMinutes: ["deliveryTimeMaxMinutes"],
+    deliveryTimeMaxMinutes: ["deliveryTimeMinMinutes"],
   },
 };
 
@@ -202,6 +213,9 @@ export const restaurantResponseSchema = {
     logoUrl: { type: "string" },
     coverUrl: { type: "string" },
     brandColor: { type: "string" },
+    prepTimeMinutes: { type: "integer" },
+    deliveryTimeMinMinutes: { type: "integer" },
+    deliveryTimeMaxMinutes: { type: "integer" },
     address: { type: "object", properties: addressProperties },
     isDelivery: { type: "boolean" },
     // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada

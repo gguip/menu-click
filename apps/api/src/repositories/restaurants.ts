@@ -30,6 +30,9 @@ type RestaurantRow = {
   logo_url: string | null;
   cover_url: string | null;
   brand_color: string | null;
+  prep_time_minutes: number | null;
+  delivery_time_min_minutes: number | null;
+  delivery_time_max_minutes: number | null;
   street: string;
   number: string;
   neighborhood: string;
@@ -66,6 +69,13 @@ function toRestaurant(row: RestaurantRow): Restaurant {
     ...(row.logo_url === null ? {} : { logoUrl: row.logo_url }),
     ...(row.cover_url === null ? {} : { coverUrl: row.cover_url }),
     ...(row.brand_color === null ? {} : { brandColor: row.brand_color }),
+    ...(row.prep_time_minutes === null ? {} : { prepTimeMinutes: row.prep_time_minutes }),
+    ...(row.delivery_time_min_minutes === null
+      ? {}
+      : {
+          deliveryTimeMinMinutes: row.delivery_time_min_minutes,
+          deliveryTimeMaxMinutes: row.delivery_time_max_minutes as number,
+        }),
     address: {
       street: row.street,
       number: row.number,
@@ -109,6 +119,9 @@ const restaurantColumns = {
   logoUrl: "logo_url",
   coverUrl: "cover_url",
   brandColor: "brand_color",
+  prepTimeMinutes: "prep_time_minutes",
+  deliveryTimeMinMinutes: "delivery_time_min_minutes",
+  deliveryTimeMaxMinutes: "delivery_time_max_minutes",
   isDelivery: "is_delivery",
   isTakeaway: "is_takeaway",
   isQrcode: "is_qrcode",
