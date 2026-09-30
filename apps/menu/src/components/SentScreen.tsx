@@ -21,8 +21,8 @@ export function SentScreen({
   onRestart: () => void;
 }) {
   return (
-    <main className="flex min-h-dvh flex-col px-5 pb-6 pt-12">
-      <span className="flex size-[60px] items-center justify-center rounded-full bg-success-soft text-success" aria-hidden="true">
+    <main className="flex min-h-dvh flex-col px-5 pb-28 pt-12">
+      <span className="sent-badge flex size-[60px] items-center justify-center rounded-full bg-success-soft text-success" aria-hidden="true">
         <CheckIcon size={30} />
       </span>
       <h1 className="mt-5 text-[26px] font-semibold leading-[1.15] tracking-[-0.03em]">Pedido enviado para a cozinha</h1>
@@ -52,9 +52,15 @@ export function SentScreen({
         </p>
       )}
 
-      <button type="button" onClick={onRestart} className="mt-auto min-h-11 pt-8 text-sm font-semibold text-ink-2">
-        Voltar ao cardápio
-      </button>
+      <div className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[480px] border-t border-paper-3 bg-paper px-4 pb-[18px] pt-3">
+        <button
+          type="button"
+          onClick={onRestart}
+          className="min-h-[52px] w-full rounded-field bg-action text-base font-semibold text-white"
+        >
+          Voltar ao cardápio
+        </button>
+      </div>
     </main>
   );
 }

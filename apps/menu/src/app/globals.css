@@ -48,3 +48,37 @@ html {
   }
 }
 
+/* O check do pedido enviado: o círculo cresce e o traço se desenha. Só com
+   movimento liberado — quem pediu menos movimento vê o check parado. */
+@keyframes sent-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes sent-draw {
+  from {
+    stroke-dashoffset: 22;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sent-badge {
+    animation: sent-pop 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .sent-badge path {
+    stroke-dasharray: 22;
+    animation: sent-draw 360ms 240ms ease-out both;
+  }
+}
