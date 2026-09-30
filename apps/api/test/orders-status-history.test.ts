@@ -78,7 +78,9 @@ describe("histórico de status do pedido", () => {
     expect(rows.map((row) => row.status)).toEqual(["pending"]);
   });
 
-  it("o histórico sai só no detalhe: nem na listagem, nem no acompanhamento", async () => {
+  // o acompanhamento público passou a trazer o histórico por decisão da spec
+  // da parte 2 do app (a trilha mostra a hora de cada etapa); a listagem não
+  it("o histórico sai no detalhe e no acompanhamento, não na listagem", async () => {
     const r = await createRestaurant(app);
     const p = await createProduct(app, r, { stock: 10 });
     const order = await createOrder(app, r.id, [{ productId: p.id, quantity: 1 }], { type: "takeaway" });
@@ -87,6 +89,6 @@ describe("histórico de status do pedido", () => {
     const tracked = await app.inject({ method: "GET", url: `/orders/${order.id}?token=${order.trackingToken}` });
 
     expect(list.json().data[0].statusHistory).toBeUndefined();
-    expect(tracked.json().statusHistory).toBeUndefined();
+    expect(tracked.json().statusHistory.map((e: { status: string }) => e.status)).toEqual(["pending"]);
   });
 });
