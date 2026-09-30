@@ -10,11 +10,33 @@
 export const CUSTOMER_KEY = "customer";
 export const CUSTOMER_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-export type RememberedCustomer = { name: string; phone: string };
+export type RememberedAddress = {
+  neighborhood: string;
+  street: string;
+  number: string;
+  complement: string;
+  zip: string;
+};
 
+export type RememberedCustomer = { name: string; phone: string; address?: RememberedAddress };
+
+function isAddress(value: unknown): value is RememberedAddress {
+  if (typeof value !== "object" || value === null) return false;
+  const a = value as Record<string, unknown>;
+  return ["neighborhood", "street", "number", "complement", "zip"].every((k) => typeof a[k] === "string");
+}
+
+/**
+ * Pedido de retirada não traz endereço, e isso não é motivo para esquecer o
+ * de quem pediu entrega na semana passada: sem endereço novo, fica o antigo.
+ */
 export function saveCustomer(customer: RememberedCustomer, now = Date.now()): void {
   try {
-    localStorage.setItem(CUSTOMER_KEY, JSON.stringify({ ...customer, savedAt: now }));
+    const address = customer.address ?? loadCustomer(now)?.address;
+    localStorage.setItem(
+      CUSTOMER_KEY,
+      JSON.stringify({ name: customer.name, phone: customer.phone, ...(address ? { address } : {}), savedAt: now }),
+    );
   } catch {
     // sem storage: a pessoa digita de novo no próximo pedido
   }
@@ -31,7 +53,12 @@ export function loadCustomer(now = Date.now()): RememberedCustomer | null {
       clearCustomer();
       return null;
     }
-    return { name: saved.name as string, phone: saved.phone as string };
+    return {
+      name: saved.name as string,
+      phone: saved.phone as string,
+      // endereço adulterado sai sozinho; nome e telefone continuam valendo
+      ...(isAddress(saved.address) ? { address: saved.address } : {}),
+    };
   } catch {
     return null;
   }
