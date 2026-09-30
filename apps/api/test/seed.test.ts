@@ -29,4 +29,14 @@ describe("seed de exemplo", () => {
     );
     expect(semHistorico).toEqual([]);
   });
+  // num banco novo de produção, loja sem verificação nasce bloqueada: 403 no
+  // painel e 404 no cardápio logo na primeira subida
+  it("as lojas do seed nascem verificadas", async () => {
+    const seed = await readFile(new URL("../src/db/seed.sql", import.meta.url), "utf8");
+    await pool.query(seed);
+    const { rows } = await pool.query(
+      `select slug from restaurants where deleted_at is null and email_verified_at is null`,
+    );
+    expect(rows).toEqual([]);
+  });
 });

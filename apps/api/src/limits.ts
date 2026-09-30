@@ -51,6 +51,31 @@ export const CONNECTION_TIMEOUT_MS = 10_000;
  */
 export const TRUST_PROXY = process.env.TRUST_PROXY === "true";
 
+/** Nome de header HTTP (token da RFC 9110), já em minúsculas. */
+const HEADER_NAME = /^[a-z0-9!#$%&'*+.^_`|~-]+$/;
+
+/**
+ * O header que carrega o IP do cliente, quando há um proxy que o SOBRESCREVE
+ * — no Render, o Cloudflare escreve `CF-Connecting-IP` na borda com o IP de
+ * quem conectou, e o cliente não consegue forjá-lo. Lá o `X-Forwarded-For`
+ * não serve: chega como "cliente, borda, interno do Render" com o interno
+ * mudando a cada requisição, e nem `trustProxy` nem um número de saltos dão
+ * uma chave estável para o limite de requisições.
+ *
+ * ⚠️ Só é seguro onde TODA requisição passa por esse proxy. Em outra
+ * hospedagem, deixe vazio: aí vale o `request.ip` (e o `TRUST_PROXY`).
+ * Nome inválido derruba a subida — um erro de digitação aqui desligaria o
+ * limite em silêncio.
+ */
+export function parseClientIpHeader(value: string | undefined): string | null {
+  const name = value?.trim().toLowerCase() ?? "";
+  if (name === "") return null;
+  if (!HEADER_NAME.test(name)) {
+    throw new Error(`CLIENT_IP_HEADER inválido: "${value}" não é um nome de header HTTP`);
+  }
+  return name;
+}
+
 /**
  * Teto global por IP, por minuto. Folgado de propósito: cobre o cardápio
  * público e a criação de pedido (as duas rotas anônimas de uso legítimo) sem

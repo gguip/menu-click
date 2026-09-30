@@ -4,6 +4,7 @@ import websocket from "@fastify/websocket";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import rateLimit from "@fastify/rate-limit";
+import { clientIpKey } from "./client-ip.ts";
 import {
   BODY_LIMIT_BYTES,
   corsOrigins,
@@ -12,6 +13,7 @@ import {
   RATE_LIMIT_MAX,
   RATE_LIMIT_WINDOW,
   TRUST_PROXY,
+  parseClientIpHeader,
 } from "./limits.ts";
 import type { FastifyError } from "fastify";
 import { drainBackgroundWork } from "./background.ts";
@@ -67,6 +69,12 @@ export async function buildApp() {
    * `assertMenuBaseUrl` em `menu-url.ts`.
    */
   assertMenuBaseUrl();
+
+  /**
+   * Terceira pré-condição: o header do IP do cliente, se configurado, tem que
+   * ser um nome válido — ver `parseClientIpHeader` em `limits.ts`.
+   */
+  const clientIp = clientIpKey(parseClientIpHeader(process.env.CLIENT_IP_HEADER));
 
   const app = Fastify({
     bodyLimit: BODY_LIMIT_BYTES,
@@ -277,13 +285,19 @@ export async function buildApp() {
    * isso é exato; com duas, cada uma tem o próprio contador e o limite efetivo
    * dobra. Resolver é trocar o store por Redis, e é decisão de infra.
    *
-   * `request.ip` respeita o `trustProxy` de `limits.ts` — sem ele, atrás de um
-   * proxy todos os clientes contam como um só.
+   * A chave sai de `clientIpKey`: o header do proxy quando `CLIENT_IP_HEADER`
+   * está configurado (no Render, o `CF-Connecting-IP` do Cloudflare), senão o
+   * `request.ip`, que respeita o `trustProxy` de `limits.ts` — sem os dois,
+   * atrás de um proxy todos os clientes contariam como um só.
    */
   await app.register(rateLimit, {
     global: true,
     max: RATE_LIMIT_MAX,
     timeWindow: RATE_LIMIT_WINDOW,
+    // a chave é o cliente, não o salto de proxy — ver `clientIpKey`. As rotas
+    // com limite próprio herdam esta chave: o plugin mescla as opções delas
+    // com as globais (`mergeParams`)
+    keyGenerator: clientIp,
     // o plugin tem corpo de erro próprio; este casa com o resto da API (S11)
     errorResponseBuilder: (_request, context) => ({
       statusCode: 429,
