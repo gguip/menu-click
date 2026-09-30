@@ -123,6 +123,15 @@
                           "brandColor": {
                             "type": "string"
                           },
+                          "prepTimeMinutes": {
+                            "type": "integer"
+                          },
+                          "deliveryTimeMinMinutes": {
+                            "type": "integer"
+                          },
+                          "deliveryTimeMaxMinutes": {
+                            "type": "integer"
+                          },
                           "address": {
                             "type": "object",
                             "properties": {
@@ -271,6 +280,15 @@
                     },
                     "brandColor": {
                       "type": "string"
+                    },
+                    "prepTimeMinutes": {
+                      "type": "integer"
+                    },
+                    "deliveryTimeMinMinutes": {
+                      "type": "integer"
+                    },
+                    "deliveryTimeMaxMinutes": {
+                      "type": "integer"
                     },
                     "address": {
                       "type": "object",
@@ -519,7 +537,33 @@
                   "minimumOrderInCents": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "prepTimeMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240,
+                    "nullable": true
+                  },
+                  "deliveryTimeMinMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240,
+                    "nullable": true
+                  },
+                  "deliveryTimeMaxMinutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 240,
+                    "nullable": true
                   }
+                },
+                "dependencies": {
+                  "deliveryTimeMinMinutes": [
+                    "deliveryTimeMaxMinutes"
+                  ],
+                  "deliveryTimeMaxMinutes": [
+                    "deliveryTimeMinMinutes"
+                  ]
                 }
               }
             }
@@ -568,6 +612,15 @@
                     },
                     "brandColor": {
                       "type": "string"
+                    },
+                    "prepTimeMinutes": {
+                      "type": "integer"
+                    },
+                    "deliveryTimeMinMinutes": {
+                      "type": "integer"
+                    },
+                    "deliveryTimeMaxMinutes": {
+                      "type": "integer"
                     },
                     "address": {
                       "type": "object",
@@ -8486,6 +8539,15 @@
                         },
                         "brandColor": {
                           "type": "string"
+                        },
+                        "prepTimeMinutes": {
+                          "type": "integer"
+                        },
+                        "deliveryTimeMinMinutes": {
+                          "type": "integer"
+                        },
+                        "deliveryTimeMaxMinutes": {
+                          "type": "integer"
                         },
                         "address": {
                           "type": "object",

@@ -306,6 +306,21 @@ function assertCorLegivel(cor: string | null | undefined): void {
   }
 }
 
+/**
+ * A faixa de entrega vem em par (o schema garante) e com sentido: nula nas
+ * duas pontas, ou número nas duas com o mínimo até o máximo.
+ */
+function assertFaixaDeEntrega(input: UpdateRestaurantInput): void {
+  const { deliveryTimeMinMinutes: min, deliveryTimeMaxMinutes: max } = input;
+  if (min === undefined && max === undefined) return;
+  if ((min === null) !== (max === null)) {
+    throw new ValidationError("Informe o tempo mínimo e o máximo da entrega, ou nenhum dos dois");
+  }
+  if (typeof min === "number" && typeof max === "number" && min > max) {
+    throw new ValidationError("O tempo mínimo da entrega não pode passar do máximo");
+  }
+}
+
 export async function update(
   id: string,
   input: UpdateRestaurantInput,
@@ -313,6 +328,7 @@ export async function update(
   if (!isUuid(id)) throw restaurantNotFound(id);
   assertTimezoneValida(input.timezone);
   assertCorLegivel(input.brandColor);
+  assertFaixaDeEntrega(input);
 
   const restaurant = await restaurantsRepository.update(id, input);
   if (restaurant === null) throw restaurantNotFound(id);
