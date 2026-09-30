@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { MenuApp } from "../src/components/MenuApp.tsx";
 import { saveCart } from "../src/lib/cart.ts";
@@ -162,6 +162,38 @@ describe("pedido no salão", () => {
     expect(screen.getByText("TOTAL")).toBeTruthy();
     expect(screen.queryByText("Itens")).toBeNull();
     expect(screen.getAllByText("R$ 104,00")).toHaveLength(1);
+  });
+
+  it("lembra nome e telefone do último pedido, e deixa limpar", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({ id: "o1", number: 42, totalInCents: 10400, table: { id: "t7", label: "Mesa 7" }, items: [{ name: "Margherita", quantity: 2, unitPriceInCents: 5200, options: [], note: "sem cebola" }] }, 201),
+      ),
+    );
+    withCart();
+    await checkout();
+    await screen.findByText("Pedido enviado para a cozinha");
+    cleanup();
+
+    withCart();
+    fireEvent.click(await screen.findByRole("button", { name: /Ver carrinho/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Finalizar pedido" }));
+    expect((screen.getByLabelText("Nome") as HTMLInputElement).value).toBe("Ana");
+    expect((screen.getByLabelText("Telefone") as HTMLInputElement).value).toBe("(11) 99999-0000");
+
+    fireEvent.click(screen.getByRole("button", { name: "Não é você? Limpar dados" }));
+    expect((screen.getByLabelText("Nome") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Telefone") as HTMLInputElement).value).toBe("");
+    expect(localStorage.getItem("customer")).toBeNull();
+  });
+
+  it("pedido que falhou não guarda nada", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ message: "A loja não está aceitando pedidos no momento" }, 409)));
+    withCart();
+    await checkout();
+    await screen.findByText("A loja não está aceitando pedidos no momento");
+    expect(localStorage.getItem("customer")).toBeNull();
   });
 
   it("carrinho vazio orienta de volta ao cardápio", async () => {

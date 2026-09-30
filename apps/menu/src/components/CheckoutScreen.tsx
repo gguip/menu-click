@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createDineInOrder, OrderError, type OrderReceipt } from "@/lib/api.ts";
 import { type CartLine, subtotal, toOrderItems } from "@/lib/cart.ts";
 import { checkoutBlock, type DineInPayment, dineInPayments, formatPhone } from "@/lib/checkout.ts";
+import { clearCustomer, loadCustomer, saveCustomer } from "@/lib/customer.ts";
 import { formatCents } from "@/lib/money.ts";
 import type { MenuRestaurant } from "@/lib/types.ts";
 import { FIELD_BOX, FIELD_FOCUS, FIELD_TEXT } from "./field.ts";
@@ -29,8 +30,11 @@ export function CheckoutScreen({
   onBack: () => void;
   onSent: (receipt: OrderReceipt) => void;
 }) {
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
+  // o finalizar só existe no navegador (nunca é a tela do HTML do servidor),
+  // então dá para ler o storage no próprio estado inicial
+  const [remembered, setRemembered] = useState(() => loadCustomer());
+  const [name, setName] = useState(remembered?.name ?? "");
+  const [phone, setPhone] = useState(remembered?.phone ?? "");
   const [payment, setPayment] = useState<DineInPayment | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<{ message: string; staleCart: boolean } | null>(null);
@@ -61,6 +65,7 @@ export function CheckoutScreen({
         if (!(cause instanceof OrderError && cause.status === 400 && tableHash)) throw cause;
         receipt = await createDineInOrder(restaurant.id, body);
       }
+      saveCustomer({ name: name.trim(), phone });
       onSent(receipt);
     } catch (cause) {
       const failure = cause instanceof OrderError ? cause : new OrderError(0, "Não deu para enviar. Tente de novo.");
@@ -81,6 +86,20 @@ export function CheckoutScreen({
           <h2 className="text-[19px] font-semibold tracking-[-0.02em]">Quem está pedindo?</h2>
           <p className="mt-1 text-[13px] leading-[1.45] text-ink-2">Sem cadastro. Só o nome e o telefone para a loja te achar.</p>
         </div>
+        {remembered && (
+          <button
+            type="button"
+            onClick={() => {
+              clearCustomer();
+              setRemembered(null);
+              setName("");
+              setPhone("");
+            }}
+            className="-my-1.5 min-h-11 self-start text-[13px] font-semibold text-action"
+          >
+            Não é você? Limpar dados
+          </button>
+        )}
         <label className="flex flex-col gap-1.5">
           <span className="text-[13px] font-semibold text-ink-2">Nome</span>
           <input
