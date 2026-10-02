@@ -757,6 +757,8 @@ Roteiro em `docs/deploy.md`; desenho em `docs/superpowers/specs/2026-09-30-deplo
 - **Ping do cron-job.org no `/health`, a cada 10 min das 06:00 às 23:00** (Brasília): o Render dorme depois de 15 min parado e leva ~1 min para acordar; de madrugada a API dorme de propósito (~530 das 750 h/mês). 🚨 **O `/health` não toca no banco** (há teste): senão o Neon ficaria acordado o dia todo e estouraria as 100 CU-h/mês.
 - **O seed cria lojas já verificadas** (`email_verified_at = now()`): num banco novo, sem isso, elas nasceriam bloqueadas.
 - ⚠️ **Custo zero depende de não cadastrar cartão** no Render e no Neon: sem cartão, estourar limite suspende em vez de cobrar.
+- ⚠️ **Mudou o `render.yaml`? "Manual sync" no Blueprint.** O Blueprint grava os comandos no serviço quando o cria, e "Manual Deploy" publica o código novo com o comando antigo. O build é `corepack pnpm install`, não `corepack enable`: no Render `/usr` é só leitura (`EROFS`).
+- ⚠️ **Variável de app na Vercel é Config, sem barra no fim** (`NEXT_PUBLIC_API_URL`, `VITE_API_URL`): a Vercel recusa Secret com prefixo público, e o valor entra no build — trocou, Redeploy sem cache. Com a barra, o app pedia `//menu/<slug>` e a API respondia 401.
 
 ### Monorepo
 
