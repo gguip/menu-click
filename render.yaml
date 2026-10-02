@@ -16,8 +16,12 @@ services:
     # (o gancho de pré-deploy do Render é pago). Direto pelo node, sem pnpm:
     # não depende dos atalhos do corepack existirem na hora de rodar, e o
     # SIGTERM do Render chega ao Node sem intermediário (F26). As variáveis
-    # vêm do Render, então o --env-file dos scripts não faz falta
-    startCommand: cd apps/api && node src/db/migrate.ts up && node src/server.ts
+    # vêm do Render, então o --env-file dos scripts não faz falta.
+    # Duas credenciais (S14): as migrations rodam com o dono do banco
+    # (MIGRATION_DATABASE_URL) e o servidor com o papel `menuclick_app`, que não
+    # tem DELETE, TRUNCATE nem DDL. Sem a variável das migrations, elas rodam
+    # com o papel restrito e o deploy falha alto, na leitura da `pgmigrations`
+    startCommand: cd apps/api && DATABASE_URL="${MIGRATION_DATABASE_URL:-$DATABASE_URL}" node src/db/migrate.ts up && node src/server.ts
     healthCheckPath: /health
     # publica só depois do CI verde no GitHub
     autoDeployTrigger: checksPass
@@ -31,7 +35,11 @@ services:
       # o Render fica atrás do Cloudflare, que sobrescreve este header na borda
       - key: CLIENT_IP_HEADER
         value: cf-connecting-ip
+      # papel `menuclick_app`: SELECT, INSERT e UPDATE, e nada mais
       - key: DATABASE_URL
+        sync: false
+      # o dono do banco (`neondb_owner`), só para as migrations
+      - key: MIGRATION_DATABASE_URL
         sync: false
       - key: DB_POOL_MAX
         value: "5"

@@ -23,6 +23,20 @@ cartão, estourar um limite suspende o serviço em vez de cobrar.
    - trocar `sslmode=require` por **`sslmode=verify-full`**. O `pg` já trata `require` como `verify-full` e avisa disso no log a cada subida; escrever `verify-full` mantém a mesma segurança sem o aviso.
 
    A caixa do Neon é só leitura: copie ("Copy snippet") e ajuste num arquivo ignorado pelo git (`apps/api/.env.neon` casa com o `.env.*` do `.gitignore`). A URL tem a senha do banco: não a cole em chat nem em issue.
+3. **Criar o papel da aplicação** (S14). A URL do passo anterior é a do dono do banco (`neondb_owner`), e ela fica só para as migrations; a API conecta com um papel que não tem `DELETE`, `TRUNCATE` nem DDL, e um `delete from` esquecido no código falha no banco em vez de apagar dado. Rodar **como o dono**, depois das migrations, com a senha sorteada na hora (`openssl rand -hex 32`) e nunca escrita em chat:
+   ```sql
+   create role menuclick_app login password '<senha>' connection limit 10;
+   grant connect on database neondb to menuclick_app;
+   grant usage on schema public to menuclick_app;
+   grant select, insert, update on all tables in schema public to menuclick_app;
+   revoke all on table pgmigrations from menuclick_app;
+   -- tabela criada por migration futura já nasce com as mesmas permissões
+   alter default privileges for role neondb_owner in schema public
+     grant select, insert, update on tables to menuclick_app;
+   alter default privileges for role neondb_owner in schema public
+     grant usage, select on sequences to menuclick_app;
+   ```
+   A URL dele é a do dono com usuário e senha trocados, e vai em `apps/api/.env.neon` como `APP_DATABASE_URL` (o `DATABASE_URL` de lá continua sendo o dono, para seed e consultas de manutenção). Medido na primeira aplicação: com o papel, `select ... for update`, `insert` e `update` passam; `delete`, `truncate`, `create table`, `alter table` e a leitura da `pgmigrations` são recusados; e o `migrate up` falha com `permission denied for schema public`.
 
 ## 2. Resend (e-mail)
 
@@ -36,7 +50,7 @@ cartão, estourar um limite suspende o serviço em vez de cobrar.
 1. **Workspace só do MenuClick** (menu do workspace → "New Workspace", plano **Hobby, $0**; a tela vem com o Pro de $25 marcado). As 750 h gratuitas são por workspace, e serviço gratuito antigo acordado no mesmo workspace as divide.
 2. No GitHub, "Settings → Applications → Render → Configure": dar acesso ao repositório `gguip/menu-click`. Sem isso o Render clona (o repositório é público), mas não recebe o aviso do CI verde e o deploy automático não dispara.
 3. "New → Blueprint" apontando para o repositório: o `render.yaml` da raiz cria o serviço `menuclick-api`.
-4. Preencher `DATABASE_URL` e `SMTP_URL` quando o Render pedir (são os dois segredos, `sync: false`). Para não passar o segredo por chat nem histórico do terminal, ponha cada um na área de transferência a partir do arquivo local e cole direto no campo.
+4. Preencher os três segredos (`sync: false`) quando o Render pedir: `DATABASE_URL` com a URL do **papel da aplicação** (`APP_DATABASE_URL` do `.env.neon`), `MIGRATION_DATABASE_URL` com a do **dono**, e `SMTP_URL`. Trocados, a API sobe com poder de apagar o banco e nada avisa. Para não passar o segredo por chat nem histórico do terminal, ponha cada um na área de transferência a partir do arquivo local e cole direto no campo.
 5. Nos logs do primeiro deploy, conferir que as migrations rodaram antes do servidor subir.
 6. Em "Settings → Custom Domains", adicionar `api.menuclick.gguip.dev` e anotar o alvo `.onrender.com` que o Render mostrar.
 
@@ -136,4 +150,5 @@ O cardápio e os QR das mesas ficam públicos; o painel, só com você.
 - **Nenhum outro serviço gratuito no mesmo workspace do Render**: as 750 h são por workspace, e a API acordada das 6h às 23h já usa ~530.
 - **A API dorme das 23h às 6h.** A primeira chamada da madrugada leva ~1 min; o cardápio continua abrindo na hora, pelo cache do ISR.
 - **`CLIENT_IP_HEADER=cf-connecting-ip` só vale atrás do Cloudflare.** Em outra hospedagem, deixe vazio.
+- ⚠️ **O papel restrito protege contra bug, não contra invasor.** A URL do dono continua no Render, porque as migrations rodam na subida (o gancho de pré-deploy é pago): quem executar código no processo da API lê as duas variáveis. Fechar isso é tirar as migrations do Render (um job do CI com o segredo do dono) — mudança maior, não feita.
 - **Vercel Hobby é para uso não comercial.** Se o MenuClick virar produto, o plano muda.
