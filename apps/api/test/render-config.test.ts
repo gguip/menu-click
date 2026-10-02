@@ -17,8 +17,13 @@ describe("render.yaml", () => {
 
   // revisão final: subir pelo pnpm dependia dos atalhos do corepack existirem
   // na hora de rodar, e punha o pnpm entre o Render e o Node no SIGTERM (F26)
-  it("roda as migrations antes do servidor, direto pelo node", () => {
-    expect(yaml).toMatch(/startCommand: cd apps\/api && node src\/db\/migrate\.ts up && node src\/server\.ts/);
+  // S14: o servidor conecta com o papel sem DELETE/TRUNCATE/DDL, e só as
+  // migrations recebem a URL do dono. Trocar as duas daria ao processo da API
+  // o poder de apagar o banco, sem nada avisar
+  it("roda as migrations antes do servidor, direto pelo node, e só elas com o dono do banco", () => {
+    expect(yaml).toMatch(
+      /startCommand: cd apps\/api && DATABASE_URL="\$\{MIGRATION_DATABASE_URL:-\$DATABASE_URL\}" node src\/db\/migrate\.ts up && node src\/server\.ts/,
+    );
   });
 
   // primeiro deploy: `corepack enable` quebrou com EROFS — ele troca o atalho
@@ -34,7 +39,7 @@ describe("render.yaml", () => {
   });
 
   it("segredos nunca têm valor no arquivo", () => {
-    for (const key of ["DATABASE_URL", "SMTP_URL"]) {
+    for (const key of ["DATABASE_URL", "MIGRATION_DATABASE_URL", "SMTP_URL"]) {
       // da chave até a próxima variável — o recorte não pode pegar o `value:` vizinho
       const start = yaml.indexOf(`key: ${key}`);
       const end = yaml.indexOf("- key:", start);
