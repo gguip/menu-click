@@ -34,6 +34,7 @@ import { openingHoursRoutes } from "./routes/opening-hours.ts";
 import { deliveryNeighborhoodsRoutes } from "./routes/delivery-neighborhoods.ts";
 import { restaurantUserRoutes } from "./routes/restaurant-users.ts";
 import { tableRoutes } from "./routes/tables.ts";
+import { uploadRoutes } from "./routes/uploads.ts";
 import { orderRoutes } from "./routes/orders.ts";
 import { menuRoutes } from "./routes/menu.ts";
 import { trackingRoutes } from "./routes/tracking.ts";
@@ -357,6 +358,7 @@ export async function buildApp() {
   await app.register(deliveryNeighborhoodsRoutes);
   await app.register(restaurantUserRoutes);
   await app.register(tableRoutes);
+  await app.register(uploadRoutes);
   await app.register(orderRoutes);
   await app.register(menuRoutes);
   await app.register(trackingRoutes);
