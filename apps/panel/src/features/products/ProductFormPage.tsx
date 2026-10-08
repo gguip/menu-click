@@ -1,7 +1,7 @@
 import { ActionIcon, Button, NativeSelect, Textarea, TextInput } from "@mantine/core";
 import { IconArrowDown, IconArrowLeft, IconArrowUp } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { listAllCategories } from "../../api/categories.ts";
 import { describeError } from "../../api/client.ts";
@@ -71,6 +71,10 @@ function ProductEditor({
     (location.state as { notice?: string } | null)?.notice ?? null,
   );
   const [photo, setPhoto] = useState<ImageChange>(KEEP);
+  // Trava contra o segundo clique. É um `ref`, e não o `isPending` da mutação:
+  // o estado da mutação só chega à tela no redesenho seguinte, então dois
+  // cliques no mesmo instante enxergariam `isPending: false` — há teste.
+  const saving = useRef(false);
   const update = (patch: Partial<ProductForm>) => setForm((current) => ({ ...current, ...patch }));
 
   const save = useMutation({
@@ -133,6 +137,9 @@ function ProductEditor({
         state: { ...LEAVE_WITHOUT_ASKING, notice: cause.message },
       });
     },
+    onSettled: () => {
+      saving.current = false;
+    },
   });
 
   const [removing, setRemoving] = useState(false);
@@ -151,12 +158,14 @@ function ProductEditor({
   });
 
   const submit = () => {
+    if (saving.current) return;
     const result = validateProductForm(form);
     if (!result.ok) {
       setError(result.error);
       return;
     }
     setError(null);
+    saving.current = true;
     save.mutate(result.value);
   };
 

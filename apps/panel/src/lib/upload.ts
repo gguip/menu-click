@@ -58,6 +58,11 @@ export async function uploadImage(
     throw new UploadError("Não foi possível enviar a imagem. Confira a internet e tente de novo.");
   }
   const payload: unknown = await response.json().catch(() => null);
+  // 400 é o Cloudinary recusando o ARQUIVO (formato, tamanho, imagem
+  // corrompida): "tente de novo" falharia para sempre
+  if (response.status === 400) {
+    throw new UploadError("A imagem foi recusada. Use um arquivo JPG, PNG ou WebP de até 5 MB.");
+  }
   if (
     !response.ok ||
     payload === null ||

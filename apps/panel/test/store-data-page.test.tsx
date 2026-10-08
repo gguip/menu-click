@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { useTodaySummary } from "../src/features/orders/useSummary.ts";
 import { StoreDataPage } from "../src/features/settings/StoreDataPage.tsx";
@@ -269,6 +269,26 @@ describe("StoreDataPage", () => {
     const save = screen.getByRole("button", { name: "Salvar dados" });
     fireEvent.click(save);
     fireEvent.click(save);
+
+    await waitFor(() => expect(api.calls.some((call) => call.method === "PATCH")).toBe(true));
+    expect(api.calls.filter((call) => call.host === "api.cloudinary.com")).toHaveLength(1);
+    expect(api.calls.filter((call) => call.method === "PATCH")).toHaveLength(1);
+  });
+
+  it("dois cliques no mesmo instante fazem um envio só", async () => {
+    signIn();
+    const api = mockApi([
+      { method: "PATCH", path: `/restaurants/${RESTAURANT_ID}`, body: makeRestaurant({ logoUrl: UPLOADED_URL }) },
+      ...uploadHandlers(),
+      ...panelHandlers(),
+    ]);
+    renderInPanel(routes, "/dados-da-loja");
+    await pickLogo();
+    const save = screen.getByRole("button", { name: "Salvar dados" });
+    act(() => {
+      save.click();
+      save.click();
+    });
 
     await waitFor(() => expect(api.calls.some((call) => call.method === "PATCH")).toBe(true));
     expect(api.calls.filter((call) => call.host === "api.cloudinary.com")).toHaveLength(1);

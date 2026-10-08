@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ProductFormPage } from "../src/features/products/ProductFormPage.tsx";
 import { type MockHandler, mockApi } from "./api-mock.ts";
@@ -339,5 +339,25 @@ describe("ProductFormPage", () => {
 
     expect(await screen.findByText("O envio da imagem falhou. Tente de novo.")).toBeTruthy();
     expect(api.calls.some((call) => call.method === "PATCH")).toBe(false);
+  });
+
+  // dois cliques no MESMO instante, antes de a tela redesenhar: o botão em
+  // carregamento ainda não existe, só a trava do próprio salvar segura
+  it("dois cliques no mesmo instante num produto novo criam um produto só", async () => {
+    const api = setup(
+      [{ method: "POST", path: `${BASE}/products`, status: 201, body: makeProduct({ id: "prod-9" }) }],
+      "/produtos/novo",
+    );
+    await screen.findByLabelText("Nome");
+    type("Nome", "Pizza Grande");
+    type("Preço (R$)", "45,90");
+    const save = screen.getByRole("button", { name: "Salvar produto" });
+    act(() => {
+      save.click();
+      save.click();
+    });
+
+    await screen.findByTestId("location");
+    expect(api.calls.filter((call) => call.method === "POST")).toHaveLength(1);
   });
 });

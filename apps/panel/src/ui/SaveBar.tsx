@@ -44,7 +44,12 @@ export function SaveBar({
   return (
     <div className={classes.saveBar}>
       {dirty && <span className={classes.dirty}>Alterações não salvas</span>}
-      {"to" in cancel ? (
+      {busy ? (
+        // salvando: cancelar desfaria a tela, e o salvar chegaria do mesmo jeito
+        <Button variant="default" disabled>
+          Cancelar
+        </Button>
+      ) : "to" in cancel ? (
         <Button component={Link} to={cancel.to} state={LEAVE_WITHOUT_ASKING} variant="default">
           Cancelar
         </Button>

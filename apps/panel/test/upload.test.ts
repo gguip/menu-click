@@ -140,3 +140,15 @@ describe("describeSaveError", () => {
     expect(describeSaveError(new ApiError(400, "Nome inválido", null))).toBe("Nome inválido");
   });
 });
+
+describe("recusa do Cloudinary", () => {
+  // arquivo que diz ser JPG e não é: "tente de novo" falharia para sempre
+  it("400 diz que a imagem foi recusada e quais formatos servem", async () => {
+    signIn();
+    mockApi(uploadHandlers({ uploadStatus: 400 }));
+
+    await expect(uploadImage(RESTAURANT_ID, makeFile(), "logo")).rejects.toThrow(
+      "A imagem foi recusada. Use um arquivo JPG, PNG ou WebP de até 5 MB.",
+    );
+  });
+});
