@@ -15,8 +15,6 @@ describe("formulário de dados da loja", () => {
       name: "Trattoria Bella",
       cuisineType: "Italiana",
       timezone: "America/Sao_Paulo",
-      logoUrl: "",
-      coverUrl: "",
       brandColor: "",
       street: "Rua Aspicuelta",
       number: "120",
@@ -27,12 +25,9 @@ describe("formulário de dados da loja", () => {
     });
   });
 
-  it("capa e cor esvaziadas vão como null; preenchidas, como texto", () => {
-    const withBrand = { ...initial, coverUrl: "https://cdn.exemplo/capa.jpg", brandColor: "#0B7A48" };
-    expect(changedPatch({ ...withBrand, coverUrl: "", brandColor: "" }, withBrand)).toEqual({
-      coverUrl: null,
-      brandColor: null,
-    });
+  it("cor esvaziada vai como null; preenchida, em maiúsculas", () => {
+    const withBrand = { ...initial, brandColor: "#0B7A48" };
+    expect(changedPatch({ ...withBrand, brandColor: "" }, withBrand)).toEqual({ brandColor: null });
     expect(changedPatch({ ...initial, brandColor: "#0b7a48" }, initial)).toEqual({ brandColor: "#0B7A48" });
   });
 
@@ -50,11 +45,6 @@ describe("formulário de dados da loja", () => {
     expect(changedPatch({ ...initial, name: "Trattoria Bela" }, initial)).toEqual({
       name: "Trattoria Bela",
     });
-  });
-
-  it("logo esvaziado vai como null: é assim que a API tira o logo", () => {
-    const withLogo = { ...initial, logoUrl: "https://cdn.exemplo/logo.png" };
-    expect(changedPatch({ ...withLogo, logoUrl: " " }, withLogo)).toEqual({ logoUrl: null });
   });
 
   it("uma mudança no endereço manda o endereço inteiro", () => {
@@ -85,9 +75,5 @@ describe("formulário de dados da loja", () => {
     expect(validateStoreForm(initial)).toBeNull();
     expect(validateStoreForm({ ...initial, name: "  " })).toBe("Informe o nome da loja.");
     expect(validateStoreForm({ ...initial, city: "" })).toBe("Preencha o endereço completo da loja.");
-    expect(validateStoreForm({ ...initial, logoUrl: "logo.png" })).toBe(
-      "Cole um endereço completo de imagem, começando com https://.",
-    );
-    expect(validateStoreForm({ ...initial, logoUrl: "https://cdn.exemplo/logo.png" })).toBeNull();
   });
 });

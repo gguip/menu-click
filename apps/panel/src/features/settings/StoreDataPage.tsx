@@ -1,8 +1,12 @@
 import { NativeSelect, TextInput } from "@mantine/core";
-import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import { describeError } from "../../api/client.ts";
+import type { RestaurantPatch } from "../../api/restaurant.ts";
 import type { Restaurant } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
+import { describeSaveError, type ImageChange, KEEP, uploadImage } from "../../lib/upload.ts";
+import { ImageField } from "../../ui/ImageField.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { useRestaurant, useUpdateRestaurant } from "../restaurant/useRestaurant.ts";
 import { DangerZone } from "./DangerZone.tsx";
@@ -16,6 +20,35 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
   const [form, setForm] = useState<StoreForm>(initial);
   const [problem, setProblem] = useState<string | null>(null);
   const update = useUpdateRestaurant(restaurant.id);
+  const [logo, setLogo] = useState<ImageChange>(KEEP);
+  const [cover, setCover] = useState<ImageChange>(KEEP);
+  // Trava contra o segundo clique. É um `ref`, e não o `isPending` da mutação:
+  // o TanStack Query avisa a mudança de estado depois do clique, então dois
+  // cliques seguidos enxergariam `isPending: false` — e fariam dois envios.
+  const saving = useRef(false);
+
+  // O salvar tem dois tempos: as imagens sobem ANTES do PATCH, e é a URL que
+  // o Cloudinary devolve que vai nele. Envio que falha interrompe aqui, sem
+  // gravar nada. Se o envio der certo e o PATCH falhar, o arquivo novo já
+  // está lá, mas o cardápio segue na versão antiga — o banco guarda a URL com
+  // versão — e salvar de novo conserta.
+  const save = useMutation({
+    mutationFn: async (textPatch: RestaurantPatch) => {
+      const patch: RestaurantPatch = { ...textPatch };
+      if (logo.kind === "replace") patch.logoUrl = await uploadImage(restaurant.id, logo.file, "logo");
+      if (logo.kind === "remove") patch.logoUrl = null;
+      if (cover.kind === "replace") patch.coverUrl = await uploadImage(restaurant.id, cover.file, "cover");
+      if (cover.kind === "remove") patch.coverUrl = null;
+      return update.mutateAsync(patch);
+    },
+    onSuccess: () => {
+      setLogo(KEEP);
+      setCover(KEEP);
+    },
+    onSettled: () => {
+      saving.current = false;
+    },
+  });
 
   const field = (name: keyof StoreForm) => ({
     value: form[name],
@@ -24,7 +57,7 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
   });
 
   const patch = changedPatch(form, initial);
-  const dirty = Object.keys(patch).length > 0;
+  const dirty = Object.keys(patch).length > 0 || logo.kind !== "keep" || cover.kind !== "keep";
 
   // A API aceita apelidos de fuso (`Brazil/East`) que a lista fechada não
   // cobre. Sem essa opção extra, o `<select>` mostraria "Brasília" enquanto o
@@ -36,8 +69,9 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
   const submit = () => {
     const found = validateStoreForm(form);
     setProblem(found);
-    if (found !== null || !dirty) return;
-    update.mutate(patch);
+    if (found !== null || !dirty || saving.current) return;
+    saving.current = true;
+    save.mutate(patch);
   };
 
   return (
@@ -56,17 +90,20 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
                 {...field("timezone")}
               />
             </div>
-            <TextInput
-              label="URL do logo"
-              placeholder="https://"
-              description="Ainda não há upload de imagem: cole o endereço de uma imagem já publicada."
-              {...field("logoUrl")}
+            <ImageField
+              label="Logo"
+              description="JPG, PNG ou WebP, até 5 MB. Aparece ao lado do nome da loja no cardápio."
+              saved={restaurant.logoUrl}
+              change={logo}
+              onChange={setLogo}
             />
-            <TextInput
-              label="Capa do cardápio (URL)"
-              placeholder="https://"
-              description="A imagem do topo do cardápio que o cliente abre pelo QR code."
-              {...field("coverUrl")}
+            <ImageField
+              label="Capa do cardápio"
+              description="A imagem do topo do cardápio que o cliente abre pelo QR code. Fica melhor na horizontal."
+              saved={restaurant.coverUrl}
+              change={cover}
+              onChange={setCover}
+              shape="wide"
             />
             <TextInput
               label="Cor da marca"
@@ -111,9 +148,9 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
             {problem}
           </p>
         )}
-        {update.isError && (
+        {save.isError && (
           <p role="alert" className={classes.error}>
-            {describeError(update.error)}
+            {describeSaveError(save.error)}
           </p>
         )}
 
@@ -121,13 +158,16 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
       </div>
       <SaveBar
         dirty={dirty}
-        busy={update.isPending}
+        busy={save.isPending}
         saveLabel="Salvar dados"
         onSave={submit}
         cancel={{
           onClick: () => {
             setForm(initial);
             setProblem(null);
+            setLogo(KEEP);
+            setCover(KEEP);
+            save.reset();
           },
         }}
       />
