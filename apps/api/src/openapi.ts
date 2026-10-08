@@ -36,6 +36,12 @@ export const OPENAPI_TAGS = [
   },
   { name: "Produtos", description: "O cardápio, do lado de quem o edita." },
   {
+    name: "Imagens",
+    description:
+      "Logo, capa e foto de produto. A API não recebe o arquivo: ela assina " +
+      "o envio, e o navegador manda direto para o Cloudinary.",
+  },
+  {
     name: "Mesas",
     description:
       "O salão, e o QR code colado em cada mesa. A resposta já traz a " +
