@@ -42,6 +42,7 @@ import { installAuth } from "./routes/authenticate.ts";
 import { openapiOptions } from "./openapi.ts";
 import { assertEmailDriverIsSafe, configureEmail } from "./email.ts";
 import { assertMenuBaseUrl } from "./menu-url.ts";
+import { assertCloudinaryUrl } from "./cloudinary.ts";
 
 /**
  * Monta a instância do Fastify sem escutar (F1): registra plugins, rotas e o
@@ -71,6 +72,13 @@ export async function buildApp() {
   assertMenuBaseUrl();
 
   /**
+   * Mais uma pré-condição de subida: a conta do Cloudinary. Sem ela nenhuma
+   * loja consegue pôr logo, capa ou foto — ver `assertCloudinaryUrl` em
+   * `cloudinary.ts`.
+   */
+  assertCloudinaryUrl();
+
+  /**
    * Terceira pré-condição: o header do IP do cliente, se configurado, tem que
    * ser um nome válido — ver `parseClientIpHeader` em `limits.ts`.
    */
@@ -91,8 +99,8 @@ export async function buildApp() {
       // em texto puro, e quem mexer no logger não vai lembrar disso. Custo
       // zero agora, e a alternativa é depender de memória.
       //
-      // `DATABASE_URL` e `SMTP_URL` entram pelo mesmo motivo: as duas são
-      // connection string com senha dentro (S13), e nenhuma das duas é lida
+      // `DATABASE_URL`, `SMTP_URL` e `CLOUDINARY_URL` entram pelo mesmo motivo:
+      // as três têm segredo dentro (S13), e nenhuma delas é lida
       // hoje por nada que logue o valor — a rede é para o dia em que alguém
       // logar a config do pool ou do transporte de e-mail para depurar uma
       // conexão que não sobe.
@@ -102,6 +110,7 @@ export async function buildApp() {
           "req.headers.cookie",
           "DATABASE_URL",
           "SMTP_URL",
+          "CLOUDINARY_URL",
         ],
         remove: true,
       },

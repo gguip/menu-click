@@ -39,7 +39,7 @@ describe("render.yaml", () => {
   });
 
   it("segredos nunca têm valor no arquivo", () => {
-    for (const key of ["DATABASE_URL", "MIGRATION_DATABASE_URL", "SMTP_URL"]) {
+    for (const key of ["DATABASE_URL", "MIGRATION_DATABASE_URL", "SMTP_URL", "CLOUDINARY_URL"]) {
       // da chave até a próxima variável — o recorte não pode pegar o `value:` vizinho
       const start = yaml.indexOf(`key: ${key}`);
       const end = yaml.indexOf("- key:", start);
