@@ -186,6 +186,19 @@ export const validProductBody = {
 };
 
 /**
+ * Uma URL de imagem que a API aceita gravar: a do Cloudinary de mentira da
+ * suíte (`CLOUDINARY_URL` em `vitest.config.ts`), na pasta daquele
+ * restaurante. `target` é `logo`, `cover` ou `products/<productId>`.
+ */
+export function cloudinaryUrl(
+  restaurantId: string,
+  target: string,
+  ext = "jpg",
+): string {
+  return `https://res.cloudinary.com/nuvem/image/upload/v1728400000/menuclick/${restaurantId}/${target}.${ext}`;
+}
+
+/**
  * Cria uma categoria via API. Como `createProduct`, recebe o restaurante
  * inteiro porque é rota de gestão e precisa do `headers`.
  */

@@ -415,7 +415,7 @@
         "tags": [
           "Restaurantes"
         ],
-        "description": "Edição parcial. O `slug` NÃO é editável por aqui: mudar a URL pública quebraria QR code já impresso, então isso precisa ser operação explícita.",
+        "description": "Edição parcial. O `slug` NÃO é editável por aqui: mudar a URL pública quebraria QR code já impresso, então isso precisa ser operação explícita. `logoUrl` e `coverUrl` aceitam `null` ou a URL devolvida pelo Cloudinary para esta loja (ver `signUpload`) — qualquer outra é 400.",
         "requestBody": {
           "required": true,
           "content": {
@@ -781,7 +781,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404.",
+        "description": "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404. A foto não entra aqui: é enviada depois, por `PATCH` (ver `signUpload`).",
         "requestBody": {
           "required": true,
           "content": {
@@ -807,10 +807,6 @@
                   },
                   "description": {
                     "type": "string"
-                  },
-                  "photoUrl": {
-                    "type": "string",
-                    "format": "uri"
                   },
                   "stock": {
                     "type": "integer",
@@ -1168,7 +1164,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio.",
+        "description": "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio. `photoUrl` aceita `null` (tira a foto) ou a URL devolvida pelo Cloudinary para **este** produto — qualquer outra é 400.",
         "requestBody": {
           "required": true,
           "content": {
@@ -8570,10 +8566,6 @@
                       "cuisineType": {
                         "type": "string",
                         "minLength": 1
-                      },
-                      "logoUrl": {
-                        "type": "string",
-                        "format": "uri"
                       },
                       "address": {
                         "type": "object",

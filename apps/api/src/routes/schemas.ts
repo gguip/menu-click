@@ -126,7 +126,8 @@ export const createRestaurantBodySchema = {
       maxLength: SLUG_MAX_LENGTH,
     },
     cuisineType: { type: "string", minLength: 1 },
-    logoUrl: { type: "string", format: "uri" },
+    // sem `logoUrl`: o logo é enviado pelo painel depois, por PATCH — o
+    // endereço da imagem tem o id do restaurante, que aqui ainda não existe
     address: addressSchema,
     isDelivery: { type: "boolean" },
     // simétrico ao isDelivery: sem ele, todo restaurante aceitaria retirada
@@ -150,10 +151,9 @@ export const updateRestaurantBodySchema = {
   properties: {
     name: { type: "string", minLength: 1 },
     cuisineType: { type: "string", minLength: 1 },
-    // `null` tira o logo (F12: `nullable`, não `anyOf`); string vazia continua
-    // 400 pelo `format`, então "tirar" tem um jeito só de ser dito
+    // imagens: só `null` (tira) ou a URL do Cloudinary DESTA loja — o serviço
+    // confere (`assertOwnImageUrl`). O `format` é só a primeira barreira; F12
     logoUrl: { type: "string", format: "uri", nullable: true },
-    // capa do topo do cardápio do cliente; `null` tira (F12)
     coverUrl: { type: "string", format: "uri", nullable: true },
     // cor da ação no app do cliente (#RRGGBB); o serviço recusa sem contraste
     brandColor: { type: "string", pattern: HEX_COLOR_PATTERN, nullable: true },

@@ -77,10 +77,4 @@ describe("POST /auth/register — corpo do restaurante", () => {
 
     expect(response.statusCode).toBe(400);
   });
-
-  it("400 com logoUrl malformada", async () => {
-    const response = await registerResponse(app, { logoUrl: "not-a-url" });
-
-    expect(response.statusCode).toBe(400);
-  });
 });

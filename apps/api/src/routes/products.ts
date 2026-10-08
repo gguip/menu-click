@@ -33,7 +33,7 @@ const createProductBodySchema = {
     categoryId: { type: "string" },
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
-    photoUrl: { type: "string", format: "uri" },
+    // sem `photoUrl`: a foto entra por PATCH, depois de o produto ter id
     stock: { type: "integer", minimum: 0 },
   },
 };
@@ -49,7 +49,8 @@ const updateProductBodySchema = {
     categoryId: { type: "string", nullable: true },
     priceInCents: { type: "integer", minimum: 0 },
     description: { type: "string" },
-    // `null` tira a foto; string vazia continua 400 pelo `format`
+    // `null` tira a foto; fora isso, só a URL do Cloudinary DESTE produto — o
+    // serviço confere. String vazia continua 400 pelo `format`
     photoUrl: { type: "string", format: "uri", nullable: true },
     stock: { type: "integer", minimum: 0 },
   },
@@ -123,7 +124,7 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "createProduct",
         summary: "Adiciona um produto ao cardápio",
         description:
-          "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404.",
+          "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404. A foto não entra aqui: é enviada depois, por `PATCH` (ver `signUpload`).",
         params: restaurantIdParamsSchema,
         body: createProductBodySchema,
         response: { 201: productResponseSchema, 404: errorResponseSchema },
@@ -202,7 +203,7 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "updateProduct",
         summary: "Edita o produto",
         description:
-          "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio.",
+          "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio. `photoUrl` aceita `null` (tira a foto) ou a URL devolvida pelo Cloudinary para **este** produto — qualquer outra é 400.",
         params: productParamsSchema,
         body: updateProductBodySchema,
         response: { 200: productResponseSchema, 404: errorResponseSchema },
