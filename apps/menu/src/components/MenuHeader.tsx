@@ -1,3 +1,4 @@
+import { imageUrl } from "@/lib/image.ts";
 import { formatCents } from "@/lib/money.ts";
 import { openChip } from "@/lib/schedule.ts";
 import type { MenuRestaurant } from "@/lib/types.ts";
@@ -24,7 +25,7 @@ export function MenuHeader({
     <header>
       <div className="relative h-[118px] bg-paper-3">
         {restaurant.coverUrl ? (
-          <img src={restaurant.coverUrl} alt="" className="h-full w-full object-cover" />
+          <img src={imageUrl(restaurant.coverUrl, 1200)} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="absolute inset-0 flex items-center justify-center text-[11px] uppercase tracking-[0.14em] text-ink-3">
             capa da loja
@@ -35,7 +36,7 @@ export function MenuHeader({
       <div className="flex items-center gap-3 px-4 pt-3.5">
         <div className="flex size-[52px] flex-none items-center justify-center overflow-hidden rounded-field border border-line bg-paper-2 text-[9px] text-ink-3">
           {restaurant.logoUrl ? (
-            <img src={restaurant.logoUrl} alt="" className="h-full w-full object-cover" />
+            <img src={imageUrl(restaurant.logoUrl, 200)} alt="" className="h-full w-full object-cover" />
           ) : (
             "LOGO"
           )}

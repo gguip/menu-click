@@ -1,3 +1,4 @@
+import { imageUrl } from "@/lib/image.ts";
 import { formatCents } from "@/lib/money.ts";
 import { fromPrice } from "@/lib/selection.ts";
 import type { MenuOptionGroup, MenuProduct, MenuSection } from "@/lib/types.ts";
@@ -46,7 +47,7 @@ function Photo({ product, dim = false }: { product: MenuProduct; dim?: boolean }
   return (
     <div className={`flex h-28 items-center justify-center bg-paper-3 text-[9px] text-ink-3 ${dim ? "opacity-40" : ""}`}>
       {product.photoUrl ? (
-        <img src={product.photoUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+        <img src={imageUrl(product.photoUrl, 400)} alt="" loading="lazy" className="h-full w-full object-cover" />
       ) : (
         "FOTO"
       )}
