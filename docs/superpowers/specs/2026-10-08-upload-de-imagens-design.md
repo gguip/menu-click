@@ -1,6 +1,6 @@
 # Upload de imagens — desenho
 
-**Data:** 2026-10-08 · **Estado:** desenho aprovado em conversa, aguardando revisão da spec
+**Data:** 2026-10-08 · **Estado:** implementado (branch `feat/upload-de-imagens`)
 
 ## O problema
 

@@ -50,7 +50,7 @@ cartão, estourar um limite suspende o serviço em vez de cobrar.
 1. **Workspace só do MenuClick** (menu do workspace → "New Workspace", plano **Hobby, $0**; a tela vem com o Pro de $25 marcado). As 750 h gratuitas são por workspace, e serviço gratuito antigo acordado no mesmo workspace as divide.
 2. No GitHub, "Settings → Applications → Render → Configure": dar acesso ao repositório `gguip/menu-click`. Sem isso o Render clona (o repositório é público), mas não recebe o aviso do CI verde e o deploy automático não dispara.
 3. "New → Blueprint" apontando para o repositório: o `render.yaml` da raiz cria o serviço `menuclick-api`.
-4. Preencher os três segredos (`sync: false`) quando o Render pedir: `DATABASE_URL` com a URL do **papel da aplicação** (`APP_DATABASE_URL` do `.env.neon`), `MIGRATION_DATABASE_URL` com a do **dono**, e `SMTP_URL`. Trocados, a API sobe com poder de apagar o banco e nada avisa. Para não passar o segredo por chat nem histórico do terminal, ponha cada um na área de transferência a partir do arquivo local e cole direto no campo.
+4. Preencher os quatro segredos (`sync: false`) quando o Render pedir: `DATABASE_URL` com a URL do **papel da aplicação** (`APP_DATABASE_URL` do `.env.neon`), `MIGRATION_DATABASE_URL` com a do **dono**, `SMTP_URL`, e `CLOUDINARY_URL` (painel do Cloudinary → "API Keys" → "API environment variable", no formato `cloudinary://<api_key>:<api_secret>@<cloud_name>`). Trocados, a API sobe com poder de apagar o banco e nada avisa. Para não passar o segredo por chat nem histórico do terminal, ponha cada um na área de transferência a partir do arquivo local e cole direto no campo.
 5. Nos logs do primeiro deploy, conferir que as migrations rodaram antes do servidor subir.
 6. Em "Settings → Custom Domains", adicionar `api.menuclick.gguip.dev` e anotar o alvo `.onrender.com` que o Render mostrar.
 
@@ -59,6 +59,8 @@ cartão, estourar um limite suspende o serviço em vez de cobrar.
 O build usa `corepack pnpm install`, e não `corepack enable`: o `enable` troca o atalho `/usr/bin/pnpm`, e no Render `/usr` é só leitura (`EROFS: read-only file system, unlink '/usr/bin/pnpm'`).
 
 O deploy automático só publica **depois do CI verde** (`autoDeployTrigger: checksPass`).
+
+**Variável nova num serviço que já existe (`CLOUDINARY_URL`):** o Blueprint só pergunta os segredos na criação. Cadastre a variável em "Environment" **antes** de publicar o código que a exige — sem ela a API não sobe —, e depois faça o "Manual sync" do Blueprint.
 
 ## 4. Vercel — app do cliente
 

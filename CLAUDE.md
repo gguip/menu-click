@@ -37,7 +37,7 @@ pnpm --filter @menuclick/menu build           # type-check + next build
 pnpm --filter @menuclick/pricing test         # a conta do preço (sem banco)
 ```
 
-A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). 🚨 **`MENU_BASE_URL` é obrigatória e não tem default — sem ela a API não sobe** (é a raiz da URL do cardápio, de onde sai o endereço dentro do QR code das mesas; ver a seção de mesas). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
+A API respeita `PORT` (default 3333) e `HOST` (default 0.0.0.0), e conecta no Postgres via `DATABASE_URL` **ou** `DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` (+ `DB_POOL_MAX`). 🚨 **`MENU_BASE_URL` é obrigatória e não tem default — sem ela a API não sobe** (é a raiz da URL do cardápio, de onde sai o endereço dentro do QR code das mesas; ver a seção de mesas). 🚨 **`CLOUDINARY_URL` também é obrigatória** (a conta que guarda logo, capa e foto; ver a seção de imagens). Os scripts do pacote carregam `apps/api/.env` com `node --env-file-if-exists=.env` — **não use dotenv**. Copie `apps/api/.env.example` para começar.
 
 Testes rodam no **Vitest** e o lint no **ESLint** (config mínima na raiz, `eslint.config.js`). O CI (`.github/workflows/ci.yml`) roda os três — lint, type-check e testes — contra um Postgres de serviço.
 
@@ -608,6 +608,45 @@ aceite, e não há o que congelar. `minimumOrderInCents` sai no cardápio públi
 para a tela avisar antes do carrinho: informar continua sendo do cardápio,
 decidir continua sendo da criação.
 
+### Imagens (Cloudinary)
+
+Logo, capa e foto de produto eram três campos de URL colada à mão. Agora o
+painel envia o arquivo **direto do navegador para o Cloudinary**, e a API só
+**assina** (`POST /restaurants/:restaurantId/uploads/signature`, em
+`src/cloudinary.ts`, com `node:crypto` — sem SDK). O arquivo nunca passa pela
+API: o `bodyLimit` é 128 KB e o Render gratuito não aguentaria.
+
+- **O endereço é fixo por dono** (`menuclick/<restaurantId>/logo`, `…/cover`,
+  `…/products/<productId>`), e é a API que o escolhe, nunca o cliente. Trocar a
+  imagem **sobrescreve** o mesmo arquivo: não sobra órfã na conta e a API nunca
+  chama o Cloudinary. A assinatura também trava os formatos (`jpg,png,webp`) e
+  uma transformação de entrada (`c_limit,w_2000,h_2000`).
+- 🔒 **A API só grava URL do nosso Cloudinary, na pasta daquela loja**
+  (`assertOwnImageUrl`, nos serviços de restaurante e de produto): forma exata,
+  com versão, sem transformação no caminho, e com o `restaurantId`/`productId`
+  **da rota**. O endereço vai direto para o `<img>` de todo cliente — URL
+  arbitrária ali é rastreador. ⚠️ A forma é comparada por igualdade, não por
+  prefixo: afrouxar para "começa com" deixa passar `…/logo.jpg?x=…`.
+- ⚠️ **A versão na URL (`/v<n>/`) não é enfeite**: como o arquivo é sobrescrito,
+  é ela que faz a foto trocada aparecer. O que o banco guarda é o original
+  versionado; a transformação de exibição (`f_auto,q_auto,c_limit,w_<n>`) é
+  posta pelo app (`lib/image.ts`), com poucas larguras fixas — cada combinação
+  nova é uma transformação cobrada da cota.
+- **A imagem só entra por `PATCH`.** `POST …/products` e o cadastro descartam
+  `photoUrl`/`logoUrl`: o endereço tem o id, que ainda não existe.
+- **URL externa antiga continua sendo lida**; só gravação nova é conferida.
+  Reenviar a URL antiga num `PATCH` é 400 — o painel só manda o campo de imagem
+  quando ela mudou.
+- **Foto removida não é apagada do Cloudinary**, e produto removido também não:
+  é coerente com o soft delete (restaurar devolve a foto), e o limite é um
+  arquivo por dono.
+- ⚠️ **A cota é da conta inteira** (plano gratuito, 25 créditos/mês entre
+  espaço, banda e transformações), e dev e produção dividem a mesma conta e a
+  mesma pasta. Estourar restringe a conta até virar o mês.
+- 🚨 **`CLOUDINARY_URL` derruba o boot se faltar ou vier malformada**, e está no
+  `logger.redact`: o segredo está dentro dela. A mensagem de erro nunca repete
+  o valor.
+
 ### Documentação: OpenAPI derivado das rotas
 
 O `openapi.json` é **gerado**, nunca editado à mão: sai dos mesmos `schema` que validam a requisição e serializam a resposta. Consequência prática — campo esquecido no `schema.response` some da documentação **e** da resposta ao mesmo tempo, então documentação errada é sintoma de contrato errado.
@@ -712,6 +751,8 @@ SPA em Vite + React 19 + Mantine 9 + React Router 8 + TanStack Query 5 — **o p
 - **Remover produto mora na edição**, não na listagem (cada linha já é um link inteiro). A API tira o produto dos grupos de opções na mesma transação; o painel só invalida `["products", restaurantId]`, que também refaz o "usado em N produtos".
 - **Cancelar pede o motivo** ("Motivo (o cliente vê)", opcional): o `ConfirmDialog` ganhou um slot `children`. Vazio não manda corpo. O `Textarea` é de altura fixa (`rows`), não `autosize` — o autosize do Mantine usa `document.fonts`, que o jsdom não tem.
 - **"Tempos estimados" em Modalidades** (`TimesCard`, regra em `features/settings/times.ts`): barra de salvar própria; a faixa de entrega vai sempre em par, porque a API exige os dois juntos; vazio vai como `null`. O card é montado com `key` nos próprios tempos, para recomeçar do salvo.
+- **Imagem é upload, e o arquivo sobe no SALVAR, não ao escolher** (`ImageField` em `src/ui/`, envio em `lib/upload.ts`). Como a troca sobrescreve o mesmo endereço, subir ao escolher mudaria o cardápio antes de a pessoa confirmar, e "Cancelar" não desfaria. A ordem é assinatura → envio → `PATCH` com a `secure_url`; envio que falha interrompe antes do `PATCH`. ⚠️ O envio ao Cloudinary é `fetch` cru, **sem** `apiRequest`: o Bearer não pode sair para outro domínio.
+- **Produto novo sobe a foto depois de criado** (o endereço tem o id): `POST` → envio → `PATCH`. Se a foto falhar, o produto fica criado e a tela vira a de edição, com o aviso — o mesmo caminho dos grupos de opções que falham (`SavedWithProblem`).
 
 ### App do cliente (`apps/menu`)
 
@@ -739,6 +780,7 @@ O que a pessoa abre ao escanear o QR. Next.js 16 (App Router) + Tailwind 4 + Rea
 - **O acompanhamento** (`/:slug/pedido/:orderId?t=`) é página **dinâmica e `noindex`**: o token é credencial (S27). O servidor busca só a loja; o pedido é lido no navegador, com o token da querystring. O transporte (`lib/tracker.ts`) abre o WebSocket e, a cada mensagem, relê o `GET` (uma fonte só); socket que cai → consulta a cada 20 s e socket de novo a cada 60 s; pedido terminado ou 404 → **para tudo**. Em dev, o aviso "WebSocket is closed before the connection is established" é o modo estrito do React montando o efeito duas vezes.
 - **Pedido em andamento no aparelho** (`lib/active-order.ts`, `order:<slug>`, um por loja, 24 h): a faixa "Você tem um pedido em andamento" confere o pedido antes de aparecer, e quem descobre que terminou (a faixa ou a página) o tira do aparelho — **nunca vira histórico**. O endereço da entrega entra no lembrado de `customer.ts`; pedido sem endereço não apaga o que havia.
 - ⚠️ **Opção de produto é checkbox visualmente escondido, em todo grupo** (inclusive o de uma escolha só): o `toggleOption` permite desmarcar, e radio nativo não desmarca. Automação de navegador que clicar no `input` falha — clique no texto da opção, como a pessoa faria.
+- **Toda imagem passa por `imageUrl()`** (`lib/image.ts`): grade 400, tela do produto 800, capa e `og:image` 1200, logo 200. URL de fora do Cloudinary volta intacta. Largura nova é transformação nova na cota — reuse uma das quatro.
 
 ### Deploy (plano gratuito)
 
@@ -751,6 +793,7 @@ Roteiro em `docs/deploy.md`; desenho em `docs/superpowers/specs/2026-09-30-deplo
 | API | Render gratuito, uma instância, Virginia (`render.yaml`) | `api.menuclick.gguip.dev` |
 | Postgres | Neon gratuito, AWS us-east-1 | — |
 | E-mail | Resend do TirzeFlow, chave "menuclick" | `menuclick@gguip.dev` |
+| Imagens | Cloudinary gratuito, conta `bird-corp`, pasta `menuclick/` | — |
 
 - **O painel chama a API direto** (CORS com as duas origens), sem reescrita da Vercel: por ela, o `CF-Connecting-IP` que chegaria seria o da Vercel, e todos os lojistas dividiriam um teto só.
 - **Migrations na subida** (`startCommand`: `migrate:up` e depois o servidor) — o gancho de pré-deploy do Render é pago, e com uma instância não há corrida. O Render só publica **depois do CI verde**.
