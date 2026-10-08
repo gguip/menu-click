@@ -1,6 +1,6 @@
 import { NativeSelect, TextInput } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { describeError } from "../../api/client.ts";
 import type { RestaurantPatch } from "../../api/restaurant.ts";
 import type { Restaurant } from "../../api/types.ts";
@@ -22,10 +22,6 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
   const update = useUpdateRestaurant(restaurant.id);
   const [logo, setLogo] = useState<ImageChange>(KEEP);
   const [cover, setCover] = useState<ImageChange>(KEEP);
-  // Trava contra o segundo clique. É um `ref`, e não o `isPending` da mutação:
-  // o TanStack Query avisa a mudança de estado depois do clique, então dois
-  // cliques seguidos enxergariam `isPending: false` — e fariam dois envios.
-  const saving = useRef(false);
 
   // O salvar tem dois tempos: as imagens sobem ANTES do PATCH, e é a URL que
   // o Cloudinary devolve que vai nele. Envio que falha interrompe aqui, sem
@@ -44,9 +40,6 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
     onSuccess: () => {
       setLogo(KEEP);
       setCover(KEEP);
-    },
-    onSettled: () => {
-      saving.current = false;
     },
   });
 
@@ -69,8 +62,7 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
   const submit = () => {
     const found = validateStoreForm(form);
     setProblem(found);
-    if (found !== null || !dirty || saving.current) return;
-    saving.current = true;
+    if (found !== null || !dirty) return;
     save.mutate(patch);
   };
 

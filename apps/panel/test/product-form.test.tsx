@@ -1,8 +1,18 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ProductFormPage } from "../src/features/products/ProductFormPage.tsx";
 import { type MockHandler, mockApi } from "./api-mock.ts";
-import { makeCategory, makeOptionGroup, makeProduct, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
+import {
+  makeCategory,
+  makeOptionGroup,
+  makeProduct,
+  makeUploadSignature,
+  panelHandlers,
+  RESTAURANT_ID,
+  signIn,
+  UPLOADED_URL,
+  uploadHandlers,
+} from "./fixtures.ts";
 import { LocationProbe, renderInPanel } from "./render.tsx";
 
 const BASE = `/restaurants/${RESTAURANT_ID}`;
@@ -173,5 +183,161 @@ describe("ProductFormPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
     expect(screen.getByText("Informe o preço no formato 12,50.")).toBeTruthy();
     expect(api.calls.some((call) => call.method === "POST")).toBe(false);
+  });
+
+  const pickPhoto = async () =>
+    fireEvent.change(await screen.findByLabelText("Foto"), {
+      target: { files: [new File(["x"], "pizza.jpg", { type: "image/jpeg" })] },
+    });
+  const SAVED_PHOTO = `https://res.cloudinary.com/nuvem/image/upload/v1/menuclick/${RESTAURANT_ID}/products/prod-1.jpg`;
+
+  it("não tem mais campo de URL da foto", async () => {
+    setup([], "/produtos/novo");
+    await screen.findByLabelText("Nome");
+    expect(screen.queryByLabelText("URL da foto")).toBeNull();
+    expect(screen.getByLabelText("Foto")).toBeTruthy();
+  });
+
+  it("produto novo com foto: cria, assina com o id novo, envia e grava a foto", async () => {
+    const api = setup(
+      [
+        { method: "POST", path: `${BASE}/products`, status: 201, body: makeProduct({ id: "prod-9" }) },
+        { method: "PATCH", path: `${BASE}/products/prod-9`, body: makeProduct({ id: "prod-9" }) },
+        ...uploadHandlers(),
+      ],
+      "/produtos/novo",
+    );
+    await screen.findByLabelText("Nome");
+    type("Nome", "Pizza Grande");
+    type("Preço (R$)", "45,90");
+    await pickPhoto();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    expect((await screen.findByTestId("location")).textContent).toBe("/produtos");
+    const writes = api.calls.filter((call) => call.method !== "GET");
+    expect(writes.map((call) => `${call.method} ${call.host}${call.path}`)).toEqual([
+      `POST localhost${BASE}/products`,
+      `POST localhost${BASE}/uploads/signature`,
+      "POST api.cloudinary.com/v1_1/nuvem/image/upload",
+      `PATCH localhost${BASE}/products/prod-9`,
+    ]);
+    // a criação não leva foto: o endereço da imagem depende do id
+    expect(writes[0].body).toEqual({ name: "Pizza Grande", priceInCents: 4590, stock: 0 });
+    expect(writes[1].body).toEqual({ target: "product", productId: "prod-9" });
+    expect(writes[3].body).toEqual({ photoUrl: UPLOADED_URL });
+  });
+
+  it("produto novo cuja foto não sobe: fica criado e a tela vira a de edição, com o aviso", async () => {
+    const api = setup(
+      [
+        { method: "POST", path: `${BASE}/products`, status: 201, body: makeProduct({ id: "prod-9" }) },
+        { method: "GET", path: `${BASE}/products/prod-9`, body: makeProduct({ id: "prod-9" }) },
+        ...uploadHandlers({ uploadStatus: 401 }),
+      ],
+      "/produtos/novo",
+    );
+    await screen.findByLabelText("Nome");
+    type("Nome", "Pizza Grande");
+    type("Preço (R$)", "45,90");
+    await pickPhoto();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    expect(await screen.findByText("Produto criado, mas a foto não subiu. Tente de novo.")).toBeTruthy();
+    // é a edição do produto criado: salvar de novo não cria um segundo
+    await waitFor(() =>
+      expect(api.calls.some((call) => call.method === "GET" && call.path === `${BASE}/products/prod-9`)).toBe(true),
+    );
+    expect(api.calls.filter((call) => call.method === "POST" && call.path === `${BASE}/products`)).toHaveLength(1);
+  });
+
+  it("editar e trocar a foto: envia antes, e a foto vai no mesmo PATCH", async () => {
+    const api = setup(
+      [
+        { method: "GET", path: `${BASE}/products/prod-1`, body: makeProduct({ id: "prod-1", photoUrl: SAVED_PHOTO }) },
+        { method: "PATCH", path: `${BASE}/products/prod-1`, body: makeProduct({ id: "prod-1" }) },
+        {
+          method: "POST",
+          path: `${BASE}/uploads/signature`,
+          body: makeUploadSignature({ publicId: `menuclick/${RESTAURANT_ID}/products/prod-1` }),
+        },
+        ...uploadHandlers(),
+      ],
+      "/produtos/prod-1",
+    );
+    await pickPhoto();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    await screen.findByTestId("location");
+    const patches = api.calls.filter((call) => call.method === "PATCH");
+    expect(patches).toHaveLength(1);
+    expect(patches[0].body).toMatchObject({ name: "Pizza Grande", photoUrl: UPLOADED_URL });
+    expect(api.calls.find((call) => call.path === `${BASE}/uploads/signature`)?.body).toEqual({
+      target: "product",
+      productId: "prod-1",
+    });
+  });
+
+  it("editar sem mexer na foto não manda photoUrl", async () => {
+    const api = setup(
+      [
+        { method: "GET", path: `${BASE}/products/prod-1`, body: makeProduct({ id: "prod-1", photoUrl: SAVED_PHOTO }) },
+        { method: "PATCH", path: `${BASE}/products/prod-1`, body: makeProduct({ id: "prod-1" }) },
+      ],
+      "/produtos/prod-1",
+    );
+    await screen.findByLabelText("Nome");
+    type("Nome", "Pizza Gigante");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    await screen.findByTestId("location");
+    const body = api.calls.find((call) => call.method === "PATCH")?.body as Record<string, unknown>;
+    expect("photoUrl" in body).toBe(false);
+  });
+
+  it("Remover a foto manda photoUrl null", async () => {
+    const api = setup(
+      [
+        { method: "GET", path: `${BASE}/products/prod-1`, body: makeProduct({ id: "prod-1", photoUrl: SAVED_PHOTO }) },
+        { method: "PATCH", path: `${BASE}/products/prod-1`, body: makeProduct({ id: "prod-1" }) },
+      ],
+      "/produtos/prod-1",
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Remover Foto" }));
+    expect(screen.getByText("Alterações não salvas")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    await screen.findByTestId("location");
+    expect(api.calls.find((call) => call.method === "PATCH")?.body).toMatchObject({ photoUrl: null });
+  });
+
+  it("dois cliques em Salvar num produto novo criam um produto só", async () => {
+    const api = setup(
+      [{ method: "POST", path: `${BASE}/products`, status: 201, body: makeProduct({ id: "prod-9" }) }],
+      "/produtos/novo",
+    );
+    await screen.findByLabelText("Nome");
+    type("Nome", "Pizza Grande");
+    type("Preço (R$)", "45,90");
+    const save = screen.getByRole("button", { name: "Salvar produto" });
+    fireEvent.click(save);
+    fireEvent.click(save);
+
+    await screen.findByTestId("location");
+    expect(api.calls.filter((call) => call.method === "POST")).toHaveLength(1);
+  });
+
+  it("editar: envio que falha mostra o motivo e não grava nada", async () => {
+    const api = setup(
+      [
+        { method: "GET", path: `${BASE}/products/prod-1`, body: makeProduct({ id: "prod-1" }) },
+        ...uploadHandlers({ uploadStatus: 401 }),
+      ],
+      "/produtos/prod-1",
+    );
+    await pickPhoto();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    expect(await screen.findByText("O envio da imagem falhou. Tente de novo.")).toBeTruthy();
+    expect(api.calls.some((call) => call.method === "PATCH")).toBe(false);
   });
 });

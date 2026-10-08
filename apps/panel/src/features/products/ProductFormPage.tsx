@@ -16,8 +16,10 @@ import {
 import type { Category, OptionGroup, Product } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { moveItem } from "../../lib/moveItem.ts";
+import { describeSaveError, type ImageChange, KEEP, uploadImage } from "../../lib/upload.ts";
 import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
+import { ImageField } from "../../ui/ImageField.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { LEAVE_WITHOUT_ASKING } from "../../ui/unsavedChanges.ts";
 import { optionGroupsQueryKey } from "../optionGroups/useOptionGroups.ts";
@@ -35,13 +37,16 @@ import {
   type ValidProduct,
 } from "./productForm.ts";
 
-/** O produto foi salvo; só o PUT dos grupos falhou. */
-class GroupsNotSaved extends Error {
+/**
+ * O produto foi salvo; uma etapa de DEPOIS falhou (os grupos de opções, ou a
+ * foto de um produto recém-criado). O `notice` é o texto inteiro para a tela.
+ */
+class SavedWithProblem extends Error {
   readonly productId: string;
 
-  constructor(productId: string, message: string) {
-    super(message);
-    this.name = "GroupsNotSaved";
+  constructor(productId: string, notice: string) {
+    super(notice);
+    this.name = "SavedWithProblem";
     this.productId = productId;
   }
 }
@@ -65,22 +70,44 @@ function ProductEditor({
   const [error, setError] = useState<string | null>(
     (location.state as { notice?: string } | null)?.notice ?? null,
   );
+  const [photo, setPhoto] = useState<ImageChange>(KEEP);
   const update = (patch: Partial<ProductForm>) => setForm((current) => ({ ...current, ...patch }));
 
   const save = useMutation({
     mutationFn: async (value: ValidProduct) => {
+      // Produto que já existe: a foto sobe ANTES, e vai no mesmo PATCH — envio
+      // que falha interrompe sem gravar nada.
+      const photoPatch: { photoUrl?: string | null } = {};
+      if (photo.kind === "remove") photoPatch.photoUrl = null;
+      if (product && photo.kind === "replace") {
+        photoPatch.photoUrl = await uploadImage(restaurantId, photo.file, "product", product.id);
+      }
       const saved = product
-        ? await updateProduct(restaurantId, product.id, toUpdateBody(value))
+        ? await updateProduct(restaurantId, product.id, { ...toUpdateBody(value), ...photoPatch })
         : await createProduct(restaurantId, toCreateBody(value));
-      // Duas chamadas: se a segunda falhar, o produto JÁ está salvo — e o
-      // erro precisa dizer isso, senão a pessoa salva de novo e duplica.
+
+      // Daqui para baixo o produto JÁ está salvo — e o erro precisa dizer
+      // isso, senão a pessoa salva de novo e duplica. As duas etapas são
+      // tentadas mesmo que a outra falhe.
+      const problems: string[] = [];
+
+      // Produto novo: o endereço da foto tem o id, que só existe agora.
+      if (!product && photo.kind === "replace") {
+        try {
+          const photoUrl = await uploadImage(restaurantId, photo.file, "product", saved.id);
+          await updateProduct(restaurantId, saved.id, { photoUrl });
+        } catch {
+          problems.push("Produto criado, mas a foto não subiu. Tente de novo.");
+        }
+      }
       if (!sameIds(product?.optionGroupIds ?? [], value.optionGroupIds)) {
         try {
           await setProductOptionGroups(restaurantId, saved.id, value.optionGroupIds);
         } catch (cause) {
-          throw new GroupsNotSaved(saved.id, describeError(cause));
+          problems.push(`O produto foi salvo, mas os grupos de opções não: ${describeError(cause)}`);
         }
       }
+      if (problems.length > 0) throw new SavedWithProblem(saved.id, problems.join(" "));
       return saved;
     },
     onSuccess: () => {
@@ -92,19 +119,18 @@ function ProductEditor({
       navigate("/produtos", { state: LEAVE_WITHOUT_ASKING });
     },
     onError: (cause) => {
-      if (!(cause instanceof GroupsNotSaved)) {
-        setError(describeError(cause));
+      if (!(cause instanceof SavedWithProblem)) {
+        setError(describeSaveError(cause));
         return;
       }
       void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
       void queryClient.invalidateQueries({ queryKey: optionGroupsQueryKey(restaurantId) });
-      const notice = `O produto foi salvo, mas os grupos de opções não: ${cause.message}`;
-      if (product) setError(notice);
+      if (product) setError(cause.message);
       // produto recém-criado: a tela passa a ser a de edição, senão salvar de
       // novo criaria um segundo produto
       else navigate(`/produtos/${cause.productId}`, {
         replace: true,
-        state: { ...LEAVE_WITHOUT_ASKING, notice },
+        state: { ...LEAVE_WITHOUT_ASKING, notice: cause.message },
       });
     },
   });
@@ -177,12 +203,12 @@ function ProductEditor({
                 ]}
               />
             </div>
-            <TextInput
-              label="URL da foto"
-              placeholder="https://"
-              description="Ainda não há upload de imagem: cole o endereço de uma foto já publicada."
-              value={form.photoUrl}
-              onChange={(e) => update({ photoUrl: e.currentTarget.value })}
+            <ImageField
+              label="Foto"
+              description="JPG, PNG ou WebP, até 5 MB."
+              saved={product?.photoUrl}
+              change={photo}
+              onChange={setPhoto}
             />
           </section>
 
@@ -300,7 +326,7 @@ function ProductEditor({
         }}
       />
       <SaveBar
-        dirty={isDirty(form, initial)}
+        dirty={isDirty(form, initial) || photo.kind !== "keep"}
         busy={save.isPending}
         saveLabel="Salvar produto"
         onSave={submit}

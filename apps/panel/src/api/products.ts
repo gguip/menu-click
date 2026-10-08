@@ -13,12 +13,12 @@ export type CreateProductBody = {
   stock: number;
   categoryId?: string;
   description?: string;
-  photoUrl?: string;
 };
 
 /**
- * `categoryId: null` tira da seção e `photoUrl: null` tira a foto (a API usa
- * `nullable` nos dois, F12).
+ * `categoryId: null` tira da seção (F12). `photoUrl` só vai quando a foto
+ * mudou: `null` tira, e a URL é a `secure_url` que o Cloudinary devolveu — a
+ * API recusa qualquer outra, inclusive a URL externa antiga reenviada.
  */
 export type UpdateProductBody = {
   name: string;
@@ -26,7 +26,7 @@ export type UpdateProductBody = {
   stock: number;
   categoryId: string | null;
   description: string;
-  photoUrl: string | null;
+  photoUrl?: string | null;
 };
 
 export function getProduct(restaurantId: string, id: string): Promise<Product> {
@@ -37,7 +37,11 @@ export function createProduct(restaurantId: string, body: CreateProductBody): Pr
   return apiRequest<Product>(`/restaurants/${restaurantId}/products`, { method: "POST", body });
 }
 
-export function updateProduct(restaurantId: string, id: string, body: UpdateProductBody): Promise<Product> {
+export function updateProduct(
+  restaurantId: string,
+  id: string,
+  body: Partial<UpdateProductBody>,
+): Promise<Product> {
   return apiRequest<Product>(`/restaurants/${restaurantId}/products/${id}`, { method: "PATCH", body });
 }
 

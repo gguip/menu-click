@@ -23,7 +23,6 @@ describe("formulário de produto", () => {
         priceInCents: 4590,
         stock: 12,
         categoryId: "cat-1",
-        photoUrl: null,
         optionGroupIds: [],
       },
     });
@@ -38,10 +37,6 @@ describe("formulário de produto", () => {
     expect(validateProductForm({ ...valid, stock: "-1" })).toEqual({
       ok: false,
       error: "O estoque é um número inteiro, zero ou mais.",
-    });
-    expect(validateProductForm({ ...valid, photoUrl: "foto.jpg" })).toEqual({
-      ok: false,
-      error: "Cole um endereço completo de imagem, começando com https://.",
     });
   });
 
@@ -60,14 +55,7 @@ describe("formulário de produto", () => {
       stock: 12,
       categoryId: null,
       description: "Massa fina",
-      photoUrl: null,
     });
-  });
-
-  it("foto esvaziada vai como null: é assim que a API tira a foto", () => {
-    const result = validateProductForm({ ...valid, photoUrl: "  " });
-    if (!result.ok) throw new Error("devia validar");
-    expect(toUpdateBody(result.value).photoUrl).toBeNull();
   });
 
   it("carrega um produto existente para edição", () => {

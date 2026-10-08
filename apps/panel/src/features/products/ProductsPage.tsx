@@ -6,6 +6,7 @@ import { Link, useSearchParams } from "react-router";
 import { listAllCategories } from "../../api/categories.ts";
 import { listProducts } from "../../api/products.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
+import { imageUrl } from "../../lib/image.ts";
 import { formatCents } from "../../lib/money.ts";
 import classes from "./ProductsPage.module.css";
 import { stockText, stockTone } from "./stock.ts";
@@ -142,7 +143,7 @@ export function ProductsPage() {
           <Link key={product.id} to={`/produtos/${product.id}`} className={classes.row}>
             <span className={classes.product}>
               {product.photoUrl ? (
-                <img className={classes.thumb} src={product.photoUrl} alt="" />
+                <img className={classes.thumb} src={imageUrl(product.photoUrl, 200)} alt="" />
               ) : (
                 <span className={classes.thumb} aria-hidden="true" />
               )}
