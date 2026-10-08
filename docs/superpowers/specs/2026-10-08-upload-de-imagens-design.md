@@ -118,7 +118,8 @@ https://res.cloudinary.com/<cloud>/image/upload/v<dígitos>/menuclick/<restauran
 
 onde `<alvo>` é `logo` para `logoUrl`, `cover` para `coverUrl` e
 `products/<productId>` para `photoUrl` — com o `restaurantId` e o `productId`
-**da rota**. A conferência é no serviço (`restaurants` e `products`), com
+**da rota**, em minúsculas (o Postgres aceita UUID em maiúsculas; o nome do
+arquivo, não). A conferência é no serviço (`restaurants` e `products`), com
 `ValidationError` (400). O `format: "uri"` do schema continua como primeira
 barreira.
 
@@ -138,9 +139,8 @@ A forma é fechada de propósito:
 ### Quebra de contrato
 
 **A foto só entra por `PATCH`.** `POST …/products` deixa de aceitar `photoUrl`,
-e o cadastro (`POST /auth/register`) e o `POST /restaurants` deixam de aceitar
-`logoUrl`: nos três o id ainda não existe, então não há endereço válido para
-mandar. Como o validador descarta campo a mais (`removeAdditional`), mandar o
+e o cadastro (`POST /auth/register`) deixa de aceitar `logoUrl`: nos dois o id
+ainda não existe, então não há endereço válido para mandar. Como o validador descarta campo a mais (`removeAdditional`), mandar o
 campo não dá 400 — só não é gravado.
 
 ### Dado que já existe
