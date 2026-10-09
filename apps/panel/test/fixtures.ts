@@ -170,6 +170,7 @@ export function makeProduct(overrides: Partial<Product> = {}): Product {
     priceInCents: 4590,
     description: "Massa fina, 8 fatias. Escolha até 2 sabores.",
     stock: 12,
+    isSuggested: false,
     optionGroupIds: [],
     ...overrides,
   };

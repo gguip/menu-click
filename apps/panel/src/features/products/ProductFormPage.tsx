@@ -1,4 +1,4 @@
-import { ActionIcon, Button, NativeSelect, Textarea, TextInput } from "@mantine/core";
+import { ActionIcon, Button, NativeSelect, Switch, Textarea, TextInput } from "@mantine/core";
 import { IconArrowDown, IconArrowLeft, IconArrowUp } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
@@ -214,6 +214,12 @@ function ProductEditor({
                 ]}
               />
             </div>
+            <Switch
+              label="Sugerir no carrinho"
+              description={'Aparece em "Que tal adicionar?" quando o cliente abre o carrinho.'}
+              checked={form.isSuggested}
+              onChange={(e) => update({ isSuggested: e.currentTarget.checked })}
+            />
             <ImageField
               label="Foto"
               description="JPG, PNG ou WebP, até 5 MB."

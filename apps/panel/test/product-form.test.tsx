@@ -84,6 +84,7 @@ describe("ProductFormPage", () => {
       name: "Pizza Grande",
       priceInCents: 4590,
       stock: 12,
+      isSuggested: false,
       categoryId: "cat-1",
     });
     expect(api.calls.find((call) => call.method === "PUT")?.body).toEqual({ optionGroupIds: ["grp-2", "grp-1"] });
@@ -224,7 +225,12 @@ describe("ProductFormPage", () => {
       `PATCH localhost${BASE}/products/prod-9`,
     ]);
     // a criação não leva foto: o endereço da imagem depende do id
-    expect(writes[0].body).toEqual({ name: "Pizza Grande", priceInCents: 4590, stock: 0 });
+    expect(writes[0].body).toEqual({
+      name: "Pizza Grande",
+      priceInCents: 4590,
+      stock: 0,
+      isSuggested: false,
+    });
     expect(writes[1].body).toEqual({ target: "product", productId: "prod-9" });
     expect(writes[3].body).toEqual({ photoUrl: UPLOADED_URL });
   });
@@ -361,5 +367,26 @@ describe("ProductFormPage", () => {
 
     await screen.findByTestId("location");
     expect(api.calls.filter((call) => call.method === "POST")).toHaveLength(1);
+  });
+
+  it("o interruptor de sugestão reflete o produto e sai no PATCH", async () => {
+    const api = setup(
+      [
+        { method: "GET", path: `${BASE}/products/prod-1`, body: makeProduct({ isSuggested: false }) },
+        { method: "PATCH", path: `${BASE}/products/prod-1`, body: makeProduct({ isSuggested: true }) },
+      ],
+      "/produtos/prod-1",
+    );
+    // o rótulo do Mantine embrulha também a frase de ajuda: o nome é os dois juntos
+    const toggle = (await screen.findByRole("switch", { name: /^Sugerir no carrinho/ })) as HTMLInputElement;
+    expect(toggle.checked).toBe(false);
+    screen.getByText('Aparece em "Que tal adicionar?" quando o cliente abre o carrinho.');
+
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
+
+    const patches = () => api.calls.filter((call) => call.method === "PATCH" && call.path === `${BASE}/products/prod-1`);
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    expect(patches()[0].body).toMatchObject({ isSuggested: true });
   });
 });

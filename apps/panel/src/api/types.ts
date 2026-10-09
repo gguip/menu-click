@@ -162,6 +162,8 @@ export type Product = {
   description?: string;
   photoUrl?: string;
   stock: number;
+  /** "Sugerir no carrinho": o app do cliente oferece em "Que tal adicionar?". */
+  isSuggested: boolean;
   optionGroupIds: string[];
 };
 
