@@ -1,4 +1,5 @@
 import { bump, type CartLine, optionsText, subtotal } from "@/lib/cart.ts";
+import { imageUrl } from "@/lib/image.ts";
 import { formatCents } from "@/lib/money.ts";
 import { MinusIcon, PlusIcon } from "./icons.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
@@ -10,6 +11,7 @@ import { ScreenHeader } from "./ScreenHeader.tsx";
 export function CartScreen({
   lines,
   context,
+  photos = {},
   notice = null,
   totalLabel = "Total",
   hint = null,
@@ -20,6 +22,11 @@ export function CartScreen({
   lines: CartLine[];
   /** "Mesa 7" no salão. */
   context: string;
+  /**
+   * A foto de cada produto, pelo id, vinda do cardápio de agora — o carrinho
+   * guardado não carrega URL, então foto trocada pela loja aparece certa.
+   */
+  photos?: Record<string, string>;
   /** O carrinho guardado mudou ao ser conferido com o cardápio. */
   notice?: string | null;
   /** "Total" no salão (sem frete); "Itens" no link (o frete vem no finalizar). */
@@ -60,6 +67,10 @@ export function CartScreen({
     );
   }
 
+  // Loja sem foto nos itens do carrinho fica sem a coluna inteira: uma fileira
+  // de quadrados vazios seria pior que a lista de antes.
+  const showPhotos = lines.some((line) => photos[line.productId] !== undefined);
+
   return (
     <main className="pb-32">
       <ScreenHeader title="Seu carrinho" context={context} onBack={onBack} />
@@ -71,13 +82,22 @@ export function CartScreen({
       <ul>
         {lines.map((line) => (
           <li key={line.key} className="flex gap-3 border-b border-paper-3 p-4">
-            <div className="min-w-0 flex-1">
-              <div className="flex gap-2.5">
-                <span className="min-w-0 text-[15px] font-semibold tracking-[-0.01em]">{line.name}</span>
-                <span className="ml-auto flex-none text-[15px] font-semibold tabular-nums">
-                  {formatCents(line.unitPriceInCents * line.quantity)}
-                </span>
+            {showPhotos && (
+              // a linha sem foto guarda o lugar, para o texto alinhar com as outras
+              <div data-slot="photo" className="size-16 flex-none overflow-hidden rounded-lg bg-paper-3">
+                {photos[line.productId] !== undefined && (
+                  // largura da grade (400): já está no cache e não cria transformação nova
+                  <img
+                    src={imageUrl(photos[line.productId], 400)}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                )}
               </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold tracking-[-0.01em]">{line.name}</span>
               <p className="mt-1 text-xs leading-[1.4] text-ink-2">{optionsText(line)}</p>
               {line.note && (
                 <p className="mt-0.5 text-xs leading-[1.4] text-ink-2">
@@ -85,7 +105,13 @@ export function CartScreen({
                   <span>{line.note}</span>
                 </p>
               )}
-              <div className="mt-2.5 flex w-fit items-center gap-1 rounded-lg border border-line-strong p-0.5">
+            </div>
+            {/* preço em cima e quantidade embaixo, na mesma coluna da direita */}
+            <div className="flex flex-none flex-col items-end justify-between gap-2.5">
+              <span className="text-[15px] font-semibold tabular-nums">
+                {formatCents(line.unitPriceInCents * line.quantity)}
+              </span>
+              <div className="flex w-fit items-center gap-1 rounded-lg border border-line-strong p-0.5">
                 <button
                   type="button"
                   aria-label={`Diminuir ${line.name}`}
