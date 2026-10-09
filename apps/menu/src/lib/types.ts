@@ -55,6 +55,11 @@ export type MenuProduct = {
   description?: string;
   photoUrl?: string;
   available: boolean;
+  /**
+   * A loja marcou para oferecer no carrinho. Opcional: a página do cardápio
+   * pode ter saído do cache antes de a API mandar o campo.
+   */
+  suggested?: boolean;
   optionGroupIds: string[];
 };
 export type MenuSection = { id?: string; name: string; products: MenuProduct[] };
