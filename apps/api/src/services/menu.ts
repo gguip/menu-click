@@ -149,6 +149,7 @@ function toMenuProduct(
     // o número exato de estoque não sai; o cliente só precisa saber se dá
     // para pedir — e agora isso também depende dos grupos obrigatórios
     available: estaDisponivel(product, gruposFiltrados),
+    suggested: product.isSuggested,
   };
 }
 

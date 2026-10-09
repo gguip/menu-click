@@ -96,9 +96,15 @@ export type MenuRestaurant = Pick<
  */
 export type MenuProduct = Omit<
   Product,
-  "stock" | "restaurantId" | "createdAt" | "updatedAt" | "categoryId"
+  "stock" | "restaurantId" | "createdAt" | "updatedAt" | "categoryId" | "isSuggested"
 > & {
   available: boolean;
+  /**
+   * A loja marcou este produto para ser oferecido no carrinho. Sai sem o `is`
+   * para acompanhar `available`; `isSuggested` é o nome da gestão e não chega
+   * aqui — um nome só por superfície.
+   */
+  suggested: boolean;
   /**
    * Os grupos deste produto, na ordem que ele os usa. Só os ids: o conteúdo
    * (nome, opções) vem uma vez só em `optionGroups`, no topo da página — ver

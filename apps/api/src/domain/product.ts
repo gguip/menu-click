@@ -22,6 +22,8 @@ export type CreateProductInput = {
   photoUrl?: string;
   /** Estoque inicial. Ausente = 0 (o default da coluna). */
   stock?: number;
+  /** "Sugerir no carrinho". Ausente = `false` (o default da coluna). */
+  isSuggested?: boolean;
 };
 
 /**
@@ -44,6 +46,8 @@ export type Product = CreateProductInput & {
   restaurantId: string;
   /** Sempre presente na leitura, mesmo quando não foi enviado na criação. */
   stock: number;
+  /** Sempre presente na leitura, como o `stock`. */
+  isSuggested: boolean;
   createdAt: string;
   updatedAt: string;
 };

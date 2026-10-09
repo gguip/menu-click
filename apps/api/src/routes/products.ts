@@ -35,6 +35,8 @@ const createProductBodySchema = {
     description: { type: "string" },
     // sem `photoUrl`: a foto entra por PATCH, depois de o produto ter id
     stock: { type: "integer", minimum: 0 },
+    // "sugerir no carrinho"; ausente = false
+    isSuggested: { type: "boolean" },
   },
 };
 
@@ -53,6 +55,7 @@ const updateProductBodySchema = {
     // serviço confere. String vazia continua 400 pelo `format`
     photoUrl: { type: "string", format: "uri", nullable: true },
     stock: { type: "integer", minimum: 0 },
+    isSuggested: { type: "boolean" },
   },
 };
 
@@ -67,6 +70,7 @@ const productResponseSchema = {
     description: { type: "string" },
     photoUrl: { type: "string" },
     stock: { type: "integer" },
+    isSuggested: { type: "boolean" },
     // ids dos grupos de opções vinculados, na ordem de exibição (`position`
     // do vínculo) — a mesma ordem do cardápio público. Só sai preenchido nos
     // pontos de leitura (get/list); criar/editar não o calcula.
@@ -124,7 +128,7 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "createProduct",
         summary: "Adiciona um produto ao cardápio",
         description:
-          "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404. A foto não entra aqui: é enviada depois, por `PATCH` (ver `signUpload`).",
+          "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404. A foto não entra aqui: é enviada depois, por `PATCH` (ver `signUpload`). `isSuggested` marca o produto para ser oferecido no carrinho do cliente (ausente = `false`).",
         params: restaurantIdParamsSchema,
         body: createProductBodySchema,
         response: { 201: productResponseSchema, 404: errorResponseSchema },
@@ -203,7 +207,7 @@ export async function productRoutes(app: FastifyInstance) {
         operationId: "updateProduct",
         summary: "Edita o produto",
         description:
-          "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio. `photoUrl` aceita `null` (tira a foto) ou a URL devolvida pelo Cloudinary para **este** produto — qualquer outra é 400.",
+          "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio. `photoUrl` aceita `null` (tira a foto) ou a URL devolvida pelo Cloudinary para **este** produto — qualquer outra é 400. `isSuggested` liga e desliga a sugestão no carrinho.",
         params: productParamsSchema,
         body: updateProductBodySchema,
         response: { 200: productResponseSchema, 404: errorResponseSchema },
