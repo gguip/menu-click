@@ -415,7 +415,7 @@
         "tags": [
           "Restaurantes"
         ],
-        "description": "Edição parcial. O `slug` NÃO é editável por aqui: mudar a URL pública quebraria QR code já impresso, então isso precisa ser operação explícita.",
+        "description": "Edição parcial. O `slug` NÃO é editável por aqui: mudar a URL pública quebraria QR code já impresso, então isso precisa ser operação explícita. `logoUrl` e `coverUrl` aceitam `null` ou a URL devolvida pelo Cloudinary para esta loja (ver `signUpload`) — qualquer outra é 400.",
         "requestBody": {
           "required": true,
           "content": {
@@ -781,7 +781,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404.",
+        "description": "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404. A foto não entra aqui: é enviada depois, por `PATCH` (ver `signUpload`).",
         "requestBody": {
           "required": true,
           "content": {
@@ -807,10 +807,6 @@
                   },
                   "description": {
                     "type": "string"
-                  },
-                  "photoUrl": {
-                    "type": "string",
-                    "format": "uri"
                   },
                   "stock": {
                     "type": "integer",
@@ -1168,7 +1164,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio.",
+        "description": "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio. `photoUrl` aceita `null` (tira a foto) ou a URL devolvida pelo Cloudinary para **este** produto — qualquer outra é 400.",
         "requestBody": {
           "required": true,
           "content": {
@@ -4504,6 +4500,135 @@
                       "type": "string"
                     },
                     "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/restaurants/{restaurantId}/uploads/signature": {
+      "post": {
+        "operationId": "signUpload",
+        "summary": "Assina o envio de uma imagem ao Cloudinary",
+        "tags": [
+          "Imagens"
+        ],
+        "description": "A API não recebe o arquivo: ela assina, e o navegador envia direto para `uploadUrl`. Devolva os campos da resposta **como vieram** no `FormData` (`api_key`, `timestamp`, `public_id`, `allowed_formats`, `transformation`, `signature`), junto do `file`. `target` é `logo`, `cover` ou `product`; `productId` é obrigatório com `product` e recusado com os outros. O endereço é fixo por dono, então enviar de novo **sobrescreve** a imagem anterior. A `secure_url` que o Cloudinary devolver é o que se grava em `logoUrl`, `coverUrl` ou `photoUrl`, por `PATCH`. A assinatura vale por 1 hora.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "type": "string",
+                    "enum": [
+                      "logo",
+                      "cover",
+                      "product"
+                    ]
+                  },
+                  "productId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "restaurantId",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uploadUrl": {
+                      "type": "string"
+                    },
+                    "apiKey": {
+                      "type": "string"
+                    },
+                    "timestamp": {
+                      "type": "integer"
+                    },
+                    "publicId": {
+                      "type": "string"
+                    },
+                    "allowedFormats": {
+                      "type": "string"
+                    },
+                    "transformation": {
+                      "type": "string"
+                    },
+                    "signature": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "integer"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
                       "type": "string"
                     }
                   }
@@ -8442,10 +8567,6 @@
                         "type": "string",
                         "minLength": 1
                       },
-                      "logoUrl": {
-                        "type": "string",
-                        "format": "uri"
-                      },
                       "address": {
                         "type": "object",
                         "additionalProperties": false,
@@ -9411,6 +9532,10 @@
     {
       "name": "Produtos",
       "description": "O cardápio, do lado de quem o edita."
+    },
+    {
+      "name": "Imagens",
+      "description": "Logo, capa e foto de produto. A API não recebe o arquivo: ela assina o envio, e o navegador manda direto para o Cloudinary."
     },
     {
       "name": "Mesas",

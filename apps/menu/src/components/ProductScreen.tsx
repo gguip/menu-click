@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { type CartLine, lineKey, normalizeNote } from "@/lib/cart.ts";
+import { imageUrl } from "@/lib/image.ts";
 import { formatCents } from "@/lib/money.ts";
 import {
   groupBadge,
@@ -69,7 +70,7 @@ export function ProductScreen({
     <main className="pb-44">
       <div className="relative flex h-[188px] items-center justify-center bg-paper-3">
         {product.photoUrl ? (
-          <img src={product.photoUrl} alt="" className="h-full w-full object-cover" />
+          <img src={imageUrl(product.photoUrl, 800)} alt="" className="h-full w-full object-cover" />
         ) : (
           <span className="text-[11px] uppercase tracking-[0.14em] text-ink-3">foto do produto</span>
         )}

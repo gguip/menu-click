@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buildTestApp,
+  cloudinaryUrl,
   createRestaurant,
 } from "./helpers.ts";
 
@@ -327,12 +328,13 @@ describe("CRUD /restaurants", () => {
     // e a loja que colou uma URL não conseguia mais tirar o logo pela API.
     it("tira o logo com null, e o campo some da resposta", async () => {
       const restaurant = await createRestaurant(app, { slug: "tira-logo" });
-      await app.inject({
+      const gravado = await app.inject({
         method: "PATCH",
         url: `/restaurants/${restaurant.id}`,
         headers: restaurant.headers,
-        payload: { logoUrl: "https://example.com/logo.png" },
+        payload: { logoUrl: cloudinaryUrl(restaurant.id, "logo", "png") },
       });
+      expect(gravado.statusCode).toBe(200);
 
       const response = await app.inject({
         method: "PATCH",

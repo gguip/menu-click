@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buildTestApp,
+  cloudinaryUrl,
   createProduct,
   createRestaurant,
   validProductBody,
@@ -141,9 +142,14 @@ describe("CRUD /restaurants/:restaurantId/products", () => {
     // recusava `""` e `null`, e colar uma URL errada não tinha volta.
     it("tira a foto com null, e o campo some da resposta", async () => {
       const restaurant = await createRestaurant(app);
-      const product = await createProduct(app, restaurant, {
-        photoUrl: "https://example.com/foto.jpg",
+      const product = await createProduct(app, restaurant);
+      const gravado = await app.inject({
+        method: "PATCH",
+        url: `/restaurants/${restaurant.id}/products/${product.id}`,
+        headers: restaurant.headers,
+        payload: { photoUrl: cloudinaryUrl(restaurant.id, `products/${product.id}`) },
       });
+      expect(gravado.statusCode).toBe(200);
 
       const response = await app.inject({
         method: "PATCH",

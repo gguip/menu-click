@@ -9,7 +9,6 @@ export type ProductForm = {
   price: string;
   stock: string;
   categoryId: string;
-  photoUrl: string;
   optionGroupIds: string[];
 };
 
@@ -19,7 +18,6 @@ export const EMPTY_FORM: ProductForm = {
   price: "",
   stock: "0",
   categoryId: "",
-  photoUrl: "",
   optionGroupIds: [],
 };
 
@@ -30,7 +28,6 @@ export function fromProduct(product: Product): ProductForm {
     price: centsToInput(product.priceInCents),
     stock: String(product.stock),
     categoryId: product.categoryId ?? "",
-    photoUrl: product.photoUrl ?? "",
     optionGroupIds: [...product.optionGroupIds],
   };
 }
@@ -41,18 +38,8 @@ export type ValidProduct = {
   priceInCents: number;
   stock: number;
   categoryId: string | null;
-  photoUrl: string | null;
   optionGroupIds: string[];
 };
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 export function validateProductForm(
   form: ProductForm,
@@ -63,10 +50,6 @@ export function validateProductForm(
   if (priceInCents === null) return { ok: false, error: "Informe o preço no formato 12,50." };
   const stock = form.stock.trim();
   if (!/^\d+$/.test(stock)) return { ok: false, error: "O estoque é um número inteiro, zero ou mais." };
-  const photoUrl = form.photoUrl.trim();
-  if (photoUrl !== "" && !isHttpUrl(photoUrl)) {
-    return { ok: false, error: "Cole um endereço completo de imagem, começando com https://." };
-  }
   return {
     ok: true,
     value: {
@@ -75,7 +58,6 @@ export function validateProductForm(
       priceInCents,
       stock: Number(stock),
       categoryId: form.categoryId === "" ? null : form.categoryId,
-      photoUrl: photoUrl === "" ? null : photoUrl,
       optionGroupIds: form.optionGroupIds,
     },
   };
@@ -88,7 +70,6 @@ export function toCreateBody(value: ValidProduct): CreateProductBody {
     stock: value.stock,
     ...(value.categoryId !== null ? { categoryId: value.categoryId } : {}),
     ...(value.description !== "" ? { description: value.description } : {}),
-    ...(value.photoUrl !== null ? { photoUrl: value.photoUrl } : {}),
   };
 }
 
@@ -99,8 +80,6 @@ export function toUpdateBody(value: ValidProduct): UpdateProductBody {
     stock: value.stock,
     categoryId: value.categoryId,
     description: value.description,
-    // `null` tira a foto — do mesmo jeito que `categoryId: null` tira da seção
-    photoUrl: value.photoUrl,
   };
 }
 

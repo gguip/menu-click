@@ -12,6 +12,7 @@ import { ABANDONED_REGISTRATION_DAYS } from "../domain/email-verification.ts";
 import { SLUG_MAX_LENGTH, slugify } from "../domain/slug.ts";
 import { isUuid } from "../domain/uuid.ts";
 import { isValidTimezone } from "../domain/timezone.ts";
+import { assertOwnImageUrl, storeImagePublicId } from "../cloudinary.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import { contrastWithWhite, MIN_ACTION_CONTRAST } from "../domain/color.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
@@ -329,6 +330,10 @@ export async function update(
   assertTimezoneValida(input.timezone);
   assertCorLegivel(input.brandColor);
   assertFaixaDeEntrega(input);
+  // logo e capa só podem ser os arquivos DESTA loja no Cloudinary: o endereço
+  // vai direto para o `<img>` do cardápio público
+  assertOwnImageUrl("logoUrl", input.logoUrl, storeImagePublicId(id, "logo"));
+  assertOwnImageUrl("coverUrl", input.coverUrl, storeImagePublicId(id, "cover"));
 
   const restaurant = await restaurantsRepository.update(id, input);
   if (restaurant === null) throw restaurantNotFound(id);

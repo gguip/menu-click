@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MenuApp } from "@/components/MenuApp.tsx";
 import { getMenu } from "@/lib/api.ts";
+import { imageUrl } from "@/lib/image.ts";
 
 // ISR: o cardápio sai do cache e se refaz a cada 60 s. A mesa (?mesa=) é lida
 // NO NAVEGADOR, depois de montar (`useTable`) — ler a querystring aqui tornaria
@@ -25,7 +26,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${menu.restaurant.name} · Cardápio`,
     description: `${menu.restaurant.cuisineType} — peça pelo celular.`,
-    openGraph: { title: menu.restaurant.name, images: menu.restaurant.coverUrl ? [menu.restaurant.coverUrl] : [] },
+    openGraph: {
+      title: menu.restaurant.name,
+      images: menu.restaurant.coverUrl ? [imageUrl(menu.restaurant.coverUrl, 1200)] : [],
+    },
   };
 }
 

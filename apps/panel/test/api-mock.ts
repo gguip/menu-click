@@ -19,6 +19,8 @@ export type MockCall = {
   query: Record<string, string>;
   body: unknown;
   headers: Record<string, string>;
+  /** `localhost` nas chamadas à API; o host de fora nas outras (Cloudinary). */
+  host: string;
 };
 
 /**
@@ -37,8 +39,15 @@ export function mockApi(initial: MockHandler[]) {
     const query = Object.fromEntries(url.searchParams);
     const method = init.method ?? "GET";
     const headers = (init.headers ?? {}) as Record<string, string>;
-    const body = typeof init.body === "string" ? JSON.parse(init.body) : undefined;
-    calls.push({ method, path, query, body, headers });
+    // FormData (o envio ao Cloudinary) vira objeto, para o teste conferir os
+    // campos; o `File` continua sendo o `File`
+    const body =
+      typeof init.body === "string"
+        ? JSON.parse(init.body)
+        : init.body instanceof FormData
+          ? Object.fromEntries(init.body.entries())
+          : undefined;
+    calls.push({ method, path, query, body, headers, host: url.host });
 
     const index = handlers.findIndex(
       (handler) =>

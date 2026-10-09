@@ -26,6 +26,10 @@ export default defineConfig({
       // de boot), então a suíte precisa de um valor — e um valor FIXO, porque
       // os testes de mesa conferem a `qrUrl` montada caractere a caractere.
       MENU_BASE_URL: "http://localhost:5173",
+      // Conta de mentira, mas PARSEÁVEL: sem ela o `buildApp()` não sobe, e os
+      // testes de assinatura conferem o hash contra este segredo exato. A
+      // suíte nunca fala com o Cloudinary.
+      CLOUDINARY_URL: "cloudinary://chave:segredo@nuvem",
     },
     globalSetup: ["./test/global-setup.ts"],
     setupFiles: ["./test/setup.ts"],

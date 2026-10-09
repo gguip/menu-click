@@ -35,3 +35,8 @@ Object.defineProperty(window, "ResizeObserver", {
   value: ResizeObserverStub,
 });
 window.HTMLElement.prototype.scrollIntoView = () => {};
+
+// O jsdom não implementa as URLs de objeto, e a prévia da imagem escolhida
+// usa as duas.
+URL.createObjectURL = () => "blob:previa";
+URL.revokeObjectURL = () => {};

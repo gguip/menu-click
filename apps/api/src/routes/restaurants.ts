@@ -105,7 +105,7 @@ export async function restaurantRoutes(app: FastifyInstance) {
         operationId: "updateRestaurant",
         summary: "Edita o restaurante",
         description:
-          "Edição parcial. O `slug` NÃO é editável por aqui: mudar a URL pública quebraria QR code já impresso, então isso precisa ser operação explícita.",
+          "Edição parcial. O `slug` NÃO é editável por aqui: mudar a URL pública quebraria QR code já impresso, então isso precisa ser operação explícita. `logoUrl` e `coverUrl` aceitam `null` ou a URL devolvida pelo Cloudinary para esta loja (ver `signUpload`) — qualquer outra é 400.",
         params: restaurantIdParamsSchema,
         body: updateRestaurantBodySchema,
         response: { 200: restaurantResponseSchema, 404: errorResponseSchema },

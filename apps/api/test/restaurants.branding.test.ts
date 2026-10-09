@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildTestApp, createRestaurant, type TestRestaurant } from "./helpers.ts";
+import { buildTestApp, cloudinaryUrl, createRestaurant, type TestRestaurant } from "./helpers.ts";
 
 describe("capa e cor da marca", () => {
   let app: FastifyInstance;
@@ -19,16 +19,17 @@ describe("capa e cor da marca", () => {
 
   it("salva e sai no cardápio público", async () => {
     const r = await createRestaurant(app);
-    const res = await patch(r, { coverUrl: "https://example.com/capa.jpg", brandColor: "#0B7A48" });
+    const coverUrl = cloudinaryUrl(r.id, "cover");
+    const res = await patch(r, { coverUrl, brandColor: "#0B7A48" });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ coverUrl: "https://example.com/capa.jpg", brandColor: "#0B7A48" });
+    expect(res.json()).toMatchObject({ coverUrl, brandColor: "#0B7A48" });
     const menu = (await app.inject({ method: "GET", url: `/menu/${r.slug}` })).json();
-    expect(menu).toMatchObject({ coverUrl: "https://example.com/capa.jpg", brandColor: "#0B7A48" });
+    expect(menu).toMatchObject({ coverUrl, brandColor: "#0B7A48" });
   });
 
   it("null tira os dois", async () => {
     const r = await createRestaurant(app);
-    await patch(r, { coverUrl: "https://example.com/capa.jpg", brandColor: "#0B7A48" });
+    await patch(r, { coverUrl: cloudinaryUrl(r.id, "cover"), brandColor: "#0B7A48" });
     const res = await patch(r, { coverUrl: null, brandColor: null });
     expect(res.json().coverUrl).toBeUndefined();
     expect(res.json().brandColor).toBeUndefined();

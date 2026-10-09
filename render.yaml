@@ -57,3 +57,7 @@ services:
         value: https://painel.menuclick.gguip.dev/recuperar-senha
       - key: EMAIL_VERIFICATION_URL
         value: https://painel.menuclick.gguip.dev/verificar-email
+      # conta do Cloudinary que guarda logo, capa e foto de produto; a API só
+      # assina o envio. Tem o API secret dentro
+      - key: CLOUDINARY_URL
+        sync: false

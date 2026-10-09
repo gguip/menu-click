@@ -10,6 +10,7 @@ import type {
   Product,
   Restaurant,
 } from "../src/api/types.ts";
+import type { UploadSignature } from "../src/api/uploads.ts";
 
 export const RESTAURANT_ID = "cb95db58-0ea1-4157-a6fd-64f775f24a6e";
 
@@ -212,6 +213,42 @@ export function panelHandlers(
       method: "GET",
       path: `/restaurants/${RESTAURANT_ID}/orders/summary`,
       body: makeSummary(options.summary),
+    },
+  ];
+}
+
+export function makeUploadSignature(overrides: Partial<UploadSignature> = {}): UploadSignature {
+  return {
+    uploadUrl: "https://api.cloudinary.com/v1_1/nuvem/image/upload",
+    apiKey: "chave",
+    timestamp: 1791000000,
+    publicId: `menuclick/${RESTAURANT_ID}/logo`,
+    allowedFormats: "jpg,png,webp",
+    transformation: "c_limit,w_2000,h_2000",
+    signature: "a".repeat(40),
+    ...overrides,
+  };
+}
+
+/** A `secure_url` que o Cloudinary de mentira devolve. */
+export const UPLOADED_URL = `https://res.cloudinary.com/nuvem/image/upload/v1791000001/menuclick/${RESTAURANT_ID}/logo.jpg`;
+
+/** A assinatura da API e o envio ao Cloudinary; `uploadStatus` simula a recusa. */
+export function uploadHandlers(options: { uploadStatus?: number } = {}): MockHandler[] {
+  return [
+    {
+      method: "POST",
+      path: `/restaurants/${RESTAURANT_ID}/uploads/signature`,
+      body: makeUploadSignature(),
+    },
+    {
+      method: "POST",
+      path: "/v1_1/nuvem/image/upload",
+      status: options.uploadStatus ?? 200,
+      body:
+        options.uploadStatus === undefined
+          ? { secure_url: UPLOADED_URL }
+          : { error: { message: "Invalid Signature" } },
     },
   ];
 }

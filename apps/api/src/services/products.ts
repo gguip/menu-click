@@ -8,6 +8,7 @@ import type {
 } from "../domain/product.ts";
 import type { Page, Pagination } from "../domain/pagination.ts";
 import { isUuid } from "../domain/uuid.ts";
+import { assertOwnImageUrl, productImagePublicId } from "../cloudinary.ts";
 import { NotFoundError } from "../errors.ts";
 import * as optionGroupsRepository from "../repositories/option-groups.ts";
 import * as productsRepository from "../repositories/products.ts";
@@ -127,6 +128,8 @@ export async function update(
 ): Promise<Product> {
   await restaurantsService.ensureExists(restaurantId);
   if (!isUuid(id)) throw productNotFound(id);
+  // a foto só pode ser o arquivo DESTE produto, na pasta deste restaurante
+  assertOwnImageUrl("photoUrl", input.photoUrl, productImagePublicId(restaurantId, id));
   await ensureCategoryBelongs(restaurantId, input.categoryId);
 
   const product = await productsRepository.update(restaurantId, id, input);
