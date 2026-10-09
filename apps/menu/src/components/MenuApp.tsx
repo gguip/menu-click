@@ -3,13 +3,24 @@
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fetchLiveRestaurant, type OrderReceipt } from "@/lib/api.ts";
 import { canOrderByLink, linkModalities, minimumHint } from "@/lib/link-order.ts";
-import { addLine, type CartLine, cartStorageKey, loadCart, reconcileCart, saveCart, subtotal } from "@/lib/cart.ts";
+import {
+  addLine,
+  type CartLine,
+  cartStorageKey,
+  lineKey,
+  loadCart,
+  reconcileCart,
+  saveCart,
+  subtotal,
+} from "@/lib/cart.ts";
 import { formatCents } from "@/lib/money.ts";
+import { fromPrice } from "@/lib/selection.ts";
+import { needsChoice, suggestionsFor } from "@/lib/suggestions.ts";
 import { orderTableHash, type TableState, tableHashOf, tableLabelOf } from "@/lib/table.ts";
 import type { Menu, MenuProduct, MenuRestaurant, MenuSection } from "@/lib/types.ts";
 import { SearchIcon, TableIcon } from "./icons.tsx";
 import { ActiveOrderBanner } from "./ActiveOrderBanner.tsx";
-import { CartScreen } from "./CartScreen.tsx";
+import { type CartSuggestion, CartScreen } from "./CartScreen.tsx";
 import { CheckoutScreen } from "./CheckoutScreen.tsx";
 import { LinkCheckout } from "./LinkCheckout.tsx";
 import { MenuHeader } from "./MenuHeader.tsx";
@@ -141,6 +152,22 @@ export function MenuApp({
     () => Object.fromEntries(products.flatMap((product) => (product.photoUrl ? [[product.id, product.photoUrl]] : []))),
     [products],
   );
+  // "Que tal adicionar?": do cardápio de agora, sem o que já está no carrinho
+  const suggestions = useMemo<CartSuggestion[]>(
+    () =>
+      suggestionsFor(products, lines).map((suggested) => {
+        const price = fromPrice(suggested, menu.optionGroups);
+        return {
+          id: suggested.id,
+          name: suggested.name,
+          // `prefix` é "" ou "a partir de", sem espaço no fim
+          priceLabel: [price.prefix, formatCents(price.cents)].filter(Boolean).join(" "),
+          photoUrl: suggested.photoUrl,
+          needsChoice: needsChoice(suggested, menu.optionGroups),
+        };
+      }),
+    [products, lines, menu.optionGroups],
+  );
 
   const show = (next: Screen, productId?: string, step = 0) => {
     setCheckoutStep(step);
@@ -161,6 +188,29 @@ export function MenuApp({
   };
 
   const back = () => window.history.back();
+
+  // Sugestão do carrinho: entra com um toque quando não há o que escolher;
+  // com grupo obrigatório, a tela do produto é que monta a linha — e o
+  // `back()` dela devolve a pessoa ao carrinho, de onde ela veio.
+  const pickSuggestion = (productId: string) => {
+    const chosen = products.find((candidate) => candidate.id === productId);
+    if (!chosen) return;
+    if (needsChoice(chosen, menu.optionGroups)) {
+      go("product", productId);
+      return;
+    }
+    updateLines(
+      addLine(lines, {
+        key: lineKey(chosen.id, {}, null),
+        productId: chosen.id,
+        name: chosen.name,
+        unitPriceInCents: chosen.priceInCents,
+        quantity: 1,
+        options: [],
+        note: null,
+      }),
+    );
+  };
 
   // cada passo do finalizar é uma entrada do histórico: o voltar do celular
   // volta um passo, e o voltar da tela (history.back) faz o mesmo
@@ -272,6 +322,8 @@ export function MenuApp({
           lines={lines}
           context={tableLabel ?? (inDineIn ? "" : "Entrega ou retirada")}
           photos={photos}
+          suggestions={suggestions}
+          onSuggestion={pickSuggestion}
           totalLabel={inDineIn ? "Total" : "Itens"}
           hint={inDineIn ? null : minimumHint(restaurant, subtotal(lines))}
           notice={cartUpdated ? "Atualizamos seu carrinho com o cardápio de agora." : null}
