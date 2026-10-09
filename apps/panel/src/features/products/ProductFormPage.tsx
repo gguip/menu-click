@@ -1,4 +1,4 @@
-import { ActionIcon, Button, NativeSelect, Switch, Textarea, TextInput } from "@mantine/core";
+import { ActionIcon, Button, Input, NativeSelect, Switch, Textarea, TextInput } from "@mantine/core";
 import { IconArrowDown, IconArrowLeft, IconArrowUp } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
@@ -214,12 +214,20 @@ function ProductEditor({
                 ]}
               />
             </div>
-            <Switch
-              label="Sugerir no carrinho"
-              description={'Aparece em "Que tal adicionar?" quando o cliente abre o carrinho.'}
-              checked={form.isSuggested}
-              onChange={(e) => update({ isSuggested: e.currentTarget.checked })}
-            />
+            {/* rótulo e ajuda no padrão dos outros campos (`Input.Wrapper`), com o
+                interruptor à direita; o nome do controle vem do `aria-label` */}
+            <div className={classes.suggest}>
+              <Input.Wrapper
+                label="Sugerir no carrinho"
+                labelElement="div"
+                description={'Aparece em "Que tal adicionar?" quando o cliente abre o carrinho.'}
+              />
+              <Switch
+                aria-label="Sugerir no carrinho"
+                checked={form.isSuggested}
+                onChange={(e) => update({ isSuggested: e.currentTarget.checked })}
+              />
+            </div>
             <ImageField
               label="Foto"
               description="JPG, PNG ou WebP, até 5 MB."

@@ -377,8 +377,7 @@ describe("ProductFormPage", () => {
       ],
       "/produtos/prod-1",
     );
-    // o rótulo do Mantine embrulha também a frase de ajuda: o nome é os dois juntos
-    const toggle = (await screen.findByRole("switch", { name: /^Sugerir no carrinho/ })) as HTMLInputElement;
+    const toggle = (await screen.findByRole("switch", { name: "Sugerir no carrinho" })) as HTMLInputElement;
     expect(toggle.checked).toBe(false);
     screen.getByText('Aparece em "Que tal adicionar?" quando o cliente abre o carrinho.');
 
