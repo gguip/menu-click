@@ -16,6 +16,7 @@ import {
 import type { Category, OptionGroup, Product } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { moveItem } from "../../lib/moveItem.ts";
+import { notifySaved } from "../../lib/notify.ts";
 import { describeSaveError, type ImageChange, KEEP, uploadImage } from "../../lib/upload.ts";
 import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
@@ -115,6 +116,7 @@ function ProductEditor({
       return saved;
     },
     onSuccess: () => {
+      notifySaved();
       void queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
       // o `productCount` de cada grupo vem da listagem de grupos
       void queryClient.invalidateQueries({ queryKey: optionGroupsQueryKey(restaurantId) });

@@ -4,6 +4,7 @@ import { describeError } from "../../api/client.ts";
 import type { DeliveryNeighborhood, Restaurant } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { formatCents } from "../../lib/money.ts";
+import { notifySaved } from "../../lib/notify.ts";
 import buttons from "../../ui/buttons.module.css";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { DeliveryAlert } from "../orders/OrdersNotices.tsx";
@@ -75,7 +76,9 @@ function DeliveryEditor({
       // lista existir faria a loja recusar entrega por um instante.
       if (listChanged) await saveList.mutateAsync(list);
       const patch = changedDeliveryPatch(form, restaurant);
-      if (Object.keys(patch).length > 0) await update.mutateAsync(patch);
+      const patchChanged = Object.keys(patch).length > 0;
+      if (patchChanged) await update.mutateAsync(patch);
+      if (listChanged || patchChanged) notifySaved();
     } catch {
       // A mensagem sai de `saveList.error`/`update.error`. O que deu certo já
       // está no cache, e a barra continua suja só no que faltou.

@@ -3,6 +3,7 @@ import { TextInput } from "@mantine/core";
 import { useState } from "react";
 import { describeError } from "../../api/client.ts";
 import type { Restaurant } from "../../api/types.ts";
+import { notifySaved } from "../../lib/notify.ts";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { useUpdateRestaurant } from "../restaurant/useRestaurant.ts";
 import classes from "./ModalitiesPage.module.css";
@@ -36,7 +37,9 @@ export function TimesCard({ restaurant }: { restaurant: Restaurant }) {
     const found = validateTimes(form);
     setProblem(found);
     if (found !== null || !dirty) return;
-    update.mutate(patch);
+    // pela promessa, e não por `onSuccess` da chamada: o card é remontado
+    // quando os tempos salvos mudam, e callback por chamada morre com ele
+    update.mutateAsync(patch).then(notifySaved, () => {});
   };
 
   return (
