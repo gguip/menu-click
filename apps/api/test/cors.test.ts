@@ -49,6 +49,30 @@ describe("CORS", () => {
       );
     });
 
+    it("o preflight libera todo método que alguma rota usa", async () => {
+      // O painel chama a API direto, de outra origem: método fora desta lista
+      // é bloqueado pelo navegador antes de sair, e a tela diz "sem conexão".
+      // A lista sai da árvore de rotas, para rota de método novo cair aqui.
+      const usados = new Set(
+        [...app.printRoutes({ commonPrefix: false }).matchAll(/\(([A-Z, ]+)\)/g)]
+          .flatMap((achado) => achado[1].split(", "))
+          .filter((metodo) => metodo !== "HEAD" && metodo !== "OPTIONS"),
+      );
+      expect(usados.size).toBeGreaterThan(3);
+
+      const response = await app.inject({
+        method: "OPTIONS",
+        url: "/restaurants",
+        headers: {
+          origin: ORIGEM_AUTORIZADA,
+          "access-control-request-method": "PUT",
+          "access-control-request-headers": "authorization",
+        },
+      });
+      const liberados = String(response.headers["access-control-allow-methods"]).split(", ");
+      expect([...usados].filter((metodo) => !liberados.includes(metodo))).toEqual([]);
+    });
+
     it("não libera origem fora da lista", async () => {
       const response = await app.inject({
         method: "GET",
