@@ -97,12 +97,7 @@ export function CartScreen({
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <div className="flex gap-2.5">
-                <span className="min-w-0 text-[15px] font-semibold tracking-[-0.01em]">{line.name}</span>
-                <span className="ml-auto flex-none text-[15px] font-semibold tabular-nums">
-                  {formatCents(line.unitPriceInCents * line.quantity)}
-                </span>
-              </div>
+              <span className="block text-[15px] font-semibold tracking-[-0.01em]">{line.name}</span>
               <p className="mt-1 text-xs leading-[1.4] text-ink-2">{optionsText(line)}</p>
               {line.note && (
                 <p className="mt-0.5 text-xs leading-[1.4] text-ink-2">
@@ -110,7 +105,13 @@ export function CartScreen({
                   <span>{line.note}</span>
                 </p>
               )}
-              <div className="mt-2.5 flex w-fit items-center gap-1 rounded-lg border border-line-strong p-0.5">
+            </div>
+            {/* preço em cima e quantidade embaixo, na mesma coluna da direita */}
+            <div className="flex flex-none flex-col items-end justify-between gap-2.5">
+              <span className="text-[15px] font-semibold tabular-nums">
+                {formatCents(line.unitPriceInCents * line.quantity)}
+              </span>
+              <div className="flex w-fit items-center gap-1 rounded-lg border border-line-strong p-0.5">
                 <button
                   type="button"
                   aria-label={`Diminuir ${line.name}`}
