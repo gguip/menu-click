@@ -1,9 +1,13 @@
+import { notifications } from "@mantine/notifications";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 
 // Com `globals: false`, a Testing Library não registra a limpeza sozinha.
 afterEach(() => {
   cleanup();
+  // a fila de avisos é do módulo, não da árvore: sem isto, o "salvo" de um
+  // teste apareceria no seguinte
+  notifications.clean();
   localStorage.clear();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();

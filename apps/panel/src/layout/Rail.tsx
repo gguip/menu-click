@@ -42,12 +42,16 @@ export function Rail({
   pendingCount,
   soundBlocked,
   onEnableSound,
+  noticesBlocked,
+  onEnableNotices,
 }: {
   restaurant: Restaurant | undefined;
   me: Me;
   pendingCount: number;
   soundBlocked: boolean;
   onEnableSound: () => void;
+  noticesBlocked: boolean;
+  onEnableNotices: () => void;
 }) {
   const now = useNow();
   // o painel FORMATA o que a API calculou; nenhuma regra de faixa mora aqui
@@ -71,6 +75,11 @@ export function Rail({
         {soundBlocked && (
           <button type="button" className={classes.sound} onClick={onEnableSound}>
             Som desligado · Ativar som
+          </button>
+        )}
+        {noticesBlocked && (
+          <button type="button" className={classes.sound} onClick={onEnableNotices}>
+            Avisos desligados · Ativar avisos
           </button>
         )}
       </div>

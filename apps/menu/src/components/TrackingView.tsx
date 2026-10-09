@@ -10,6 +10,7 @@ import {
   fetchTrackedOrder,
   isFinished,
   trackHeadline,
+  trackProgress,
   trackingSocketUrl,
   trackSteps,
 } from "@/lib/tracking.ts";
@@ -56,6 +57,15 @@ export function TrackingView({ restaurant, orderId }: { restaurant: MenuRestaura
     };
   }, [orderId]);
 
+  // A trilha só se anima no que MUDOU com a tela aberta: `from` é quantas
+  // etapas estavam feitas antes do último avanço. Ao abrir, `from` é igual a
+  // `done` — pedido já em preparo aparece pronto, sem replay.
+  const progress = state.order === null ? null : trackProgress(state.order);
+  const [trail, setTrail] = useState<{ from: number; done: number } | null>(null);
+  if (progress !== null && trail?.done !== progress.done) {
+    setTrail({ from: trail === null ? progress.done : trail.done, done: progress.done });
+  }
+
   // terminou: o aparelho esquece o pedido (nunca vira histórico)
   const finished = state.order !== null && isFinished(state.order.status);
   useEffect(() => {
@@ -81,7 +91,7 @@ export function TrackingView({ restaurant, orderId }: { restaurant: MenuRestaura
   }
 
   const order = state.order;
-  if (order === null) {
+  if (order === null || progress === null) {
     return (
       <main style={brand} className="mx-auto min-h-dvh max-w-[480px] bg-paper px-5 pt-16 text-ink">
         <p className="text-[15px] text-ink-2">Carregando o pedido…</p>
@@ -104,7 +114,10 @@ export function TrackingView({ restaurant, orderId }: { restaurant: MenuRestaura
           {state.mode === "live" ? "Atualizando em tempo real" : seconds === null ? "Atualizando…" : `Atualizado há ${seconds} s`}
         </p>
       )}
-      <h1 className="mt-2 text-[26px] font-semibold leading-[1.15] tracking-[-0.03em]">{trackHeadline(order)}</h1>
+      {/* `key`: a manchete nova entra como elemento novo, e a entrada se anima */}
+      <h1 key={order.status} className="track-headline mt-2 text-[26px] font-semibold leading-[1.15] tracking-[-0.03em]">
+        {trackHeadline(order)}
+      </h1>
       {estimate && <p className="mt-2 text-sm text-ink-2">{estimate}</p>}
       {cancelled && <p className="mt-2 text-[15px] text-ink-2">{order.cancellationReason ?? "A loja cancelou este pedido."}</p>}
 
@@ -118,19 +131,47 @@ export function TrackingView({ restaurant, orderId }: { restaurant: MenuRestaura
       )}
 
       {!cancelled && (
-        <ol className="mt-6 flex flex-col gap-3">
-          {trackSteps(order, tz).map((step) => (
-            <li key={step.label} className="flex items-center gap-3">
-              <span
-                aria-hidden="true"
-                className={`flex size-6 flex-none items-center justify-center rounded-full ${step.done ? "bg-action text-white" : "border-[1.5px] border-line-control"}`}
+        <ol className="mt-6 flex flex-col gap-[22px]">
+          {trackSteps(order, tz).map((step, index, steps) => {
+            // posição na fila de quem acabou de ser alcançado: pulou duas
+            // etapas de uma vez, a segunda espera a primeira terminar
+            const just = trail !== null && step.done && index >= trail.from ? index - trail.from : null;
+            const current = progress.current === index;
+            const pulse = current || (just !== null && index === steps.length - 1);
+            return (
+              <li
+                key={step.label}
+                data-state={current ? "current" : step.done ? "done" : "upcoming"}
+                data-just={just ?? undefined}
+                style={just === null ? undefined : ({ "--track-delay": `${just * 700}ms` } as CSSProperties)}
+                className="relative flex items-center gap-3"
               >
-                {step.done && <CheckIcon size={13} />}
-              </span>
-              <span className={`text-[15px] ${step.done ? "font-semibold" : "text-ink-3"}`}>{step.label}</span>
-              <span className="ml-auto text-sm tabular-nums text-ink-2">{step.time ?? "—"}</span>
-            </li>
-          ))}
+                {index > 0 && (
+                  // o trilho que chega nesta etapa: enche quando ela é alcançada
+                  <span aria-hidden="true" className="absolute bottom-[calc(50%+14px)] left-[13px] h-[calc(100%-6px)] w-0.5 bg-line-strong">
+                    {step.done && <span className="track-rail absolute inset-0 bg-action" />}
+                  </span>
+                )}
+                <span
+                  aria-hidden="true"
+                  className={`relative flex size-7 flex-none items-center justify-center rounded-full border-[1.5px] ${
+                    current && !step.done ? "border-action" : "border-line-control"
+                  }`}
+                >
+                  {/* `key`: a etapa atual pode continuar a mesma de um status
+                      para o outro (aguardando → aceito), e o anel recomeça */}
+                  {pulse && <span key={order.status} className="track-ring absolute -inset-[1.5px] rounded-full border-2 border-action opacity-0" />}
+                  {step.done && (
+                    <span className="track-dot absolute -inset-[1.5px] flex items-center justify-center rounded-full bg-action text-white">
+                      <CheckIcon size={15} />
+                    </span>
+                  )}
+                </span>
+                <span className={`text-[15px] ${step.done ? "font-semibold" : current ? "text-ink" : "text-ink-3"}`}>{step.label}</span>
+                <span className="track-time ml-auto text-sm tabular-nums text-ink-2">{step.time ?? "—"}</span>
+              </li>
+            );
+          })}
         </ol>
       )}
 

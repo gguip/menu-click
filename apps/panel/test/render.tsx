@@ -5,6 +5,7 @@ import { createMemoryRouter, type RouteObject, useLocation } from "react-router"
 import { RouterProvider } from "react-router/dom";
 import { RequireVerified } from "../src/auth/guards.tsx";
 import { cssVariablesResolver, theme } from "../src/theme/theme.ts";
+import { Toaster } from "../src/ui/Toaster.tsx";
 
 type TestRouter = ReturnType<typeof createMemoryRouter>;
 
@@ -23,6 +24,7 @@ export function renderRoutes(routes: RouteObject[], initialPath: string, options
     // env="test": sem transições e sem portal — Modal, Drawer e Menu
     // renderizam no lugar, e a Testing Library os enxerga.
     <MantineProvider theme={theme} cssVariablesResolver={cssVariablesResolver} env="test">
+      <Toaster />
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>

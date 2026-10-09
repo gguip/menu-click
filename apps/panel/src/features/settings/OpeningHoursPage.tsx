@@ -3,6 +3,7 @@ import { useState } from "react";
 import { describeError } from "../../api/client.ts";
 import type { OpeningHour } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
+import { notifySaved } from "../../lib/notify.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { PauseSwitch } from "../../layout/PauseSwitch.tsx";
 import { useRestaurant } from "../restaurant/useRestaurant.ts";
@@ -48,7 +49,8 @@ function OpeningHoursEditor({
     const found = validate(days);
     setProblem(found);
     if (found !== null) return;
-    save.mutate(toApi(days));
+    // a falha sai de `save.error`, na tela
+    save.mutateAsync(toApi(days)).then(notifySaved, () => {});
   };
 
   return (

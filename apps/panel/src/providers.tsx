@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { ApiError } from "./api/client.ts";
 import { cssVariablesResolver, theme } from "./theme/theme.ts";
+import { Toaster } from "./ui/Toaster.tsx";
 
 const colorSchemeManager = localStorageColorSchemeManager({ key: "menuclick.color-scheme" });
 
@@ -34,6 +35,7 @@ export function AppProviders({
       colorSchemeManager={colorSchemeManager}
       defaultColorScheme="light"
     >
+      <Toaster />
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </MantineProvider>
   );

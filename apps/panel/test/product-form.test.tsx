@@ -90,6 +90,7 @@ describe("ProductFormPage", () => {
     // trocar os grupos do produto muda o "usado em N produtos" de cada um
     // (a listagem de grupos é buscada de novo: uma vez na tela, outra depois)
     expect(api.calls.filter((call) => call.method === "GET" && call.path === `${BASE}/option-groups`)).toHaveLength(2);
+    expect(await screen.findByText("Alterações salvas")).toBeTruthy();
   });
 
   it("editar sem mexer nos grupos não regrava os grupos; 'Sem seção' manda null", async () => {
@@ -138,6 +139,7 @@ describe("ProductFormPage", () => {
     expect(
       await screen.findByText("O produto foi salvo, mas os grupos de opções não: Grupo de opções inexistente"),
     ).toBeTruthy();
+    expect(screen.queryByText("Alterações salvas")).toBeNull();
   });
 
   it("produto recém-criado troca para edição quando os grupos falham, e salvar de novo não duplica", async () => {

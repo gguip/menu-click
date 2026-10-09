@@ -199,6 +199,11 @@ export function KitchenPage() {
                 Som desligado · Ativar som
               </Button>
             )}
+            {alert.noticesBlocked && (
+              <Button variant="default" onClick={alert.enableNotices}>
+                Avisos desligados · Ativar avisos
+              </Button>
+            )}
             <Button component={Link} to="/pedidos" variant="default">
               Sair do modo cozinha
             </Button>

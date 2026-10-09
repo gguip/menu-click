@@ -90,6 +90,7 @@ describe("OpeningHoursPage", () => {
     const before = restaurantGets();
     fireEvent.click(screen.getByRole("button", { name: "Salvar horário" }));
     await waitFor(() => expect(restaurantGets()).toBeGreaterThan(before));
+    expect(await screen.findByText("Alterações salvas")).toBeTruthy();
   });
 
   it("dia esvaziado sai do corpo", async () => {
