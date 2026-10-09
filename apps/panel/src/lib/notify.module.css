@@ -1,0 +1,32 @@
+/* Sem sombra, como o resto do painel: quem separa o aviso do conteúdo é a
+   borda mais forte e a superfície. */
+.root {
+  padding: 14px 16px;
+  background: var(--mc-surface);
+  border: 1px solid var(--mc-line-hi);
+  border-radius: 10px;
+}
+
+.icon {
+  width: 36px;
+  height: 36px;
+  margin-right: 14px;
+  border-radius: 50%;
+  background: var(--mc-accent);
+  color: var(--mc-on-accent);
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--mc-ink);
+}
+
+.description {
+  font-size: 13.5px;
+  color: var(--mc-ink2);
+}
+
+.close {
+  color: var(--mc-ink3);
+}

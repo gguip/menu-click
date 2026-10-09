@@ -5,6 +5,7 @@ import { describeError } from "../../api/client.ts";
 import type { RestaurantPatch } from "../../api/restaurant.ts";
 import type { Restaurant } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
+import { notifySaved } from "../../lib/notify.tsx";
 import { describeSaveError, type ImageChange, KEEP, uploadImage } from "../../lib/upload.ts";
 import { ImageField } from "../../ui/ImageField.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
@@ -42,6 +43,7 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
       return update.mutateAsync(patch);
     },
     onSuccess: () => {
+      notifySaved();
       setLogo(KEEP);
       setCover(KEEP);
     },

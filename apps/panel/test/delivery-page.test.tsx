@@ -55,6 +55,7 @@ describe("DeliveryPage", () => {
     expect(put).toBeLessThan(patch);
     expect(api.calls[put].body).toEqual({ neighborhoods: saved });
     expect(api.calls[patch].body).toEqual({ deliveryFeeMode: "neighborhood" });
+    expect(await screen.findByText("Alterações salvas")).toBeTruthy();
   });
 
   it("PATCH que falha deixa os bairros salvos e a barra suja só no que faltou", async () => {
@@ -67,6 +68,7 @@ describe("DeliveryPage", () => {
     save();
     expect(await screen.findByText("Algo deu errado no servidor")).toBeTruthy();
     expect(screen.getByText("Alterações não salvas")).toBeTruthy();
+    expect(screen.queryByText("Alterações salvas")).toBeNull();
 
     save();
     await waitFor(() => expect(api.calls.filter((call) => call.method === "PATCH")).toHaveLength(2));

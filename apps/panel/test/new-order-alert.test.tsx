@@ -1,11 +1,11 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RequireVerified } from "../src/auth/guards.tsx";
 import { PanelLayout } from "../src/layout/PanelLayout.tsx";
 import { playBeep, unlockAudio } from "../src/lib/audio.ts";
 import { mockApi } from "./api-mock.ts";
 import { makeOrder, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
-import { renderRoutes } from "./render.tsx";
+import { LocationProbe, renderRoutes } from "./render.tsx";
 
 vi.mock("../src/lib/audio.ts", () => ({
   playBeep: vi.fn(async () => true),
@@ -103,5 +103,109 @@ describe("aviso de pedido novo", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Som desligado · Ativar som" }));
     await waitFor(() => expect(unlockAudio).toHaveBeenCalledOnce());
     await waitFor(() => expect(screen.queryByRole("button", { name: "Som desligado · Ativar som" })).toBeNull());
+  });
+  /** Chega um pedido depois da primeira carga, que veio vazia. */
+  async function arrive(order = makeOrder({ number: 1042 })) {
+    signIn();
+    const api = mockApi([
+      {
+        method: "GET",
+        path: `/restaurants/${RESTAURANT_ID}/orders`,
+        query: { status: "pending" },
+        once: true,
+        body: { data: [], limit: 100, offset: 0, total: 0 },
+      },
+      ...panelHandlers({ pending: [order] }),
+    ]);
+    const view = renderRoutes(
+      [...routes, { path: "/outra", element: <LocationProbe /> }],
+      "/pedidos",
+    );
+    await waitFor(() =>
+      expect(api.calls.filter((call) => call.query.status === "pending")).toHaveLength(1),
+    );
+    await view.queryClient.invalidateQueries({ queryKey: ["orders", "pending"] });
+    await waitFor(() => expect(playBeep).toHaveBeenCalledOnce());
+    return view;
+  }
+
+  function stubNotification(permission: NotificationPermission, answer: NotificationPermission = permission) {
+    const created: { title: string; onclick: (() => void) | null; close: () => void }[] = [];
+    class FakeNotification {
+      static permission = permission;
+      static requestPermission = vi.fn(async () => {
+        FakeNotification.permission = answer;
+        return answer;
+      });
+      onclick: (() => void) | null = null;
+      close = () => {};
+      title: string;
+      constructor(title: string) {
+        this.title = title;
+        created.push(this);
+      }
+    }
+    vi.stubGlobal("Notification", FakeNotification);
+    return { created, FakeNotification };
+  }
+
+  it("pedido novo aparece como aviso na tela, com o número", async () => {
+    await arrive();
+    expect(await screen.findByText("Novo pedido #1042")).toBeTruthy();
+  });
+
+  it("a primeira carga não avisa", async () => {
+    signIn();
+    mockApi(panelHandlers({ pending: [makeOrder({ number: 7 })] }));
+    renderRoutes(routes, "/pedidos");
+    const link = await screen.findByRole("link", { name: /Pedidos/ });
+    await waitFor(() => expect(link.textContent).toContain("1"));
+    expect(screen.queryByText("Novo pedido #7")).toBeNull();
+  });
+
+  it("com a janela atrás de outra e permissão dada, sai o aviso do sistema", async () => {
+    const { created } = stubNotification("granted");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    await arrive();
+    expect(created.map((notice) => notice.title)).toEqual(["Novo pedido #1042"]);
+  });
+
+  it("com a janela na frente, o aviso do sistema não sai — o da tela basta", async () => {
+    const { created } = stubNotification("granted");
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    await arrive();
+    expect(await screen.findByText("Novo pedido #1042")).toBeTruthy();
+    expect(created).toHaveLength(0);
+  });
+
+  it("clicar no aviso do sistema abre Pedidos", async () => {
+    const { created } = stubNotification("granted");
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    vi.spyOn(window, "focus").mockImplementation(() => {});
+    const { router } = await arrive();
+    await act(() => router.navigate("/outra"));
+    act(() => created[0].onclick?.());
+    await waitFor(() => expect(router.state.location.pathname).toBe("/pedidos"));
+  });
+
+  it("sem permissão decidida, oferece ativar os avisos; aceitar tira o botão", async () => {
+    const { FakeNotification } = stubNotification("default", "granted");
+    signIn();
+    mockApi(panelHandlers());
+    renderRoutes(routes, "/pedidos");
+    fireEvent.click(await screen.findByRole("button", { name: "Avisos desligados · Ativar avisos" }));
+    await waitFor(() => expect(FakeNotification.requestPermission).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Avisos desligados · Ativar avisos" })).toBeNull(),
+    );
+  });
+
+  it("permissão negada ou navegador sem suporte: o botão de avisos não aparece", async () => {
+    stubNotification("denied");
+    signIn();
+    mockApi(panelHandlers());
+    renderRoutes(routes, "/pedidos");
+    await screen.findByRole("button", { name: "Som desligado · Ativar som" });
+    expect(screen.queryByRole("button", { name: "Avisos desligados · Ativar avisos" })).toBeNull();
   });
 });

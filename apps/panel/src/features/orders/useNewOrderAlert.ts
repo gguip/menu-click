@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { listPendingOrders } from "../../api/orders.ts";
 import type { Order } from "../../api/types.ts";
 import { hasUserGesture, playBeep, unlockAudio } from "../../lib/audio.ts";
-import { detectNewPending } from "./newOrders.ts";
+import { notifyNewOrder } from "../../lib/notify.tsx";
+import { noticePermission, requestNoticePermission, showSystemNotice } from "../../lib/systemNotice.ts";
+import { detectNewPending, newOrderTitle } from "./newOrders.ts";
 import { ORDERS_POLL_MS } from "./polling.ts";
 
 /**
@@ -41,9 +43,20 @@ function pendingQueryKey(restaurantId: string) {
  * exata era o batching do React ou o notifyManager do TanStack agrupando as
  * notificações; o que se sabe, medido, é que o efeito não via o estado
  * intermediário.)
+ *
+ * Além do bipe, o pedido novo vira aviso na tela e — com a janela atrás de
+ * outra e a permissão dada — aviso do sistema. `onNoticeClick` é o que o
+ * clique no aviso do sistema faz depois de trazer a janela; a casca abre
+ * Pedidos, a cozinha fica onde está.
  */
-export function useNewOrderAlert(restaurantId: string) {
+export function useNewOrderAlert(restaurantId: string, onNoticeClick?: () => void) {
   const queryClient = useQueryClient();
+  // em `ref`: a inscrição no cache é feita uma vez, e o clique pode vir bem
+  // depois, com outra função já no lugar
+  const noticeClick = useRef(onNoticeClick);
+  useEffect(() => {
+    noticeClick.current = onNoticeClick;
+  });
   const seen = useRef<Set<string> | null>(null);
   // Semeia com o que já está no cache desta chave, se houver: um pedido que
   // chegou durante a troca de tela (casca -> cozinha, ou o contrário) não
@@ -56,6 +69,9 @@ export function useNewOrderAlert(restaurantId: string) {
     if (cached !== undefined) seen.current = new Set(cached.map((order) => order.id));
   }
   const [soundBlocked, setSoundBlocked] = useState(() => !hasUserGesture());
+  // só "ainda não decidiu" oferece o botão: negado e sem suporte não têm o
+  // que pedir de novo
+  const [noticesBlocked, setNoticesBlocked] = useState(() => noticePermission() === "default");
 
   const pending = useQuery({
     queryKey: pendingQueryKey(restaurantId),
@@ -75,6 +91,11 @@ export function useNewOrderAlert(restaurantId: string) {
       const result = detectNewPending(seen.current, orders);
       seen.current = result.seen;
       if (result.fresh.length > 0) {
+        const fresh = new Set(result.fresh);
+        const title = newOrderTitle(orders.filter((order) => fresh.has(order.id)));
+        notifyNewOrder(title);
+        // com a janela na frente, o aviso da tela basta
+        if (!document.hasFocus()) showSystemNotice(title, () => noticeClick.current?.());
         void playBeep().then((played) => {
           // guarda de unmount: a promessa pode assentar depois de a tela sair.
           if (active) setSoundBlocked(!played);
@@ -104,6 +125,10 @@ export function useNewOrderAlert(restaurantId: string) {
     void unlockAudio().then((unlocked) => setSoundBlocked(!unlocked));
   };
 
+  const enableNotices = () => {
+    void requestNoticePermission().then((permission) => setNoticesBlocked(permission === "default"));
+  };
+
   // `pendingOrders` é a MESMA lista que o aviso vigia: a cozinha a mostra em
   // "Entraram agora" sem uma requisição a mais. `pendingError` deixa a
   // cozinha mostrar o próprio erro em vez do "Carregando pedidos…" fixo, e
@@ -113,6 +138,8 @@ export function useNewOrderAlert(restaurantId: string) {
     pendingCount,
     soundBlocked,
     enableSound,
+    noticesBlocked,
+    enableNotices,
     pendingOrders: pending.data,
     pendingError: pending.error,
     pendingUpdatedAt: pending.dataUpdatedAt,

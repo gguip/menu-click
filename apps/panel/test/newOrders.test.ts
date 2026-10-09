@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectNewPending } from "../src/features/orders/newOrders.ts";
+import { detectNewPending, newOrderTitle } from "../src/features/orders/newOrders.ts";
 import { makeOrder } from "./fixtures.ts";
 
 describe("detectNewPending", () => {
@@ -23,5 +23,15 @@ describe("detectNewPending", () => {
     const first = detectNewPending(null, [a]);
     const gone = detectNewPending(first.seen, []);
     expect(detectNewPending(gone.seen, [a]).fresh).toEqual([]);
+  });
+});
+
+describe("newOrderTitle", () => {
+  it("um pedido: diz o número", () => {
+    expect(newOrderTitle([makeOrder({ number: 1042 })])).toBe("Novo pedido #1042");
+  });
+
+  it("vários de uma vez: diz quantos", () => {
+    expect(newOrderTitle([makeOrder(), makeOrder(), makeOrder()])).toBe("3 pedidos novos");
   });
 });

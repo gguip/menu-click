@@ -44,6 +44,20 @@ describe("StoreDataPage", () => {
         name: "Trattoria Bela",
       }),
     );
+    expect(await screen.findByText("Alterações salvas")).toBeTruthy();
+  });
+
+  it("salvar que falha não avisa que salvou", async () => {
+    signIn();
+    mockApi([
+      { method: "PATCH", path: `/restaurants/${RESTAURANT_ID}`, status: 500, body: { message: "Algo deu errado no servidor" } },
+      ...panelHandlers(),
+    ]);
+    renderInPanel(routes, "/dados-da-loja");
+    fireEvent.change(await screen.findByLabelText("Nome da loja"), { target: { value: "Trattoria Bela" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar dados" }));
+    expect(await screen.findByText("Algo deu errado no servidor")).toBeTruthy();
+    expect(screen.queryByText("Alterações salvas")).toBeNull();
   });
 
   it("o fuso é uma lista fechada, com o aviso do que ele decide", async () => {

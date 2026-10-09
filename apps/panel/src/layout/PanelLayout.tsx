@@ -1,4 +1,4 @@
-import { Outlet, useMatches } from "react-router";
+import { Outlet, useMatches, useNavigate } from "react-router";
 import { useSessionUser } from "../auth/useMe.ts";
 import { useNewOrderAlert } from "../features/orders/useNewOrderAlert.ts";
 import { usePolledRestaurant } from "../features/restaurant/useRestaurant.ts";
@@ -26,7 +26,8 @@ export function PanelLayout() {
   const restaurant = usePolledRestaurant(me.restaurantId);
   const title = useRouteTitle();
   const paused = restaurant.data?.acceptingOrders === false;
-  const alert = useNewOrderAlert(me.restaurantId);
+  const navigate = useNavigate();
+  const alert = useNewOrderAlert(me.restaurantId, () => void navigate("/pedidos"));
 
   return (
     <div className={classes.shell}>
@@ -36,6 +37,8 @@ export function PanelLayout() {
         pendingCount={alert.pendingCount}
         soundBlocked={alert.soundBlocked}
         onEnableSound={alert.enableSound}
+        noticesBlocked={alert.noticesBlocked}
+        onEnableNotices={alert.enableNotices}
       />
       <div className={classes.main}>
         <Header title={title} restaurantId={me.restaurantId} restaurant={restaurant.data} />

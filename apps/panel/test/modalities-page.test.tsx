@@ -262,6 +262,7 @@ describe("ModalitiesPage", () => {
       const call = api.calls.find((c) => c.method === "PATCH");
       expect(call?.body).toEqual({ prepTimeMinutes: 25, deliveryTimeMinMinutes: 40, deliveryTimeMaxMinutes: 55 });
     });
+    expect(await screen.findByText("Alterações salvas")).toBeTruthy();
   });
 
   it("não salva faixa de entrega pela metade, e diz por quê", async () => {
