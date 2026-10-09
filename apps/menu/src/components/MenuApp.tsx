@@ -137,6 +137,10 @@ export function MenuApp({
   // que chama o mesmo `history.back()`) anda pelas telas em vez de sair do app.
   const menuScroll = useRef<number | null>(null);
   const products = useMemo(() => menu.sections.flatMap((section) => section.products), [menu.sections]);
+  const photos = useMemo(
+    () => Object.fromEntries(products.flatMap((product) => (product.photoUrl ? [[product.id, product.photoUrl]] : []))),
+    [products],
+  );
 
   const show = (next: Screen, productId?: string, step = 0) => {
     setCheckoutStep(step);
@@ -267,6 +271,7 @@ export function MenuApp({
         <CartScreen
           lines={lines}
           context={tableLabel ?? (inDineIn ? "" : "Entrega ou retirada")}
+          photos={photos}
           totalLabel={inDineIn ? "Total" : "Itens"}
           hint={inDineIn ? null : minimumHint(restaurant, subtotal(lines))}
           notice={cartUpdated ? "Atualizamos seu carrinho com o cardápio de agora." : null}
