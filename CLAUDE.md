@@ -472,7 +472,8 @@ sozinha, precisa entrar no `Pick`, no `toMenuRestaurant()` e no
 `schema.response` da rota, os três (S10). (Fora do frete, o cardápio também traz
 `timezone`, `closesAt`/`opensAt`, `coverUrl`, `brandColor` e `deliveryNeighborhoods` —
 só os NOMES dos bairros, no modo por bairro, para o seletor do endereço; ver a
-seção do app do cliente.)
+seção do app do cliente. Cada produto traz `suggested` — a loja quer oferecê-lo
+no carrinho —, e o nome de gestão, `isSuggested`, não sai por ali.)
 `deliveryFixedFeeInCents` e `deliveryFeeToArrange` ficam de fora **de
 propósito**: a cotação já devolve o número certo para o endereço do cliente, e
 a política de "a combinar" é operação interna da loja, não informação dele.
@@ -755,6 +756,7 @@ SPA em Vite + React 19 + Mantine 9 + React Router 8 + TanStack Query 5 — **o p
 - **Pedido novo também vira aviso**, no mesmo ponto do bipe (`useNewOrderAlert`): aviso na tela sempre, e aviso do **sistema** (`lib/systemNotice.ts`, a `Notification` do navegador) só com a janela sem foco e a permissão dada. A permissão é pedida no clique de "Avisos desligados · Ativar avisos" (rail e Modo cozinha), que só aparece enquanto ela não foi decidida. Clicar no aviso do sistema traz a janela; na casca abre Pedidos, na cozinha fica onde está. ⚠️ Só funciona com o painel aberto em alguma aba — não há service worker nem push de servidor —, e o Chrome do Android recusa `new Notification` (o `try/catch` devolve `false` e sobram bipe, título e contador).
 - **Imagem é upload, e o arquivo sobe no SALVAR, não ao escolher** (`ImageField` em `src/ui/`, envio em `lib/upload.ts`). Como a troca sobrescreve o mesmo endereço, subir ao escolher mudaria o cardápio antes de a pessoa confirmar, e "Cancelar" não desfaria. A ordem é assinatura → envio → `PATCH` com a `secure_url`; envio que falha interrompe antes do `PATCH`. ⚠️ O envio ao Cloudinary é `fetch` cru, **sem** `apiRequest`: o Bearer não pode sair para outro domínio.
 - **Produto novo sobe a foto depois de criado** (o endereço tem o id): `POST` → envio → `PATCH`. Se a foto falhar, o produto fica criado e a tela vira a de edição, com o aviso — o mesmo caminho dos grupos de opções que falham (`SavedWithProblem`).
+- **"Sugerir no carrinho" é interruptor do formulário do produto**, não um que salva sozinho: suja a `SaveBar` e sai no `POST`/`PATCH` como `isSuggested`. Sugerir produto esgotado ou sem foto é permitido — quem filtra é o app.
 
 ### App do cliente (`apps/menu`)
 
@@ -784,6 +786,7 @@ O que a pessoa abre ao escanear o QR. Next.js 16 (App Router) + Tailwind 4 + Rea
 - **Pedido em andamento no aparelho** (`lib/active-order.ts`, `order:<slug>`, um por loja, 24 h): a faixa "Você tem um pedido em andamento" confere o pedido antes de aparecer, e quem descobre que terminou (a faixa ou a página) o tira do aparelho — **nunca vira histórico**. O endereço da entrega entra no lembrado de `customer.ts`; pedido sem endereço não apaga o que havia.
 - ⚠️ **Opção de produto é checkbox visualmente escondido, em todo grupo** (inclusive o de uma escolha só): o `toggleOption` permite desmarcar, e radio nativo não desmarca. Automação de navegador que clicar no `input` falha — clique no texto da opção, como a pessoa faria.
 - **O carrinho mostra a miniatura do produto** (64 px, pedida na largura 400 da grade), e a foto vem do **cardápio de agora**, pelo `productId` — o carrinho guardado não carrega URL. Carrinho sem nenhuma foto fica sem a coluna; com alguma, a linha sem foto guarda o lugar.
+- **O carrinho oferece "Que tal adicionar?"** com o que a loja marcou (`suggested` no cardápio público): a regra é `suggestionsFor()` em `lib/suggestions.ts` — sugerido, disponível, fora do carrinho, no máximo 6, na ordem do cardápio, sempre do **cardápio de agora**. O toque adiciona direto ("Adicionar"); com grupo obrigatório (`needsChoice`) o botão é "Escolher" e abre a tela do produto, cujo `back()` devolve ao carrinho. Sem sugestão sobrando, a faixa some.
 - **Toda imagem passa por `imageUrl()`** (`lib/image.ts`): grade 400, tela do produto 800, capa e `og:image` 1200, logo 200. URL de fora do Cloudinary volta intacta. Largura nova é transformação nova na cota — reuse uma das quatro.
 
 ### Deploy (plano gratuito)
