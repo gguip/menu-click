@@ -258,7 +258,9 @@ export async function buildApp() {
   const origens = corsOrigins();
   await app.register(cors, {
     origin: origens.length === 0 ? false : origens,
-    methods: ["GET", "POST", "PATCH", "DELETE"],
+    // todo método que alguma rota usa: o painel chama a API de outra origem,
+    // e método fora daqui o navegador bloqueia antes de sair (há teste)
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["content-type", "authorization"],
     // sem `credentials`: a API usa header, não cookie
   });
