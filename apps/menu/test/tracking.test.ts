@@ -1,6 +1,6 @@
 // apps/menu/test/tracking.test.ts
 import { describe, expect, it } from "vitest";
-import { estimateText, type TrackedOrder, trackHeadline, trackSteps } from "../src/lib/tracking.ts";
+import { estimateText, type TrackedOrder, trackHeadline, trackProgress, trackSteps } from "../src/lib/tracking.ts";
 
 const TZ = "America/Sao_Paulo";
 
@@ -56,5 +56,18 @@ describe("acompanhamento", () => {
       "Pronto por volta de 18:27",
     );
     expect(estimateText(order({ estimate: null }), TZ)).toBeNull();
+  });
+
+  it("progresso: quantas etapas já foram, e qual está acontecendo agora", () => {
+    // aguardando: nada feito, e a primeira etapa é a que se espera
+    expect(trackProgress(order({ status: "pending" }))).toEqual({ done: 0, current: 0 });
+    expect(trackProgress(order({ status: "confirmed" }))).toEqual({ done: 1, current: 0 });
+    expect(trackProgress(order({ status: "preparing" }))).toEqual({ done: 2, current: 1 });
+    expect(trackProgress(order({ type: "takeaway", status: "ready_for_pickup" }))).toEqual({ done: 3, current: 2 });
+  });
+
+  it("progresso: pedido terminado não tem etapa acontecendo", () => {
+    expect(trackProgress(order({ status: "completed" }))).toEqual({ done: 4, current: null });
+    expect(trackProgress(order({ status: "cancelled" }))).toEqual({ done: 0, current: null });
   });
 });

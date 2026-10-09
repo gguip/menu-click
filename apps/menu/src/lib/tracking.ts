@@ -98,3 +98,15 @@ export async function fetchTrackedOrder(orderId: string, token: string): Promise
 export function trackingSocketUrl(orderId: string, token: string): string {
   return `${API_URL.replace(/^http/, "ws")}/orders/${encodeURIComponent(orderId)}/track?token=${encodeURIComponent(token)}`;
 }
+
+/**
+ * Onde o pedido está na trilha: quantas etapas já foram alcançadas e qual
+ * está acontecendo agora. Aguardando a loja, nenhuma foi alcançada e a que se
+ * espera é a primeira; pedido terminado não tem etapa acontecendo.
+ */
+export function trackProgress(order: TrackedOrder): { done: number; current: number | null } {
+  if (order.status === "cancelled") return { done: 0, current: null };
+  const done = TRACKS[order.type].findIndex((step) => step.status === order.status) + 1;
+  if (order.status === "completed") return { done, current: null };
+  return { done, current: Math.max(0, done - 1) };
+}

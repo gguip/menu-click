@@ -1,5 +1,5 @@
 // apps/menu/test/tracking-view.test.tsx
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TrackingView } from "../src/components/TrackingView.tsx";
 import { saveActiveOrder } from "../src/lib/active-order.ts";
@@ -81,5 +81,73 @@ describe("página de acompanhamento", () => {
     render(<TrackingView restaurant={makeRestaurant()} orderId="o1" />);
     expect(await screen.findByText("Pedido #42")).toBeTruthy();
     expect(screen.getByText("Retire em Rua do Porto, 120 — Centro")).toBeTruthy();
+  });
+
+  /** A linha da trilha de uma etapa, pelo rótulo. */
+  const step = (label: string) => screen.getByText(label, { selector: "li span" }).closest("li")!;
+
+  it("ao abrir, nenhuma etapa se anima: as já feitas aparecem prontas, e a atual é marcada", async () => {
+    window.history.replaceState(null, "", "/cantina-do-porto/pedido/o1?t=tk-1");
+    vi.stubGlobal("fetch", vi.fn(async () => json(DELIVERY)));
+    vi.stubGlobal("WebSocket", FakeSocket);
+    const view = render(<TrackingView restaurant={makeRestaurant()} orderId="o1" />);
+    await screen.findByRole("heading", { name: "Preparando" });
+    expect(view.container.querySelectorAll("[data-just]")).toHaveLength(0);
+    expect(step("Pedido aceito").dataset.state).toBe("done");
+    expect(step("Preparando").dataset.state).toBe("current");
+    expect(step("Saiu para entrega").dataset.state).toBe("upcoming");
+  });
+
+  it("quando o status avança com a tela aberta, só a etapa nova se anima", async () => {
+    window.history.replaceState(null, "", "/cantina-do-porto/pedido/o1?t=tk-1");
+    let current: typeof DELIVERY = DELIVERY;
+    vi.stubGlobal("fetch", vi.fn(async () => json(current)));
+    const sockets: FakeSocket[] = [];
+    vi.stubGlobal(
+      "WebSocket",
+      class extends FakeSocket {
+        constructor() {
+          super();
+          sockets.push(this);
+        }
+      },
+    );
+    const view = render(<TrackingView restaurant={makeRestaurant()} orderId="o1" />);
+    await screen.findByRole("heading", { name: "Preparando" });
+
+    current = { ...DELIVERY, status: "out_for_delivery" };
+    act(() => sockets[0].onmessage?.({ data: "{}" }));
+    await screen.findByRole("heading", { name: "Saiu para entrega" });
+
+    expect([...view.container.querySelectorAll("[data-just]")]).toEqual([step("Saiu para entrega")]);
+    expect(step("Saiu para entrega").dataset.state).toBe("current");
+    expect(step("Preparando").dataset.state).toBe("done");
+  });
+
+  it("pulou etapas de uma vez (a tela ficou em segundo plano): as novas entram em fila", async () => {
+    window.history.replaceState(null, "", "/cantina-do-porto/pedido/o1?t=tk-1");
+    let current: typeof DELIVERY = DELIVERY;
+    vi.stubGlobal("fetch", vi.fn(async () => json(current)));
+    const sockets: FakeSocket[] = [];
+    vi.stubGlobal(
+      "WebSocket",
+      class extends FakeSocket {
+        constructor() {
+          super();
+          sockets.push(this);
+        }
+      },
+    );
+    render(<TrackingView restaurant={makeRestaurant()} orderId="o1" />);
+    await screen.findByRole("heading", { name: "Preparando" });
+
+    current = { ...DELIVERY, status: "completed" };
+    act(() => sockets[0].onmessage?.({ data: "{}" }));
+    await screen.findByRole("heading", { name: "Entregue" });
+
+    expect(step("Saiu para entrega").dataset.just).toBe("0");
+    expect(step("Entregue").dataset.just).toBe("1");
+    // terminou: nenhuma etapa fica "acontecendo"
+    expect(step("Entregue").dataset.state).toBe("done");
   });
 });

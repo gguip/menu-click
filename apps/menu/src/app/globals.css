@@ -104,3 +104,81 @@ html {
     animation: sent-draw 360ms 240ms ease-out both;
   }
 }
+
+/* A trilha do acompanhamento. Só o que MUDOU com a tela aberta se anima
+   (`data-just`, com a posição na fila em `--track-delay`): o trilho enche, a
+   bolinha estala, o check se desenha e a hora aparece. A etapa que está
+   acontecendo solta um anel quatro vezes e para — movimento automático acima
+   de 5 s precisaria de botão de pausa (WCAG 2.2.2). */
+@keyframes track-fill {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes track-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes track-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  to {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes track-rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .track-headline {
+    animation: track-rise 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  .track-rail {
+    transform-origin: top;
+  }
+  [data-just] .track-rail {
+    animation: track-fill 450ms var(--track-delay, 0ms) ease-out both;
+  }
+  [data-just] .track-dot {
+    animation: track-pop 420ms calc(var(--track-delay, 0ms) + 380ms) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+  [data-just] .track-dot path {
+    stroke-dasharray: 22;
+    animation: sent-draw 320ms calc(var(--track-delay, 0ms) + 620ms) ease-out both;
+  }
+  [data-just] .track-time {
+    animation: track-rise 320ms calc(var(--track-delay, 0ms) + 700ms) ease-out both;
+  }
+  .track-ring {
+    animation: track-pulse 1.2s 300ms ease-out 4;
+  }
+  [data-just] .track-ring {
+    animation-delay: calc(var(--track-delay, 0ms) + 900ms);
+  }
+}
