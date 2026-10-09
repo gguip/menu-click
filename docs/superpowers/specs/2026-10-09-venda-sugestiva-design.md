@@ -135,7 +135,8 @@ Entre a lista de itens e o total, quando há ao menos uma sugestão:
   um botão;
 - produto sem foto mostra o fundo neutro no lugar, como a linha do carrinho.
 
-O preço é o **preço base** do produto, como a grade já mostra.
+O preço é o **mesmo da grade** (`fromPrice`): o valor do produto, ou "a
+partir de" com as opções mais baratas quando há grupo obrigatório.
 
 Sem sugestão sobrando, a faixa não é renderizada — nem o título.
 
