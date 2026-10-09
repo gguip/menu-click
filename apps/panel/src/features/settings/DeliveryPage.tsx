@@ -4,7 +4,7 @@ import { describeError } from "../../api/client.ts";
 import type { DeliveryNeighborhood, Restaurant } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { formatCents } from "../../lib/money.ts";
-import { notifySaved } from "../../lib/notify.ts";
+import { notifySaved } from "../../lib/notify.tsx";
 import buttons from "../../ui/buttons.module.css";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { DeliveryAlert } from "../orders/OrdersNotices.tsx";

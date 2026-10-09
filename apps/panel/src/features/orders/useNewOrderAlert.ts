@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { listPendingOrders } from "../../api/orders.ts";
 import type { Order } from "../../api/types.ts";
 import { hasUserGesture, playBeep, unlockAudio } from "../../lib/audio.ts";
-import { notifyNewOrder } from "../../lib/notify.ts";
+import { notifyNewOrder } from "../../lib/notify.tsx";
 import { noticePermission, requestNoticePermission, showSystemNotice } from "../../lib/systemNotice.ts";
 import { detectNewPending, newOrderTitle } from "./newOrders.ts";
 import { ORDERS_POLL_MS } from "./polling.ts";

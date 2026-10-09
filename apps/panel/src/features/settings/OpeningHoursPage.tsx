@@ -3,7 +3,7 @@ import { useState } from "react";
 import { describeError } from "../../api/client.ts";
 import type { OpeningHour } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
-import { notifySaved } from "../../lib/notify.ts";
+import { notifySaved } from "../../lib/notify.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { PauseSwitch } from "../../layout/PauseSwitch.tsx";
 import { useRestaurant } from "../restaurant/useRestaurant.ts";

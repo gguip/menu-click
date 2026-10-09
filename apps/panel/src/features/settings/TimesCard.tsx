@@ -3,7 +3,7 @@ import { TextInput } from "@mantine/core";
 import { useState } from "react";
 import { describeError } from "../../api/client.ts";
 import type { Restaurant } from "../../api/types.ts";
-import { notifySaved } from "../../lib/notify.ts";
+import { notifySaved } from "../../lib/notify.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
 import { useUpdateRestaurant } from "../restaurant/useRestaurant.ts";
 import classes from "./ModalitiesPage.module.css";

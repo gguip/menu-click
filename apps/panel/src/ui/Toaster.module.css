@@ -1,0 +1,5 @@
+/* Abaixo do header (60px), para não cobrir os números do topo. */
+.root:where([data-position="top-right"]) {
+  top: 76px;
+  right: 20px;
+}
