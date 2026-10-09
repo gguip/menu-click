@@ -1,4 +1,5 @@
 import type { Order } from "../../api/types.ts";
+import { orderNumber } from "../../lib/orderNumber.ts";
 
 /**
  * Quais pendentes são novidade. `seen === null` é a primeira carga: nada
@@ -17,4 +18,9 @@ export function detectNewPending(
     if (seen !== null) fresh.push(order.id);
   }
   return { fresh, seen: next };
+}
+
+/** O texto do aviso: o número quando é um só, a quantidade quando chegam juntos. */
+export function newOrderTitle(orders: readonly Order[]): string {
+  return orders.length === 1 ? `Novo pedido ${orderNumber(orders[0])}` : `${orders.length} pedidos novos`;
 }
