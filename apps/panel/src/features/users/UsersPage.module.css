@@ -82,17 +82,51 @@
   font-size: 13px;
 }
 
+.row:last-child {
+  border-bottom: 0;
+}
+
 .invite {
   display: grid;
-  gap: 10px;
-  padding: 14px 16px;
-  background: var(--mc-surface2);
+  gap: 14px;
+  padding: 16px 18px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .fields {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+  align-items: start;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--mc-ink3);
+}
+
+@media (max-width: 560px) {
+  .fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .error {

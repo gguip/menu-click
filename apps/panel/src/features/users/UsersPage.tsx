@@ -137,46 +137,56 @@ export function UsersPage() {
             />
           ))}
         </ul>
-        <form className={classes.invite} onSubmit={submit}>
-          <div className={classes.fields}>
-            <TextInput
-              label="Nome"
-              value={form.name}
-              error={errors.name}
-              onChange={(event) => setForm({ ...form, name: event.currentTarget.value })}
-            />
-            <TextInput
-              label="E-mail"
-              type="email"
-              value={form.email}
-              error={errors.email}
-              onChange={(event) => setForm({ ...form, email: event.currentTarget.value })}
-            />
-            <PasswordInput
-              label="Senha provisória"
-              description="Você entrega esta senha à pessoa. Ela troca depois, no menu da conta."
-              value={form.password}
-              error={errors.password}
-              onChange={(event) => setForm({ ...form, password: event.currentTarget.value })}
-            />
-            <Select
-              label="Papel"
-              data={[
-                { value: "staff", label: "Equipe" },
-                { value: "owner", label: "Dono" },
-              ]}
-              value={form.role}
-              allowDeselect={false}
-              onChange={(value) => setForm({ ...form, role: (value ?? "staff") as UserRole })}
-            />
-          </div>
-          <div>
-            <Button type="submit" loading={invite.isPending}>
-              Convidar
-            </Button>
-          </div>
-        </form>
       </section>
+      <form
+        className={`${classes.card} ${classes.invite}`}
+        aria-labelledby="convidar-titulo"
+        onSubmit={submit}
+      >
+        <h2 id="convidar-titulo" className={classes.cardTitle}>
+          Convidar pessoa
+        </h2>
+        <div className={classes.fields}>
+          <TextInput
+            label="Nome"
+            value={form.name}
+            error={errors.name}
+            onChange={(event) => setForm({ ...form, name: event.currentTarget.value })}
+          />
+          <TextInput
+            label="E-mail"
+            type="email"
+            value={form.email}
+            error={errors.email}
+            onChange={(event) => setForm({ ...form, email: event.currentTarget.value })}
+          />
+          <PasswordInput
+            label="Senha provisória"
+            aria-describedby="senha-provisoria-ajuda"
+            value={form.password}
+            error={errors.password}
+            onChange={(event) => setForm({ ...form, password: event.currentTarget.value })}
+          />
+          <Select
+            label="Papel"
+            data={[
+              { value: "staff", label: "Equipe" },
+              { value: "owner", label: "Dono" },
+            ]}
+            value={form.role}
+            allowDeselect={false}
+            onChange={(value) => setForm({ ...form, role: (value ?? "staff") as UserRole })}
+          />
+        </div>
+        <div className={classes.footer}>
+          <p id="senha-provisoria-ajuda" className={classes.hint}>
+            Você entrega esta senha à pessoa. Ela troca depois, no menu da conta.
+          </p>
+          <Button type="submit" loading={invite.isPending}>
+            Convidar
+          </Button>
+        </div>
+      </form>
       <p className={classes.note}>
         O papel é escolhido no convite. Para trocar, remova a pessoa e convide de novo.
       </p>
