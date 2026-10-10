@@ -1,14 +1,33 @@
 .page {
   display: grid;
   gap: 16px;
-  padding: 18px 20px 0;
+  max-width: 1180px;
+  padding: 18px 20px;
 }
 
 .columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   align-items: start;
+}
+
+@media (max-width: 900px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.column {
+  display: grid;
+  gap: 16px;
+}
+
+.divider {
+  width: 100%;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid var(--mc-line);
 }
 
 .card {
@@ -49,15 +68,24 @@
   color: var(--mc-ink2);
 }
 
-.brandPreview {
+/* a prévia fica na linha do campo, alinhada pela base */
+.brand {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.brandInput {
+  flex: 1 1 220px;
 }
 
 /* prévia do botão do app do cliente: a cor vem da loja, o texto é branco fixo */
 .brandButton {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  height: 40px;
+  height: 36px;
   padding: 0 16px;
   border-radius: 10px;
   color: #ffffff;
