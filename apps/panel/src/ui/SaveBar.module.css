@@ -1,6 +1,8 @@
 .saveBar {
   position: sticky;
   bottom: 0;
+  /* sticky só gruda com tela mais alta que a janela; na curta, é a margem que a leva ao fundo */
+  margin-top: auto;
   display: flex;
   align-items: center;
   justify-content: flex-end;
