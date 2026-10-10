@@ -1,4 +1,5 @@
 import "@mantine/core/styles.css";
+import "@mantine/dates/styles.css";
 import "@mantine/notifications/styles.css";
 import "@fontsource/figtree/400.css";
 import "@fontsource/figtree/500.css";
