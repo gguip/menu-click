@@ -254,6 +254,8 @@ export const restaurantDetailResponseSchema = {
         opensAt: { type: "string" },
       },
     },
+    // o link que a loja passa ao cliente; montado aqui, como o `qrUrl` da mesa
+    menuUrl: { type: "string" },
   },
 };
 

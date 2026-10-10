@@ -1,4 +1,4 @@
-import { NativeSelect, TextInput } from "@mantine/core";
+import { ColorInput, NativeSelect, TextInput } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { describeError } from "../../api/client.ts";
@@ -80,18 +80,47 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
     <>
       <div className={classes.page}>
         <div className={classes.columns}>
-          <section className={classes.card}>
-            <h2 className={classes.cardTitle}>Identificação</h2>
-            <TextInput label="Nome da loja" {...field("name")} />
-            <div className={classes.pair}>
-              <TextInput label="Tipo de cozinha" {...field("cuisineType")} />
-              <NativeSelect
-                label="Fuso horário"
-                description="É ele que decide onde o dia começa: “pedidos de hoje” e o faturamento do topo mudam junto."
-                data={timezoneOptions.map((zone) => ({ value: zone.value, label: zone.label }))}
-                {...field("timezone")}
+          <div className={classes.column}>
+            <section className={classes.card}>
+              <h2 className={classes.cardTitle}>Identificação</h2>
+              <TextInput label="Nome da loja" {...field("name")} />
+              <div className={classes.pair}>
+                <TextInput label="Tipo de cozinha" {...field("cuisineType")} />
+                <NativeSelect
+                  label="Fuso horário"
+                  description="É ele que decide onde o dia começa: “pedidos de hoje” e o faturamento do topo mudam junto."
+                  // ajuda embaixo do campo: em cima, ela desalinha o par
+                  inputWrapperOrder={["label", "input", "description", "error"]}
+                  data={timezoneOptions.map((zone) => ({ value: zone.value, label: zone.label }))}
+                  {...field("timezone")}
+                />
+              </div>
+              <TextInput
+                label="Endereço público"
+                disabled
+                value={`/${restaurant.slug}`}
+                description="É a URL dentro do QR code impresso — por isso não muda por aqui."
+                inputWrapperOrder={["label", "input", "description", "error"]}
               />
-            </div>
+            </section>
+
+            <section className={classes.card}>
+              <h2 className={classes.cardTitle}>Endereço</h2>
+              <TextInput label="Rua" {...field("street")} />
+              <div className={classes.pair}>
+                <TextInput label="Número" {...field("number")} />
+                <TextInput label="Bairro" {...field("neighborhood")} />
+              </div>
+              <div className={classes.address}>
+                <TextInput label="Cidade" {...field("city")} />
+                <TextInput label="UF" maxLength={2} {...field("state")} />
+                <TextInput label="CEP" {...field("zipCode")} />
+              </div>
+            </section>
+          </div>
+
+          <section className={classes.card}>
+            <h2 className={classes.cardTitle}>Aparência no cardápio</h2>
             <ImageField
               label="Logo"
               description="JPG, PNG ou WebP, até 5 MB. Aparece ao lado do nome da loja no cardápio."
@@ -99,6 +128,7 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
               change={logo}
               onChange={setLogo}
             />
+            <hr className={classes.divider} />
             <ImageField
               label="Capa do cardápio"
               description="A imagem do topo do cardápio que o cliente abre pelo QR code. Fica melhor na horizontal."
@@ -107,13 +137,20 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
               onChange={setCover}
               shape="wide"
             />
-            <TextInput
-              label="Cor da marca"
-              placeholder="#1E5AE8"
-              description="É a cor do botão principal no cardápio do cliente. Precisa de contraste com o texto branco — a loja recusa tons claros."
-              {...field("brandColor")}
-            />
-            <div className={classes.brandPreview}>
+            <hr className={classes.divider} />
+            <div className={classes.brand}>
+              <ColorInput
+                className={classes.brandInput}
+                label="Cor da marca"
+                placeholder="#1E5AE8"
+                description="É a cor do botão principal no cardápio do cliente. Precisa de contraste com o texto branco — a loja recusa tons claros."
+                format="hex"
+                withEyeDropper={false}
+                // digitar pela metade não pode ser desfeito ao sair: quem recusa é a API
+                fixOnBlur={false}
+                value={form.brandColor}
+                onChange={(value) => setForm((current) => ({ ...current, brandColor: value }))}
+              />
               <span
                 className={classes.brandButton}
                 // hex fora de tokens.ts de propósito: é a cor DA LOJA, não do tema do painel
@@ -121,26 +158,6 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
               >
                 Adicionar ao carrinho
               </span>
-            </div>
-            <TextInput
-              label="Endereço público"
-              disabled
-              value={`/${restaurant.slug}`}
-              description="É a URL dentro do QR code impresso — por isso não muda por aqui."
-            />
-          </section>
-
-          <section className={classes.card}>
-            <h2 className={classes.cardTitle}>Endereço</h2>
-            <TextInput label="Rua" {...field("street")} />
-            <div className={classes.pair}>
-              <TextInput label="Número" {...field("number")} />
-              <TextInput label="Bairro" {...field("neighborhood")} />
-            </div>
-            <div className={classes.address}>
-              <TextInput label="Cidade" {...field("city")} />
-              <TextInput label="UF" maxLength={2} {...field("state")} />
-              <TextInput label="CEP" {...field("zipCode")} />
             </div>
           </section>
         </div>

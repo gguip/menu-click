@@ -180,62 +180,69 @@ function ProductEditor({
           <IconArrowLeft size={14} /> Produtos
         </Link>
         <div className={classes.columns}>
-          <section className={classes.card}>
-            <h2 className={classes.cardTitle}>Dados do produto</h2>
-            <TextInput label="Nome" value={form.name} onChange={(e) => update({ name: e.currentTarget.value })} />
-            <Textarea
-              label="Descrição"
-              rows={3}
-              placeholder="Massa fina, 8 fatias. Escolha até 2 sabores."
-              value={form.description}
-              onChange={(e) => update({ description: e.currentTarget.value })}
-            />
-            <div className={classes.priceRow}>
-              <TextInput
-                label="Preço (R$)"
-                placeholder="0,00"
-                inputMode="decimal"
-                value={form.price}
-                onChange={(e) => update({ price: e.currentTarget.value })}
+          <div className={classes.column}>
+            <section className={classes.card}>
+              <h2 className={classes.cardTitle}>Dados do produto</h2>
+              <TextInput label="Nome" value={form.name} onChange={(e) => update({ name: e.currentTarget.value })} />
+              <Textarea
+                label="Descrição"
+                rows={3}
+                placeholder="Massa fina, 8 fatias. Escolha até 2 sabores."
+                value={form.description}
+                onChange={(e) => update({ description: e.currentTarget.value })}
               />
-              <TextInput
-                label="Estoque"
-                inputMode="numeric"
-                value={form.stock}
-                onChange={(e) => update({ stock: e.currentTarget.value })}
+              <div className={classes.priceRow}>
+                <TextInput
+                  label="Preço (R$)"
+                  placeholder="0,00"
+                  inputMode="decimal"
+                  value={form.price}
+                  onChange={(e) => update({ price: e.currentTarget.value })}
+                />
+                <TextInput
+                  label="Estoque"
+                  inputMode="numeric"
+                  value={form.stock}
+                  onChange={(e) => update({ stock: e.currentTarget.value })}
+                />
+                <NativeSelect
+                  label="Seção"
+                  value={form.categoryId}
+                  onChange={(e) => update({ categoryId: e.currentTarget.value })}
+                  data={[
+                    { value: "", label: "Sem seção" },
+                    ...categories.map((category) => ({ value: category.id, label: category.name })),
+                  ]}
+                />
+              </div>
+            </section>
+
+            <section className={classes.card}>
+              <h2 className={classes.cardTitle}>Aparência no cardápio</h2>
+              <ImageField
+                label="Foto"
+                description="JPG, PNG ou WebP, até 5 MB."
+                saved={product?.photoUrl}
+                change={photo}
+                onChange={setPhoto}
               />
-              <NativeSelect
-                label="Seção"
-                value={form.categoryId}
-                onChange={(e) => update({ categoryId: e.currentTarget.value })}
-                data={[
-                  { value: "", label: "Sem seção" },
-                  ...categories.map((category) => ({ value: category.id, label: category.name })),
-                ]}
-              />
-            </div>
-            {/* rótulo e ajuda no padrão dos outros campos (`Input.Wrapper`), com o
-                interruptor à direita; o nome do controle vem do `aria-label` */}
-            <div className={classes.suggest}>
-              <Input.Wrapper
-                label="Sugerir no carrinho"
-                labelElement="div"
-                description={'Aparece em "Que tal adicionar?" quando o cliente abre o carrinho.'}
-              />
-              <Switch
-                aria-label="Sugerir no carrinho"
-                checked={form.isSuggested}
-                onChange={(e) => update({ isSuggested: e.currentTarget.checked })}
-              />
-            </div>
-            <ImageField
-              label="Foto"
-              description="JPG, PNG ou WebP, até 5 MB."
-              saved={product?.photoUrl}
-              change={photo}
-              onChange={setPhoto}
-            />
-          </section>
+              <hr className={classes.divider} />
+              {/* rótulo e ajuda no padrão dos outros campos (`Input.Wrapper`), com o
+                  interruptor à direita; o nome do controle vem do `aria-label` */}
+              <div className={classes.suggest}>
+                <Input.Wrapper
+                  label="Sugerir no carrinho"
+                  labelElement="div"
+                  description={'Aparece em "Que tal adicionar?" quando o cliente abre o carrinho.'}
+                />
+                <Switch
+                  aria-label="Sugerir no carrinho"
+                  checked={form.isSuggested}
+                  onChange={(e) => update({ isSuggested: e.currentTarget.checked })}
+                />
+              </div>
+            </section>
+          </div>
 
           <section className={classes.card}>
             <h2 className={classes.cardTitle}>Grupos de opções</h2>

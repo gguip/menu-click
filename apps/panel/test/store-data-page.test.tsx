@@ -27,6 +27,22 @@ describe("StoreDataPage", () => {
     ).toBeTruthy();
   });
 
+  it("a cor digitada pinta a prévia do botão e suja a barra", async () => {
+    signIn();
+    mockApi(panelHandlers());
+    renderInPanel(routes, "/dados-da-loja");
+    const color = (await screen.findByLabelText("Cor da marca")) as HTMLInputElement;
+    const preview = screen.getByText("Adicionar ao carrinho");
+    fireEvent.change(color, { target: { value: "#0B7A48" } });
+    expect(color.value).toBe("#0B7A48");
+    expect(preview.style.background).toBe("rgb(11, 122, 72)");
+    expect(screen.getByText("Alterações não salvas")).toBeTruthy();
+    // cor pela metade continua no campo ao sair dele: quem recusa é a API
+    fireEvent.change(color, { target: { value: "#0B7" } });
+    fireEvent.blur(color);
+    expect(color.value).toBe("#0B7");
+  });
+
   it("salva só o que mudou", async () => {
     signIn();
     const api = mockApi([

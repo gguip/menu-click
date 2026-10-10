@@ -15,6 +15,7 @@ import { isValidTimezone } from "../domain/timezone.ts";
 import { assertOwnImageUrl, storeImagePublicId } from "../cloudinary.ts";
 import { ConflictError, NotFoundError, ValidationError } from "../errors.ts";
 import { contrastWithWhite, MIN_ACTION_CONTRAST } from "../domain/color.ts";
+import { menuUrl } from "../menu-url.ts";
 import * as categoriesRepository from "../repositories/categories.ts";
 import * as deliveryNeighborhoodsRepository from "../repositories/delivery-neighborhoods.ts";
 import * as tablesRepository from "../repositories/tables.ts";
@@ -277,19 +278,19 @@ export async function getById(id: string): Promise<Restaurant> {
 }
 
 /**
- * O restaurante como o GET do painel devolve: com o status de funcionamento.
- * Só o GET calcula — PATCH e POST devolvem o restaurante sem ele (o painel
+ * O restaurante como o GET do painel devolve: com o status de funcionamento
+ * e o link do cardápio. Só o GET calcula — PATCH e POST devolvem o restaurante sem ele (o painel
  * preserva o último valor no cache; ver `useRestaurant.ts`).
  */
 export async function getDetail(
   id: string,
-): Promise<Restaurant & { openingStatus: OpeningStatus }> {
+): Promise<Restaurant & { openingStatus: OpeningStatus; menuUrl: string }> {
   const restaurant = await getById(id);
   const openingStatus = await openingHoursRepository.findOpeningStatus(
     restaurant.id,
     restaurant.timezone,
   );
-  return { ...restaurant, openingStatus };
+  return { ...restaurant, openingStatus, menuUrl: menuUrl(restaurant.slug) };
 }
 
 /**

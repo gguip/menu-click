@@ -37,9 +37,15 @@ export function storeStatusLabel(
   };
 }
 
-/** A resposta do PATCH não traz `openingStatus`: guardá-la crua apagaria o status do rail. */
+/**
+ * A resposta do PATCH não traz o que só o GET calcula — `openingStatus` e
+ * `menuUrl`: guardá-la crua apagaria o status do rail e o botão de copiar o
+ * link.
+ */
 export function keepOpeningStatus(previous: Restaurant | undefined, next: Restaurant): Restaurant {
-  return next.openingStatus === undefined && previous?.openingStatus !== undefined
-    ? { ...next, openingStatus: previous.openingStatus }
-    : next;
+  return {
+    ...next,
+    openingStatus: next.openingStatus ?? previous?.openingStatus,
+    menuUrl: next.menuUrl ?? previous?.menuUrl,
+  };
 }

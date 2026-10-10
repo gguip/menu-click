@@ -18,6 +18,21 @@ function defer<T>() {
   return { promise, resolve };
 }
 
+/**
+ * O campo de hora são dois: hora e minuto, cada um com o próprio rótulo. É como
+ * a pessoa digita — "18", e o foco pula para os minutos.
+ */
+function setTime(label: string, time: string) {
+  const [hours, minutes] = time.split(":");
+  fireEvent.change(screen.getByLabelText(`${label}, hora`), { target: { value: hours } });
+  fireEvent.change(screen.getByLabelText(`${label}, minuto`), { target: { value: minutes } });
+}
+
+function readTime(label: string): string {
+  const part = (suffix: string) => (screen.getByLabelText(`${label}, ${suffix}`) as HTMLInputElement).value;
+  return `${part("hora")}:${part("minuto")}`;
+}
+
 const HOURS = `/restaurants/${RESTAURANT_ID}/opening-hours`;
 const routes = [{ path: "/horario", element: <OpeningHoursPage /> }];
 
@@ -63,8 +78,8 @@ describe("OpeningHoursPage", () => {
   it("acrescentar faixa manda a grade inteira", async () => {
     const api = setup([{ method: "PUT", path: HOURS, body: { openingHours: SEGUNDA_E_SABADO } }]);
     fireEvent.click(await screen.findByRole("button", { name: "Adicionar faixa em quarta" }));
-    fireEvent.change(screen.getByLabelText("Quarta: abre (faixa 1)"), { target: { value: "18:00" } });
-    fireEvent.change(screen.getByLabelText("Quarta: fecha (faixa 1)"), { target: { value: "23:00" } });
+    setTime("Quarta: abre (faixa 1)", "18:00");
+    setTime("Quarta: fecha (faixa 1)", "23:00");
     fireEvent.click(screen.getByRole("button", { name: "Salvar horário" }));
     await waitFor(() => expect(api.calls.some((call) => call.method === "PUT")).toBe(true));
     expect(api.calls.find((call) => call.method === "PUT")?.body).toEqual({
@@ -83,8 +98,8 @@ describe("OpeningHoursPage", () => {
   it("salvar a grade refaz o restaurante, para o rail refletir na hora", async () => {
     const api = setup([{ method: "PUT", path: HOURS, body: { openingHours: SEGUNDA_E_SABADO } }]);
     fireEvent.click(await screen.findByRole("button", { name: "Adicionar faixa em quarta" }));
-    fireEvent.change(screen.getByLabelText("Quarta: abre (faixa 1)"), { target: { value: "18:00" } });
-    fireEvent.change(screen.getByLabelText("Quarta: fecha (faixa 1)"), { target: { value: "23:00" } });
+    setTime("Quarta: abre (faixa 1)", "18:00");
+    setTime("Quarta: fecha (faixa 1)", "23:00");
     const restaurantGets = () =>
       api.calls.filter((call) => call.method === "GET" && call.path === `/restaurants/${RESTAURANT_ID}`).length;
     const before = restaurantGets();
@@ -107,8 +122,8 @@ describe("OpeningHoursPage", () => {
   it("faixa que começa e termina no mesmo horário nem chega à API", async () => {
     const api = setup();
     fireEvent.click(await screen.findByRole("button", { name: "Adicionar faixa em terça" }));
-    fireEvent.change(screen.getByLabelText("Terça: abre (faixa 1)"), { target: { value: "19:00" } });
-    fireEvent.change(screen.getByLabelText("Terça: fecha (faixa 1)"), { target: { value: "19:00" } });
+    setTime("Terça: abre (faixa 1)", "19:00");
+    setTime("Terça: fecha (faixa 1)", "19:00");
     fireEvent.click(screen.getByRole("button", { name: "Salvar horário" }));
     expect(screen.getByText("A faixa de terça começa e termina no mesmo horário.")).toBeTruthy();
     expect(api.calls.some((call) => call.method === "PUT")).toBe(false);
@@ -119,7 +134,7 @@ describe("OpeningHoursPage", () => {
     const api = mockApi([gradeHandler(SEGUNDA_E_SABADO), ...panelHandlers()]);
     const { queryClient } = renderInPanel(routes, "/horario");
     fireEvent.click(await screen.findByRole("button", { name: "Adicionar faixa em quarta" }));
-    fireEvent.change(screen.getByLabelText("Quarta: abre (faixa 1)"), { target: { value: "18:00" } });
+    setTime("Quarta: abre (faixa 1)", "18:00");
 
     api.add({
       method: "GET",
@@ -130,8 +145,8 @@ describe("OpeningHoursPage", () => {
     });
     await queryClient.refetchQueries({ queryKey: ["opening-hours", RESTAURANT_ID] });
 
-    expect(await screen.findByLabelText("Quarta: abre (faixa 1)")).toBeTruthy();
-    expect((screen.getByLabelText("Quarta: abre (faixa 1)") as HTMLInputElement).value).toBe("18:00");
+    expect(await screen.findByLabelText("Quarta: abre (faixa 1), hora")).toBeTruthy();
+    expect(readTime("Quarta: abre (faixa 1)")).toBe("18:00");
     expect(screen.queryByText("Fora do ar")).toBeNull();
   });
 
@@ -180,7 +195,7 @@ describe("OpeningHoursPage", () => {
 
     // Enquanto o PUT está em voo, acrescenta uma faixa nova.
     fireEvent.click(screen.getByRole("button", { name: "Adicionar faixa em quarta" }));
-    fireEvent.change(screen.getByLabelText("Quarta: abre (faixa 1)"), { target: { value: "18:00" } });
+    setTime("Quarta: abre (faixa 1)", "18:00");
 
     // O PUT resolve com a grade que foi enviada (sem a faixa nova).
     put.resolve(jsonResponse({ openingHours: SEGUNDA_E_SABADO }));
@@ -191,7 +206,7 @@ describe("OpeningHoursPage", () => {
     );
 
     // A faixa acrescentada depois de clicar salvar continua na tela...
-    expect((screen.getByLabelText("Quarta: abre (faixa 1)") as HTMLInputElement).value).toBe("18:00");
+    expect(readTime("Quarta: abre (faixa 1)")).toBe("18:00");
     // ...e a barra continua suja, porque ela nunca foi enviada.
     expect(screen.getByText("Alterações não salvas")).toBeTruthy();
   });

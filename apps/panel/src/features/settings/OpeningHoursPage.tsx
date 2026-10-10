@@ -1,10 +1,11 @@
-import { Button, TextInput } from "@mantine/core";
+import { Button } from "@mantine/core";
 import { useState } from "react";
 import { describeError } from "../../api/client.ts";
 import type { OpeningHour } from "../../api/types.ts";
 import { useSessionUser } from "../../auth/useMe.ts";
 import { notifySaved } from "../../lib/notify.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
+import { TimeField } from "../../ui/TimeField.tsx";
 import { PauseSwitch } from "../../layout/PauseSwitch.tsx";
 import { useRestaurant } from "../restaurant/useRestaurant.ts";
 import {
@@ -78,27 +79,21 @@ function OpeningHoursEditor({
                   <div className={classes.ranges}>
                     {day.ranges.map((range, index) => (
                       <div key={index} className={classes.range}>
-                        <TextInput
-                          type="time"
+                        <TimeField
                           className={classes.time}
-                          aria-label={`${day.label}: abre (faixa ${index + 1})`}
+                          label={`${day.label}: abre (faixa ${index + 1})`}
                           value={range.opensAt}
-                          onChange={(event) =>
-                            setDays(
-                              setRangeTime(days, day.weekday, index, "opensAt", event.currentTarget.value),
-                            )
+                          onChange={(value) =>
+                            setDays(setRangeTime(days, day.weekday, index, "opensAt", value))
                           }
                         />
                         <span className={classes.until}>até</span>
-                        <TextInput
-                          type="time"
+                        <TimeField
                           className={classes.time}
-                          aria-label={`${day.label}: fecha (faixa ${index + 1})`}
+                          label={`${day.label}: fecha (faixa ${index + 1})`}
                           value={range.closesAt}
-                          onChange={(event) =>
-                            setDays(
-                              setRangeTime(days, day.weekday, index, "closesAt", event.currentTarget.value),
-                            )
+                          onChange={(value) =>
+                            setDays(setRangeTime(days, day.weekday, index, "closesAt", value))
                           }
                         />
                         {crossesMidnight(range) && (

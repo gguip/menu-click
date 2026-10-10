@@ -1,6 +1,7 @@
 import type { Restaurant } from "../api/types.ts";
 import { useTodaySummary } from "../features/orders/useSummary.ts";
 import { formatCents } from "../lib/money.ts";
+import { CopyMenuLink } from "./CopyMenuLink.tsx";
 import classes from "./Header.module.css";
 import { PauseSwitch } from "./PauseSwitch.tsx";
 
@@ -36,6 +37,7 @@ export function Header({
           value={summary ? formatCents(summary.averageTicketInCents) : "—"}
         />
         <span className={classes.divider} aria-hidden="true" />
+        <CopyMenuLink menuUrl={restaurant?.menuUrl} />
         <PauseSwitch restaurantId={restaurantId} restaurant={restaurant} />
       </div>
     </header>

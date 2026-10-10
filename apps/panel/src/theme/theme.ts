@@ -40,6 +40,9 @@ export const theme = createTheme({
     Menu: { defaultProps: NO_MOTION },
     Popover: { defaultProps: NO_MOTION },
     Skeleton: { defaultProps: { animate: false } },
+    // O Mantine alinha a chave ao topo; com descrição embaixo do rótulo ela
+    // ficava na altura da primeira linha, e não no meio das duas.
+    Switch: { styles: { body: { alignItems: "center" } } },
   },
 });
 
