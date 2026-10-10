@@ -42,8 +42,7 @@
   overflow-y: auto;
   display: grid;
   align-content: start;
-  gap: 14px;
-  padding: 12px 10px;
+  padding: 14px 10px;
 }
 
 .group {
@@ -51,13 +50,20 @@
   gap: 2px;
 }
 
+/* linha e respiro entre os grupos: só a distância não bastava para separá-los */
+.group + .group {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--mc-line);
+}
+
 .groupTitle {
-  padding: 0 10px 4px;
+  padding: 0 10px 8px;
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--mc-ink3);
+  color: var(--mc-ink2);
 }
 
 .item {
