@@ -86,7 +86,7 @@ export async function restaurantRoutes(app: FastifyInstance) {
         operationId: "getRestaurant",
         summary: "Detalhe do restaurante",
         description:
-          "Pedir um restaurante que não é o da sessão responde 404, e não 403: 'proibido' confirmaria que ele existe. Traz `openingStatus`: se a loja está dentro da grade de horário agora, com `closesAt` (aberta) ou `opensAt` (fechada); sem `closesAt`, está aberta direto pelos próximos 7 dias, e sem `opensAt`, não tem nenhuma faixa cadastrada. A pausa manual não entra nele — está em `acceptingOrders`.",
+          "Pedir um restaurante que não é o da sessão responde 404, e não 403: 'proibido' confirmaria que ele existe. Traz `openingStatus`: se a loja está dentro da grade de horário agora, com `closesAt` (aberta) ou `opensAt` (fechada); sem `closesAt`, está aberta direto pelos próximos 7 dias, e sem `opensAt`, não tem nenhuma faixa cadastrada. A pausa manual não entra nele — está em `acceptingOrders`. Traz também `menuUrl`, o endereço do cardápio da loja para passar ao cliente (entrega e retirada).",
         params: restaurantIdParamsSchema,
         response: { 200: restaurantDetailResponseSchema, 404: errorResponseSchema },
       },

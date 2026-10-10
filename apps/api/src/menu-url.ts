@@ -51,6 +51,15 @@ export function assertMenuBaseUrl(): void {
  * divergiram.
  */
 export function tableQrUrl(slug: string, hash: string): string {
+  return `${menuUrl(slug)}?mesa=${hash}`;
+}
+
+/**
+ * A URL do cardápio da loja, sem mesa: é o link que a loja passa ao cliente
+ * para entrega e retirada. O painel a recebe pronta pelo mesmo motivo do QR —
+ * a raiz do cardápio é configuração da API, e não do painel.
+ */
+export function menuUrl(slug: string): string {
   const base = process.env.MENU_BASE_URL as string;
-  return `${base.replace(/\/+$/, "")}/${slug}?mesa=${hash}`;
+  return `${base.replace(/\/+$/, "")}/${slug}`;
 }
