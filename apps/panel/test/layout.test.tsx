@@ -1,5 +1,5 @@
 import { fireEvent, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readSession } from "../src/api/session.ts";
 import { RequireVerified } from "../src/auth/guards.tsx";
 import { PanelLayout } from "../src/layout/PanelLayout.tsx";
@@ -23,6 +23,8 @@ const routes = [
 const PAUSED_TEXT = "A loja não está recebendo pedidos novos. O horário cadastrado não foi alterado.";
 
 describe("PanelLayout", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
   it("mostra a loja, o título da tela e os números do dia", async () => {
     signIn();
     mockApi(
@@ -67,6 +69,43 @@ describe("PanelLayout", () => {
     });
     fireEvent.click(pause);
     expect(await screen.findByText("Aberta · fecha 23:30")).toBeTruthy();
+  });
+
+  it("copia o link do cardápio que a API montou e avisa", async () => {
+    signIn();
+    const menuUrl = "https://menu.example/trattoria-bella";
+    mockApi(panelHandlers({ restaurant: { menuUrl } }));
+    const copied: string[] = [];
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText: async (text: string) => void copied.push(text) },
+    });
+    renderRoutes(routes, "/pedidos");
+    fireEvent.click(await screen.findByRole("button", { name: "Copiar link do cardápio" }));
+    expect(await screen.findByText("Link copiado")).toBeTruthy();
+    expect(copied).toEqual([menuUrl]);
+  });
+
+  it("sem permissão para copiar, mostra o link para a pessoa copiar à mão", async () => {
+    signIn();
+    const menuUrl = "https://menu.example/trattoria-bella";
+    mockApi(panelHandlers({ restaurant: { menuUrl } }));
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText: async () => Promise.reject(new Error("negado")) },
+    });
+    renderRoutes(routes, "/pedidos");
+    fireEvent.click(await screen.findByRole("button", { name: "Copiar link do cardápio" }));
+    expect(await screen.findByText("Não deu para copiar")).toBeTruthy();
+    expect(screen.getByText(menuUrl)).toBeTruthy();
+  });
+
+  it("sem o link ainda, o botão não aparece", async () => {
+    signIn();
+    mockApi(panelHandlers());
+    renderRoutes(routes, "/pedidos");
+    await screen.findByRole("switch", { name: "Aceitando pedidos" });
+    expect(screen.queryByRole("button", { name: "Copiar link do cardápio" })).toBeNull();
   });
 
   it("loja já pausada abre com a faixa", async () => {

@@ -54,6 +54,8 @@ export type Restaurant = {
    * Ausente enquanto não houve GET — e o cache preserva o último valor.
    */
   openingStatus?: { isOpen: boolean; closesAt?: string; opensAt?: string };
+  /** O link do cardápio, montado pela API. Só o GET traz; o cache preserva. */
+  menuUrl?: string;
   /** Minutos de preparo para a retirada; ausente = sem previsão. */
   prepTimeMinutes?: number;
   /** Faixa de entrega em minutos; os dois juntos ou nenhum. */

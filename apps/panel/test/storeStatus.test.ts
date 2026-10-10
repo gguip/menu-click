@@ -40,4 +40,10 @@ describe("status da loja no rail", () => {
     expect(keepOpeningStatus(previous, patched).openingStatus).toEqual(previous.openingStatus);
     expect(keepOpeningStatus(previous, patched).acceptingOrders).toBe(false);
   });
+
+  it("o PATCH também não traz o link do cardápio, e ele não some do cache", () => {
+    const previous = { ...makeRestaurant(), menuUrl: "https://menu.example/trattoria-bella" };
+    const patched = makeRestaurant({ acceptingOrders: false });
+    expect(keepOpeningStatus(previous, patched).menuUrl).toBe("https://menu.example/trattoria-bella");
+  });
 });
