@@ -22,6 +22,18 @@
   align-items: start;
 }
 
+.column {
+  display: grid;
+  gap: 16px;
+}
+
+.divider {
+  width: 100%;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid var(--mc-line);
+}
+
 .card {
   display: grid;
   gap: 12px;
