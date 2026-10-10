@@ -11,6 +11,7 @@ export type CreateProductBody = {
   name: string;
   priceInCents: number;
   stock: number;
+  isSuggested: boolean;
   categoryId?: string;
   description?: string;
 };
@@ -24,6 +25,7 @@ export type UpdateProductBody = {
   name: string;
   priceInCents: number;
   stock: number;
+  isSuggested: boolean;
   categoryId: string | null;
   description: string;
   photoUrl?: string | null;

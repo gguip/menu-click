@@ -781,7 +781,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404. A foto não entra aqui: é enviada depois, por `PATCH` (ver `signUpload`).",
+        "description": "`priceInCents` é inteiro em centavos, e string não é aceita: o validador desta rota não faz coerção, então `\"4890\"` é 400 e não 4890. `stock` é o estoque inicial (ausente = 0). `categoryId` é opcional e tem que ser de uma categoria **deste** restaurante — de outro é 404. A foto não entra aqui: é enviada depois, por `PATCH` (ver `signUpload`). `isSuggested` marca o produto para ser oferecido no carrinho do cliente (ausente = `false`).",
         "requestBody": {
           "required": true,
           "content": {
@@ -811,6 +811,9 @@
                   "stock": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "isSuggested": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -863,6 +866,9 @@
                     },
                     "stock": {
                       "type": "integer"
+                    },
+                    "isSuggested": {
+                      "type": "boolean"
                     },
                     "optionGroupIds": {
                       "type": "array",
@@ -1002,6 +1008,9 @@
                           "stock": {
                             "type": "integer"
                           },
+                          "isSuggested": {
+                            "type": "boolean"
+                          },
                           "optionGroupIds": {
                             "type": "array",
                             "items": {
@@ -1118,6 +1127,9 @@
                     "stock": {
                       "type": "integer"
                     },
+                    "isSuggested": {
+                      "type": "boolean"
+                    },
                     "optionGroupIds": {
                       "type": "array",
                       "items": {
@@ -1164,7 +1176,7 @@
         "tags": [
           "Produtos"
         ],
-        "description": "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio. `photoUrl` aceita `null` (tira a foto) ou a URL devolvida pelo Cloudinary para **este** produto — qualquer outra é 400.",
+        "description": "É por aqui que se repõe estoque (`stock`). Dar baixa, não: só a confirmação de pedido tira unidade. Mandar `categoryId: null` tira o produto da seção sem removê-lo do cardápio. `photoUrl` aceita `null` (tira a foto) ou a URL devolvida pelo Cloudinary para **este** produto — qualquer outra é 400. `isSuggested` liga e desliga a sugestão no carrinho.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1197,6 +1209,9 @@
                   "stock": {
                     "type": "integer",
                     "minimum": 0
+                  },
+                  "isSuggested": {
+                    "type": "boolean"
                   }
                 }
               }
@@ -1257,6 +1272,9 @@
                     },
                     "stock": {
                       "type": "integer"
+                    },
+                    "isSuggested": {
+                      "type": "boolean"
                     },
                     "optionGroupIds": {
                       "type": "array",
@@ -7920,7 +7938,7 @@
         "tags": [
           "Cardápio público"
         ],
-        "description": "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir — e que agora também leva em conta os grupos de opções obrigatórios do produto. Os grupos referenciados pelos produtos desta página vêm uma vez cada em `optionGroups`, no topo; cada produto aponta para eles por `optionGroupIds`. Opção indisponível não aparece.",
+        "description": "Agrupado por categoria, na ordem que o restaurante definiu. **Quem pagina são as categorias, não os produtos** — assim nenhuma seção vem partida entre duas páginas, e `total` é o número de categorias do cardápio. Os produtos sem seção vêm num grupo final chamado `Sem categoria`, que aparece na última página e não conta no `total`. Não devolve `stock`: quantas unidades o restaurante tem é informação dele. O cliente recebe `available`, que diz só se dá para pedir — e que agora também leva em conta os grupos de opções obrigatórios do produto. Os grupos referenciados pelos produtos desta página vêm uma vez cada em `optionGroups`, no topo; cada produto aponta para eles por `optionGroupIds`. Opção indisponível não aparece. `suggested` diz que a loja quer oferecer aquele produto no carrinho.",
         "parameters": [
           {
             "schema": {
@@ -7994,6 +8012,9 @@
                                   "type": "string"
                                 },
                                 "available": {
+                                  "type": "boolean"
+                                },
+                                "suggested": {
                                   "type": "boolean"
                                 },
                                 "optionGroupIds": {

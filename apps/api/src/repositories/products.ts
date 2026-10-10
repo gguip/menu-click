@@ -29,6 +29,7 @@ type ProductRow = {
   description: string | null;
   photo_url: string | null;
   stock: number;
+  is_suggested: boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -45,6 +46,7 @@ function toProduct(row: ProductRow): Product {
     ...(row.description === null ? {} : { description: row.description }),
     ...(row.photo_url === null ? {} : { photoUrl: row.photo_url }),
     stock: row.stock,
+    isSuggested: row.is_suggested,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -58,6 +60,7 @@ const productColumns = {
   description: "description",
   photoUrl: "photo_url",
   stock: "stock",
+  isSuggested: "is_suggested",
 } as const;
 
 /** Insere um produto no restaurante e devolve o que foi criado. */
@@ -68,8 +71,8 @@ export async function insert(
 ): Promise<Product> {
   const { rows } = await db.query<ProductRow>(
     `insert into products
-       (restaurant_id, name, category_id, price_in_cents, description, photo_url, stock)
-     values ($1, $2, $3, $4, $5, $6, $7)
+       (restaurant_id, name, category_id, price_in_cents, description, photo_url, stock, is_suggested)
+     values ($1, $2, $3, $4, $5, $6, $7, $8)
      returning *`,
     [
       restaurantId,
@@ -81,6 +84,8 @@ export async function insert(
       // a coluna é `not null default 0`; sem valor explícito o driver mandaria
       // NULL (que não é "ausente") e a inserção estouraria.
       input.stock ?? 0,
+      // mesmo motivo do `stock`: `not null default false`
+      input.isSuggested ?? false,
     ],
   );
 

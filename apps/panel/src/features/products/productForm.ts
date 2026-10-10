@@ -8,6 +8,7 @@ export type ProductForm = {
   description: string;
   price: string;
   stock: string;
+  isSuggested: boolean;
   categoryId: string;
   optionGroupIds: string[];
 };
@@ -17,6 +18,7 @@ export const EMPTY_FORM: ProductForm = {
   description: "",
   price: "",
   stock: "0",
+  isSuggested: false,
   categoryId: "",
   optionGroupIds: [],
 };
@@ -27,6 +29,7 @@ export function fromProduct(product: Product): ProductForm {
     description: product.description ?? "",
     price: centsToInput(product.priceInCents),
     stock: String(product.stock),
+    isSuggested: product.isSuggested,
     categoryId: product.categoryId ?? "",
     optionGroupIds: [...product.optionGroupIds],
   };
@@ -37,6 +40,7 @@ export type ValidProduct = {
   description: string;
   priceInCents: number;
   stock: number;
+  isSuggested: boolean;
   categoryId: string | null;
   optionGroupIds: string[];
 };
@@ -57,6 +61,7 @@ export function validateProductForm(
       description: form.description.trim(),
       priceInCents,
       stock: Number(stock),
+      isSuggested: form.isSuggested,
       categoryId: form.categoryId === "" ? null : form.categoryId,
       optionGroupIds: form.optionGroupIds,
     },
@@ -68,6 +73,7 @@ export function toCreateBody(value: ValidProduct): CreateProductBody {
     name: value.name,
     priceInCents: value.priceInCents,
     stock: value.stock,
+    isSuggested: value.isSuggested,
     ...(value.categoryId !== null ? { categoryId: value.categoryId } : {}),
     ...(value.description !== "" ? { description: value.description } : {}),
   };
@@ -78,6 +84,7 @@ export function toUpdateBody(value: ValidProduct): UpdateProductBody {
     name: value.name,
     priceInCents: value.priceInCents,
     stock: value.stock,
+    isSuggested: value.isSuggested,
     categoryId: value.categoryId,
     description: value.description,
   };

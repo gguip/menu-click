@@ -22,6 +22,7 @@ describe("formulário de produto", () => {
         description: "",
         priceInCents: 4590,
         stock: 12,
+        isSuggested: false,
         categoryId: "cat-1",
         optionGroupIds: [],
       },
@@ -43,7 +44,12 @@ describe("formulário de produto", () => {
   it("criação omite o que ficou vazio", () => {
     const result = validateProductForm({ ...valid, categoryId: "" });
     if (!result.ok) throw new Error("devia ser válido");
-    expect(toCreateBody(result.value)).toEqual({ name: "Pizza Grande", priceInCents: 4590, stock: 12 });
+    expect(toCreateBody(result.value)).toEqual({
+      name: "Pizza Grande",
+      priceInCents: 4590,
+      stock: 12,
+      isSuggested: false,
+    });
   });
 
   it("edição manda categoryId null para tirar da seção", () => {
@@ -53,6 +59,7 @@ describe("formulário de produto", () => {
       name: "Pizza Grande",
       priceInCents: 4590,
       stock: 12,
+      isSuggested: false,
       categoryId: null,
       description: "Massa fina",
     });
@@ -75,5 +82,19 @@ describe("formulário de produto", () => {
   it("detecta alteração", () => {
     expect(isDirty(EMPTY_FORM, EMPTY_FORM)).toBe(false);
     expect(isDirty({ ...EMPTY_FORM, name: "x" }, EMPTY_FORM)).toBe(true);
+  });
+
+  it("leva a marca de sugestão do produto para o formulário e de volta para o corpo", () => {
+    const form = fromProduct(makeProduct({ isSuggested: true }));
+    expect(form.isSuggested).toBe(true);
+    const result = validateProductForm(form);
+    if (!result.ok) throw new Error("devia ser válido");
+    expect(toCreateBody(result.value).isSuggested).toBe(true);
+    expect(toUpdateBody(result.value).isSuggested).toBe(true);
+  });
+
+  it("ligar a sugestão suja o formulário", () => {
+    const initial = fromProduct(makeProduct());
+    expect(isDirty({ ...initial, isSuggested: true }, initial)).toBe(true);
   });
 });

@@ -4,6 +4,17 @@ import { formatCents } from "@/lib/money.ts";
 import { MinusIcon, PlusIcon } from "./icons.tsx";
 import { ScreenHeader } from "./ScreenHeader.tsx";
 
+/** Um cartão da faixa "Que tal adicionar?", já pronto para mostrar. */
+export type CartSuggestion = {
+  id: string;
+  name: string;
+  /** Já formatado, como na grade: "R$ 6,00" ou "a partir de R$ 75,00". */
+  priceLabel: string;
+  photoUrl?: string;
+  /** Tem grupo obrigatório: o toque abre a tela do produto em vez de adicionar. */
+  needsChoice: boolean;
+};
+
 /**
  * O carrinho do salão: sem pedido mínimo (a regra vale só na entrega). Linhas
  * com as mesmas opções e a mesma observação já chegam juntas (`addLine`).
@@ -15,6 +26,8 @@ export function CartScreen({
   notice = null,
   totalLabel = "Total",
   hint = null,
+  suggestions = [],
+  onSuggestion = () => {},
   onChange,
   onBack,
   onCheckout,
@@ -33,6 +46,10 @@ export function CartScreen({
   totalLabel?: "Total" | "Itens";
   /** O aviso de pedido mínimo da entrega; não trava o botão. */
   hint?: string | null;
+  /** O que a loja marcou para oferecer, já filtrado pelo carrinho e pelo cardápio de agora. */
+  suggestions?: CartSuggestion[];
+  /** O toque num cartão; quem decide entre adicionar e abrir o produto é quem chama. */
+  onSuggestion?: (productId: string) => void;
   onChange: (next: CartLine[]) => void;
   onBack: () => void;
   onCheckout: () => void;
@@ -138,6 +155,46 @@ export function CartScreen({
       <button type="button" onClick={onBack} className="min-h-11 px-4 pt-3 text-[15px] font-semibold text-action">
         + Adicionar mais itens
       </button>
+
+      {suggestions.length > 0 && (
+        <section aria-labelledby="sugestoes-titulo" className="mt-5 border-t border-paper-3 pt-4">
+          <h2 id="sugestoes-titulo" className="px-4 text-[15px] font-semibold tracking-[-0.01em]">
+            Que tal adicionar?
+          </h2>
+          <ul className="mt-3 flex gap-3 overflow-x-auto px-4 pb-1">
+            {suggestions.map((suggestion) => (
+              <li
+                key={suggestion.id}
+                className="flex w-[132px] flex-none flex-col overflow-hidden rounded-card border border-paper-3"
+              >
+                <div className="aspect-[4/3] w-full bg-paper-3">
+                  {suggestion.photoUrl !== undefined && (
+                    // largura da grade (400): já está no cache e não cria transformação nova
+                    <img
+                      src={imageUrl(suggestion.photoUrl, 400)}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </div>
+                <div className="flex flex-1 flex-col gap-1 px-2.5 pb-2.5 pt-2">
+                  <span className="line-clamp-2 text-[13px] font-semibold leading-[1.3]">{suggestion.name}</span>
+                  <span className="text-xs tabular-nums text-ink-2">{suggestion.priceLabel}</span>
+                  <button
+                    type="button"
+                    aria-label={`${suggestion.needsChoice ? "Escolher" : "Adicionar"} ${suggestion.name}`}
+                    onClick={() => onSuggestion(suggestion.id)}
+                    className="mt-auto min-h-11 rounded-field border border-action text-[13px] font-semibold text-action"
+                  >
+                    {suggestion.needsChoice ? "Escolher" : "Adicionar"}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* No salão o valor já é o total; pelo link, o frete entra no finalizar,
           e aqui o valor é só dos itens. */}
