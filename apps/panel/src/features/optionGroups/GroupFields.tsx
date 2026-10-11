@@ -1,7 +1,8 @@
-import { NativeSelect, TextInput } from "@mantine/core";
+import { TextInput } from "@mantine/core";
 import type { PriceRule } from "../../api/types.ts";
 import { type GroupForm, RULE_CARD } from "./optionGroups.ts";
 import classes from "./OptionGroupsPage.module.css";
+import { SelectField } from "../../ui/SelectField.tsx";
 
 /** Os mesmos campos no grupo novo e na edição do cabeçalho. */
 export function GroupFields({ form, onChange }: { form: GroupForm; onChange: (form: GroupForm) => void }) {
@@ -22,11 +23,11 @@ export function GroupFields({ form, onChange }: { form: GroupForm; onChange: (fo
         value={form.maxOptions}
         onChange={(event) => onChange({ ...form, maxOptions: event.currentTarget.value })}
       />
-      <NativeSelect
+      <SelectField
         label="Regra de preço"
         value={form.priceRule}
         data={RULE_CARD.map((rule) => ({ value: rule.rule, label: rule.name }))}
-        onChange={(event) => onChange({ ...form, priceRule: event.currentTarget.value as PriceRule })}
+        onChange={(priceRule) => onChange({ ...form, priceRule: priceRule as PriceRule })}
       />
     </div>
   );

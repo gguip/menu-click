@@ -6,6 +6,7 @@ import { orderNumber } from "../src/lib/orderNumber.ts";
 import { type MockHandler, mockApi } from "./api-mock.ts";
 import { makeOrder, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
 import { LocationProbe, renderInPanel } from "./render.tsx";
+import { findSelectField } from "./select.ts";
 
 const LIST = `/restaurants/${RESTAURANT_ID}/orders`;
 
@@ -234,7 +235,7 @@ describe("OrdersPage", () => {
       ...panelHandlers(),
     ]);
     renderInPanel(routes, "/pedidos");
-    const select = await screen.findByLabelText("Mesa");
-    expect(within(select).getByText("Mesa 7")).toBeTruthy();
+    fireEvent.click(await findSelectField("Mesa"));
+    expect(screen.getByRole("option", { name: "Mesa 7" })).toBeTruthy();
   });
 });

@@ -14,6 +14,7 @@ import {
   uploadHandlers,
 } from "./fixtures.ts";
 import { LocationProbe, renderInPanel } from "./render.tsx";
+import { chooseOption, chooseOptionWhenLoaded } from "./select.ts";
 
 const BASE = `/restaurants/${RESTAURANT_ID}`;
 
@@ -68,11 +69,9 @@ describe("ProductFormPage", () => {
     type("Nome", "Pizza Grande");
     type("Preço (R$)", "45,90");
     type("Estoque", "12");
-    await screen.findByRole("option", { name: "Pizzas" });
-    type("Seção", "cat-1");
-    await screen.findByRole("option", { name: "Sabores" });
-    type("Adicionar grupo já cadastrado", "grp-1");
-    type("Adicionar grupo já cadastrado", "grp-2");
+    await chooseOptionWhenLoaded("Seção", "cat-1");
+    await chooseOptionWhenLoaded("Adicionar grupo já cadastrado", "grp-1");
+    chooseOption("Adicionar grupo já cadastrado", "grp-2");
     expect(screen.getByText("Mais caro")).toBeTruthy();
     expect(screen.getByText("Margherita R$ 62 + Calabresa R$ 72 → R$ 72,00")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Subir Borda" }));
@@ -107,7 +106,7 @@ describe("ProductFormPage", () => {
       "/produtos/prod-1",
     );
     expect(((await screen.findByLabelText("Preço (R$)")) as HTMLInputElement).value).toBe("45,90");
-    type("Seção", "");
+    chooseOption("Seção", "");
     fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
     await screen.findByTestId("location");
     expect(api.calls.find((call) => call.method === "PATCH")?.body).toMatchObject({
@@ -162,8 +161,7 @@ describe("ProductFormPage", () => {
     type("Nome", "Pizza Grande");
     type("Preço (R$)", "45,90");
     type("Estoque", "12");
-    await screen.findByRole("option", { name: "Sabores" });
-    type("Adicionar grupo já cadastrado", "grp-1");
+    await chooseOptionWhenLoaded("Adicionar grupo já cadastrado", "grp-1");
     fireEvent.click(screen.getByRole("button", { name: "Salvar produto" }));
 
     expect(
