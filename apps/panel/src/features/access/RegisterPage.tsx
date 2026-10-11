@@ -1,4 +1,4 @@
-import { Button, NativeSelect, PasswordInput, Switch, TextInput } from "@mantine/core";
+import { Button, PasswordInput, Switch, TextInput } from "@mantine/core";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
@@ -8,6 +8,7 @@ import { saveSession } from "../../api/session.ts";
 import type { RegisterInput } from "../../api/types.ts";
 import classes from "./access.module.css";
 import { checkPassword } from "./password.ts";
+import { SelectField } from "../../ui/SelectField.tsx";
 
 const CUISINES = [
   "Pizzaria",
@@ -165,10 +166,12 @@ export function RegisterPage() {
             <h2 className={classes.sectionTitle}>O restaurante</h2>
             <div className={classes.grid2}>
               <TextInput label="Nome da loja" placeholder="Trattoria Bella" {...text("restaurantName")} />
-              <NativeSelect
+              <SelectField
                 label="Tipo de cozinha"
-                data={[{ value: "", label: "Escolha" }, ...CUISINES]}
-                {...text("cuisineType")}
+                placeholder="Escolha"
+                data={CUISINES.map((cuisine) => ({ value: cuisine, label: cuisine }))}
+                value={form.cuisineType}
+                onChange={(cuisineType) => setForm((current) => ({ ...current, cuisineType }))}
               />
             </div>
           </section>

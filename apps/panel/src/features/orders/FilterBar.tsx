@@ -1,4 +1,4 @@
-import { Button, NativeSelect, Popover, TextInput } from "@mantine/core";
+import { Button, Popover, TextInput } from "@mantine/core";
 import { useState } from "react";
 import { Link } from "react-router";
 import type { Table } from "../../api/types.ts";
@@ -10,6 +10,7 @@ import {
   withPeriod,
   withRange,
 } from "./orderFilters.ts";
+import { SelectField } from "../../ui/SelectField.tsx";
 
 export function FilterBar({
   filters,
@@ -79,11 +80,11 @@ export function FilterBar({
         )}
 
         {tables.length > 0 && (
-          <NativeSelect
+          <SelectField
             aria-label="Mesa"
             classNames={{ input: filters.tableId !== null ? classes.tableActive : undefined }}
             value={filters.tableId ?? ""}
-            onChange={(event) => onChange({ ...filters, tableId: event.currentTarget.value || null })}
+            onChange={(tableId) => onChange({ ...filters, tableId: tableId || null })}
             data={[
               { value: "", label: "Todas as mesas" },
               ...tables.map((table) => ({ value: table.id, label: table.label })),
@@ -96,12 +97,10 @@ export function FilterBar({
             Modo cozinha
           </Button>
           <span className={`${classes.sync} n`}>{syncLabel}</span>
-          <NativeSelect
+          <SelectField
             aria-label="Ordenação"
             value={filters.sort}
-            onChange={(event) =>
-              onChange({ ...filters, sort: event.currentTarget.value === "value" ? "value" : "recent" })
-            }
+            onChange={(sort) => onChange({ ...filters, sort: sort === "value" ? "value" : "recent" })}
             data={[
               { value: "recent", label: "Mais recentes" },
               { value: "value", label: "Maior valor" },

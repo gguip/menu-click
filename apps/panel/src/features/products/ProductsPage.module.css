@@ -204,3 +204,20 @@
   padding: 16px;
   color: var(--mc-ink3);
 }
+
+/* tela estreita: seção e estoque saem da grade (continuam na edição do produto) */
+@media (max-width: 700px) {
+  .head,
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .head > :nth-child(2),
+  .head > :nth-child(4),
+  .row > :nth-child(2),
+  .row > :nth-child(4) {
+    display: none;
+  }
+}

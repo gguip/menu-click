@@ -19,6 +19,25 @@
   flex-direction: column;
 }
 
+/* fundo da gaveta do menu: só é renderizado com ela aberta */
+.backdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: var(--mc-ink);
+    opacity: 0.4;
+    cursor: pointer;
+  }
+}
+
 .banner {
   padding: 10px 20px;
   background: var(--mc-warn-soft);

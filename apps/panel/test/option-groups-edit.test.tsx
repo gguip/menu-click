@@ -4,6 +4,7 @@ import { OptionGroupsPage } from "../src/features/optionGroups/OptionGroupsPage.
 import { type MockHandler, mockApi } from "./api-mock.ts";
 import { makeMe, makeOptionGroup, panelHandlers, RESTAURANT_ID, signIn } from "./fixtures.ts";
 import { renderInPanel } from "./render.tsx";
+import { chooseOption } from "./select.ts";
 
 const BASE = `/restaurants/${RESTAURANT_ID}`;
 const routes = [{ path: "/grupos-de-opcoes", element: <OptionGroupsPage /> }];
@@ -48,7 +49,7 @@ describe("OptionGroupsPage (grupos)", () => {
     type(screen, "Nome do grupo", "Borda");
     type(screen, "Mínimo", "0");
     type(screen, "Máximo", "1");
-    fireEvent.change(screen.getByLabelText("Regra de preço"), { target: { value: "sum" } });
+    chooseOption("Regra de preço", "sum");
     fireEvent.click(screen.getByRole("button", { name: "Criar grupo" }));
     await waitFor(() =>
       expect(api.calls.find((call) => call.method === "POST")?.body).toEqual({

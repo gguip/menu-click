@@ -88,3 +88,20 @@
   font-size: 12.5px;
   color: var(--mc-ink3);
 }
+
+/* tela estreita: o grupo da direita ocupa a linha e não espreme o "Modo cozinha" */
+@media (max-width: 700px) {
+  .bar {
+    padding: 12px;
+  }
+
+  .right {
+    flex-wrap: wrap;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .right > a {
+    flex: none;
+  }
+}

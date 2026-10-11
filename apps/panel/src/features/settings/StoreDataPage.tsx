@@ -1,4 +1,4 @@
-import { ColorInput, NativeSelect, TextInput } from "@mantine/core";
+import { ColorInput, TextInput } from "@mantine/core";
 import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { describeError } from "../../api/client.ts";
@@ -9,6 +9,7 @@ import { notifySaved } from "../../lib/notify.tsx";
 import { describeSaveError, type ImageChange, KEEP, uploadImage } from "../../lib/upload.ts";
 import { ImageField } from "../../ui/ImageField.tsx";
 import { SaveBar } from "../../ui/SaveBar.tsx";
+import { SelectField } from "../../ui/SelectField.tsx";
 import { useRestaurant, useUpdateRestaurant } from "../restaurant/useRestaurant.ts";
 import { DangerZone } from "./DangerZone.tsx";
 import classes from "./StoreDataPage.module.css";
@@ -86,13 +87,15 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
               <TextInput label="Nome da loja" {...field("name")} />
               <div className={classes.pair}>
                 <TextInput label="Tipo de cozinha" {...field("cuisineType")} />
-                <NativeSelect
+                <SelectField
                   label="Fuso horário"
+                  searchable
                   description="É ele que decide onde o dia começa: “pedidos de hoje” e o faturamento do topo mudam junto."
                   // ajuda embaixo do campo: em cima, ela desalinha o par
                   inputWrapperOrder={["label", "input", "description", "error"]}
                   data={timezoneOptions.map((zone) => ({ value: zone.value, label: zone.label }))}
-                  {...field("timezone")}
+                  value={form.timezone}
+                  onChange={(timezone) => setForm((current) => ({ ...current, timezone }))}
                 />
               </div>
               <TextInput

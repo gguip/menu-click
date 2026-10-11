@@ -5,6 +5,7 @@ import { StoreDataPage } from "../src/features/settings/StoreDataPage.tsx";
 import { mockApi } from "./api-mock.ts";
 import { makeRestaurant, panelHandlers, RESTAURANT_ID, signIn, UPLOADED_URL, uploadHandlers } from "./fixtures.ts";
 import { renderInPanel } from "./render.tsx";
+import { chooseOption, chosenValue, findSelectField } from "./select.ts";
 
 const routes = [{ path: "/dados-da-loja", element: <StoreDataPage /> }];
 
@@ -80,8 +81,9 @@ describe("StoreDataPage", () => {
     signIn();
     mockApi(panelHandlers());
     renderInPanel(routes, "/dados-da-loja");
-    const timezone = await screen.findByLabelText("Fuso horário");
-    expect(timezone.tagName).toBe("SELECT");
+    const timezone = await findSelectField("Fuso horário");
+    // a lista é a do painel, não a do navegador
+    expect(timezone.tagName).toBe("INPUT");
     expect(screen.getByText("É ele que decide onde o dia começa: “pedidos de hoje” e o faturamento do topo mudam junto.")).toBeTruthy();
   });
 
@@ -89,9 +91,9 @@ describe("StoreDataPage", () => {
     signIn();
     mockApi(panelHandlers({ restaurant: { timezone: "Brazil/East" } }));
     renderInPanel(routes, "/dados-da-loja");
-    const timezone = (await screen.findByLabelText("Fuso horário")) as HTMLSelectElement;
-    expect(timezone.value).toBe("Brazil/East");
-    expect(screen.getByText("Brazil/East (atual)")).toBeTruthy();
+    const timezone = await findSelectField("Fuso horário");
+    expect(chosenValue(timezone)).toBe("Brazil/East");
+    expect(timezone.value).toBe("Brazil/East (atual)");
   });
 
   it("campo obrigatório vazio nem chega à API", async () => {
@@ -139,12 +141,12 @@ describe("StoreDataPage", () => {
       [{ path: "/dados-da-loja", element: <><StoreDataPage /><SummaryProbe /></> }],
       "/dados-da-loja",
     );
-    const timezone = await screen.findByLabelText("Fuso horário");
+    const timezone = await findSelectField("Fuso horário");
     const summaryCallsBefore = api.calls.filter(
       (call) => call.method === "GET" && call.path.endsWith("/orders/summary"),
     ).length;
 
-    fireEvent.change(timezone, { target: { value: "America/Bahia" } });
+    chooseOption(timezone, "America/Bahia");
     fireEvent.click(screen.getByRole("button", { name: "Salvar dados" }));
 
     await waitFor(() => expect(api.calls.some((call) => call.method === "PATCH")).toBe(true));
@@ -162,12 +164,12 @@ describe("StoreDataPage", () => {
       ...panelHandlers(),
     ]);
     renderInPanel([{ path: "/dados-da-loja", element: <StoreDataPage /> }], "/dados-da-loja");
-    const timezone = await screen.findByLabelText("Fuso horário");
+    const timezone = await findSelectField("Fuso horário");
     const restaurantGets = () =>
       api.calls.filter((call) => call.method === "GET" && call.path === `/restaurants/${RESTAURANT_ID}`).length;
     const before = restaurantGets();
 
-    fireEvent.change(timezone, { target: { value: "America/Bahia" } });
+    chooseOption(timezone, "America/Bahia");
     fireEvent.click(screen.getByRole("button", { name: "Salvar dados" }));
 
     await waitFor(() => expect(restaurantGets()).toBeGreaterThan(before));

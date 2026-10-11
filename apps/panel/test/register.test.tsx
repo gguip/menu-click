@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { RegisterPage } from "../src/features/access/RegisterPage.tsx";
 import { mockApi } from "./api-mock.ts";
 import { LocationProbe, renderRoutes } from "./render.tsx";
+import { chooseOption } from "./select.ts";
 
 const routes = [
   { path: "/cadastro", element: <RegisterPage /> },
@@ -15,7 +16,7 @@ function type(label: string, value: string) {
 
 function fillAll(password = "senha-forte-1") {
   type("Nome da loja", "Trattoria Bella");
-  type("Tipo de cozinha", "Italiana");
+  chooseOption("Tipo de cozinha", "Italiana");
   type("Rua", "Rua Aspicuelta");
   type("Número", "120");
   type("Bairro", "Vila Madalena");

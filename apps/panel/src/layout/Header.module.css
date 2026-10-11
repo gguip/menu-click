@@ -49,3 +49,58 @@
   height: 32px;
   background: var(--mc-line);
 }
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.indicators {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+/* botão do menu: só existe em tela estreita */
+.menu {
+  display: none;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--mc-line);
+  border-radius: 8px;
+  background: var(--mc-surface);
+  color: var(--mc-ink);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .header {
+    gap: 10px;
+    padding: 0 12px;
+  }
+
+  .menu {
+    display: inline-flex;
+  }
+
+  .title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* os números do dia continuam no Resumo; aqui não cabem */
+  .indicators {
+    display: none;
+  }
+
+  .right {
+    gap: 8px;
+  }
+}

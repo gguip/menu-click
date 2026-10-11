@@ -44,6 +44,8 @@ export function Rail({
   onEnableSound,
   noticesBlocked,
   onEnableNotices,
+  open,
+  onClose,
 }: {
   restaurant: Restaurant | undefined;
   me: Me;
@@ -52,12 +54,15 @@ export function Rail({
   onEnableSound: () => void;
   noticesBlocked: boolean;
   onEnableNotices: () => void;
+  /** Só vale em tela estreita, onde o menu é gaveta; na larga ele está sempre à vista. */
+  open: boolean;
+  onClose: () => void;
 }) {
   const now = useNow();
   // o painel FORMATA o que a API calculou; nenhuma regra de faixa mora aqui
   const status = restaurant ? storeStatusLabel(restaurant, now) : null;
   return (
-    <nav className={classes.rail} aria-label="Navegação do painel">
+    <nav className={classes.rail} aria-label="Navegação do painel" data-open={open || undefined}>
       <div className={classes.top}>
         <strong className={classes.store}>{restaurant?.name ?? ""}</strong>
         {status &&
@@ -90,7 +95,7 @@ export function Rail({
             {group.items
               .filter((item) => item.ownerOnly !== true || me.role === "owner")
               .map((item) => (
-                <NavLink key={item.to} to={item.to} className={navClass}>
+                <NavLink key={item.to} to={item.to} className={navClass} onClick={onClose}>
                   {item.label}
                   {item.to === "/pedidos" && (
                     <span className={`${classes.badge} ${pendingCount > 0 ? classes.badgeWarn : ""} n`}>

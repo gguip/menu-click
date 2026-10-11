@@ -1,4 +1,4 @@
-import { ActionIcon, Button, Input, NativeSelect, Switch, Textarea, TextInput } from "@mantine/core";
+import { ActionIcon, Button, Input, Switch, Textarea, TextInput } from "@mantine/core";
 import { IconArrowDown, IconArrowLeft, IconArrowUp } from "@tabler/icons-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
@@ -37,6 +37,7 @@ import {
   validateProductForm,
   type ValidProduct,
 } from "./productForm.ts";
+import { SelectField } from "../../ui/SelectField.tsx";
 
 /**
  * O produto foi salvo; uma etapa de DEPOIS falhou (os grupos de opções, ou a
@@ -205,10 +206,10 @@ function ProductEditor({
                   value={form.stock}
                   onChange={(e) => update({ stock: e.currentTarget.value })}
                 />
-                <NativeSelect
+                <SelectField
                   label="Seção"
                   value={form.categoryId}
-                  onChange={(e) => update({ categoryId: e.currentTarget.value })}
+                  onChange={(categoryId) => update({ categoryId })}
                   data={[
                     { value: "", label: "Sem seção" },
                     ...categories.map((category) => ({ value: category.id, label: category.name })),
@@ -302,17 +303,13 @@ function ProductEditor({
               );
             })}
             {available.length > 0 && (
-              <NativeSelect
+              <SelectField
                 aria-label="Adicionar grupo já cadastrado"
+                placeholder="Adicionar grupo já cadastrado"
+                // sempre vazio: escolher é adicionar, e a caixa volta ao convite
                 value=""
-                onChange={(e) => {
-                  const id = e.currentTarget.value;
-                  if (id !== "") update({ optionGroupIds: [...form.optionGroupIds, id] });
-                }}
-                data={[
-                  { value: "", label: "Adicionar grupo já cadastrado" },
-                  ...available.map((group) => ({ value: group.id, label: group.name })),
-                ]}
+                onChange={(id) => update({ optionGroupIds: [...form.optionGroupIds, id] })}
+                data={available.map((group) => ({ value: group.id, label: group.name }))}
               />
             )}
           </section>
