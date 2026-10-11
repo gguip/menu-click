@@ -1,5 +1,5 @@
 import { Button, Input } from "@mantine/core";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { imageUrl } from "../lib/image.ts";
 import { ACCEPTED_IMAGE_TYPES, type ImageChange, KEEP, validateImageFile } from "../lib/upload.ts";
 import buttons from "./buttons.module.css";
@@ -32,6 +32,38 @@ export function ImageField({
   const input = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
+  // A tela descartou ou salvou (a troca mudou por fora): o aviso de um arquivo
+  // recusado antes disso não diz mais respeito a nada.
+  const [seen, setSeen] = useState(change);
+  if (seen !== change) {
+    setSeen(change);
+    setProblem(null);
+  }
+
+  // A prévia local segura memória até ser liberada. Quem a troca ou abandona
+  // nem sempre é este campo (Cancelar e salvar ficam na tela), então a
+  // liberação acompanha o valor: sai a prévia que deixou de ser a atual.
+  const preview = change.kind === "replace" ? change.previewUrl : null;
+  const lastPreview = useRef<string | null>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (lastPreview.current !== null && lastPreview.current !== preview) {
+      URL.revokeObjectURL(lastPreview.current);
+    }
+    lastPreview.current = preview;
+  }, [preview]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      // adiado: o modo estrito do React desmonta e remonta na hora, e liberar
+      // ali apagaria a prévia que continua na tela
+      setTimeout(() => {
+        if (!mounted.current && lastPreview.current !== null) URL.revokeObjectURL(lastPreview.current);
+      }, 0);
+    };
+  }, []);
+
   const shown =
     change.kind === "replace"
       ? change.previewUrl
@@ -39,23 +71,16 @@ export function ImageField({
         ? null
         : imageUrl(saved, 400);
 
-  /** A prévia local segura memória até ser liberada. */
-  const releasePreview = () => {
-    if (change.kind === "replace") URL.revokeObjectURL(change.previewUrl);
-  };
-
   const pick = (file: File | undefined) => {
     if (file === undefined) return;
     const found = validateImageFile(file);
     setProblem(found);
     if (found !== null) return;
-    releasePreview();
     onChange({ kind: "replace", file, previewUrl: URL.createObjectURL(file) });
   };
 
   const remove = () => {
     setProblem(null);
-    releasePreview();
     // sem nada salvo, "remover" a imagem recém-escolhida é só desistir dela
     onChange(saved === undefined ? KEEP : { kind: "remove" });
   };

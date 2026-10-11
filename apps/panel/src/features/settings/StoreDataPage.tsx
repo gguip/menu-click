@@ -45,8 +45,10 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
     },
     onSuccess: () => {
       notifySaved();
-      setLogo(KEEP);
-      setCover(KEEP);
+      // objeto novo, e não o `KEEP` de sempre: é a troca de identidade que avisa
+      // o `ImageField` de que a tela voltou ao que está salvo
+      setLogo({ kind: "keep" });
+      setCover({ kind: "keep" });
     },
     onSettled: () => {
       saving.current = false;
@@ -187,8 +189,8 @@ function StoreDataEditor({ restaurant }: { restaurant: Restaurant }) {
           onClick: () => {
             setForm(initial);
             setProblem(null);
-            setLogo(KEEP);
-            setCover(KEEP);
+            setLogo({ kind: "keep" });
+            setCover({ kind: "keep" });
             save.reset();
           },
         }}
