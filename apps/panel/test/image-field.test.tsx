@@ -1,7 +1,7 @@
 import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { type ImageChange, KEEP } from "../src/lib/upload.ts";
 import { ImageField } from "../src/ui/ImageField.tsx";
 
@@ -21,6 +21,10 @@ function Harness({ saved }: { saved?: string }) {
           setChange(next);
         }}
       />
+      {/* o que o "Cancelar" e o salvar da tela fazem: voltam ao que está salvo */}
+      <button type="button" onClick={() => setChange({ kind: "keep" })}>
+        Descartar
+      </button>
     </MantineProvider>
   );
 }
@@ -32,6 +36,33 @@ function pick(file: File) {
 const jpg = () => new File(["x"], "logo.jpg", { type: "image/jpeg" });
 
 describe("ImageField", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("descartar a tela apaga o aviso de arquivo que não serve", () => {
+    render(<Harness />);
+    pick(new File(["x"], "foto.heic", { type: "image/heic" }));
+    fireEvent.click(screen.getByRole("button", { name: "Descartar" }));
+    expect(screen.queryByText("Use uma imagem JPG, PNG ou WebP.")).toBeNull();
+  });
+
+  it("a prévia local é liberada quando a troca é descartada", () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+    render(<Harness />);
+    pick(jpg());
+    expect(revoke).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Descartar" }));
+    expect(revoke).toHaveBeenCalledWith("blob:previa");
+  });
+
+  it("a prévia local é liberada ao sair da tela", async () => {
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+    const view = render(<Harness />);
+    pick(jpg());
+    view.unmount();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(revoke).toHaveBeenCalledWith("blob:previa");
+  });
+
   it("sem imagem: mostra 'Sem imagem' e só o botão de escolher", () => {
     render(<Harness />);
     expect(screen.getByText("Sem imagem")).toBeTruthy();
