@@ -1,10 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Sora } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 import "./globals.css";
 
-// auto-hospedada no build: o celular do cliente não pede nada ao Google
-const sora = Sora({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-sora" });
+// O arquivo mora no repositório (ver `fonts/LEIAME.md`): o build não depende
+// do Google, e o celular do cliente também não pede nada a ele.
+const sora = localFont({
+  src: "./fonts/sora-latin.woff2",
+  weight: "100 800",
+  display: "swap",
+  variable: "--font-sora",
+});
 
 export const metadata: Metadata = { title: "Cardápio" };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
