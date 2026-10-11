@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Outlet, useMatches, useNavigate } from "react-router";
 import { useSessionUser } from "../auth/useMe.ts";
 import { useNewOrderAlert } from "../features/orders/useNewOrderAlert.ts";
@@ -28,6 +29,8 @@ export function PanelLayout() {
   const paused = restaurant.data?.acceptingOrders === false;
   const navigate = useNavigate();
   const alert = useNewOrderAlert(me.restaurantId, () => void navigate("/pedidos"));
+  // Em tela estreita o menu lateral é uma gaveta; na larga este estado não muda nada.
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className={classes.shell}>
@@ -39,9 +42,25 @@ export function PanelLayout() {
         onEnableSound={alert.enableSound}
         noticesBlocked={alert.noticesBlocked}
         onEnableNotices={alert.enableNotices}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
       />
+      {menuOpen && (
+        <button
+          type="button"
+          className={classes.backdrop}
+          aria-label="Fechar menu"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
       <div className={classes.main}>
-        <Header title={title} restaurantId={me.restaurantId} restaurant={restaurant.data} />
+        <Header
+          title={title}
+          restaurantId={me.restaurantId}
+          restaurant={restaurant.data}
+          menuOpen={menuOpen}
+          onOpenMenu={() => setMenuOpen(true)}
+        />
         {paused && <PauseBanner />}
         <div className={classes.content}>
           <Outlet />

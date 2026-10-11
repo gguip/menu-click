@@ -108,6 +108,27 @@ describe("PanelLayout", () => {
     expect(screen.queryByRole("button", { name: "Copiar link do cardápio" })).toBeNull();
   });
 
+  it("em tela estreita o menu é uma gaveta: o botão abre, e navegar ou tocar fora fecha", async () => {
+    signIn();
+    mockApi(panelHandlers());
+    renderRoutes(routes, "/pedidos");
+    const rail = await screen.findByRole("navigation", { name: "Navegação do painel" });
+    const open = screen.getByRole("button", { name: "Abrir menu" });
+    expect(rail.getAttribute("data-open")).toBeNull();
+    expect(open.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(open);
+    expect(rail.getAttribute("data-open")).toBe("true");
+    expect(open.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(within(rail).getByRole("link", { name: /Pedidos/ }));
+    expect(rail.getAttribute("data-open")).toBeNull();
+
+    fireEvent.click(open);
+    fireEvent.click(screen.getByRole("button", { name: "Fechar menu" }));
+    expect(rail.getAttribute("data-open")).toBeNull();
+  });
+
   it("loja já pausada abre com a faixa", async () => {
     signIn();
     mockApi(panelHandlers({ restaurant: { acceptingOrders: false } }));

@@ -206,3 +206,18 @@
   padding: 18px 20px;
   color: var(--mc-ink2);
 }
+
+/* tela estreita: a tabela de opções rola para o lado, e o formulário quebra em duas linhas */
+@media (max-width: 700px) {
+  .table {
+    overflow-x: auto;
+  }
+
+  .tr {
+    min-width: 540px;
+  }
+
+  .fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

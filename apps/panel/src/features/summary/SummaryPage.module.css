@@ -198,3 +198,10 @@
 .loading {
   color: var(--mc-ink2);
 }
+
+@media (max-width: 700px) {
+  .row {
+    grid-template-columns: minmax(0, 1.6fr) 24px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+}

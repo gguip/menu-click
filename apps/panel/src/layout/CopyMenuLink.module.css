@@ -1,0 +1,19 @@
+.button {
+  flex: none;
+}
+
+.text {
+  margin-left: 8px;
+}
+
+@media (max-width: 900px) {
+  .button {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+  }
+
+  .text {
+    display: none;
+  }
+}

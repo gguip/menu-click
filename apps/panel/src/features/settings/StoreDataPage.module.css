@@ -92,3 +92,14 @@
   font-size: 14px;
   font-weight: 600;
 }
+
+@media (max-width: 700px) {
+  .address {
+    grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr);
+  }
+
+  /* a cidade ocupa a linha; UF e CEP dividem a de baixo */
+  .address > :first-child {
+    grid-column: 1 / -1;
+  }
+}
