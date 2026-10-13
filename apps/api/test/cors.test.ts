@@ -119,6 +119,21 @@ describe("CORS", () => {
       ).toContain("authorization");
     });
 
+    it("expõe o Retry-After, para o painel ler quanto falta do 429", async () => {
+      // O painel chama a API de outra origem, e o navegador só entrega ao
+      // script os headers de resposta listados aqui: sem isto a contagem do
+      // "Tentar de novo em" cai sempre no padrão de 60 s.
+      const response = await app.inject({
+        method: "GET",
+        url: "/health",
+        headers: { origin: ORIGEM_AUTORIZADA },
+      });
+
+      expect(
+        String(response.headers["access-control-expose-headers"]).toLowerCase(),
+      ).toContain("retry-after");
+    });
+
     it("não anuncia credenciais: a API usa header, não cookie", async () => {
       const response = await app.inject({
         method: "GET",
