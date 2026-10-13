@@ -77,6 +77,12 @@
   color: var(--mc-accent-hi);
 }
 
+.actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
 .self {
   color: var(--mc-ink3);
   font-size: 13px;
@@ -133,4 +139,27 @@
   margin: 0;
   font-size: 13.5px;
   color: var(--mc-danger);
+}
+
+/* Em tela estreita a linha não comporta nome, selo e duas ações lado a lado:
+   as ações descem para uma segunda linha, alinhadas ao texto. */
+@media (max-width: 700px) {
+  .row {
+    flex-wrap: wrap;
+  }
+
+  .avatar {
+    flex: 0 0 32px;
+  }
+
+  /* base zero: com `auto`, o e-mail sem quebra empurraria o bloco para uma
+     linha só dele */
+  .info {
+    flex: 1 1 0;
+  }
+
+  .actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+  }
 }

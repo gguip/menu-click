@@ -7,16 +7,18 @@ import buttons from "../../ui/buttons.module.css";
 import { ConfirmDialog } from "../../ui/ConfirmDialog.tsx";
 import { Notice } from "../../ui/Notice.tsx";
 import {
+  changeRoleConfirm,
   initials,
   type InviteErrors,
   type InviteForm,
   isSelf,
+  otherRole,
   removeUserConfirm,
   roleLabel,
   validateInvite,
 } from "./users.ts";
 import classes from "./UsersPage.module.css";
-import { useInviteUser, useRemoveUser, useUsersList } from "./useUsers.ts";
+import { useChangeUserRole, useInviteUser, useRemoveUser, useUsersList } from "./useUsers.ts";
 
 const EMPTY: InviteForm = { name: "", email: "", password: "", role: "staff" };
 
@@ -32,7 +34,10 @@ function UserRow({
   onFail: (message: string) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [changingRole, setChangingRole] = useState(false);
   const remove = useRemoveUser(restaurantId, user.id);
+  const changeRole = useChangeUserRole(restaurantId, user.id);
+  const nextRole = otherRole(user.role);
 
   return (
     <li className={classes.row}>
@@ -53,15 +58,38 @@ function UserRow({
       {self ? (
         <span className={classes.self}>você</span>
       ) : (
-        <Button
-          variant="subtle"
-          className={buttons.dangerText}
-          aria-label={`Remover ${user.name}`}
-          onClick={() => setConfirming(true)}
-        >
-          Remover
-        </Button>
+        <div className={classes.actions}>
+          <Button
+            variant="subtle"
+            aria-label={`Tornar ${user.name} ${roleLabel(nextRole).toLowerCase()}`}
+            onClick={() => setChangingRole(true)}
+          >
+            Tornar {roleLabel(nextRole).toLowerCase()}
+          </Button>
+          <Button
+            variant="subtle"
+            className={buttons.dangerText}
+            aria-label={`Remover ${user.name}`}
+            onClick={() => setConfirming(true)}
+          >
+            Remover
+          </Button>
+        </div>
       )}
+      <ConfirmDialog
+        copy={changingRole ? changeRoleConfirm(user.name, nextRole) : null}
+        busy={changeRole.isPending}
+        onClose={() => setChangingRole(false)}
+        onConfirm={() =>
+          changeRole.mutate(nextRole, {
+            onSuccess: () => setChangingRole(false),
+            onError: (cause) => {
+              setChangingRole(false);
+              onFail(describeError(cause));
+            },
+          })
+        }
+      />
       <ConfirmDialog
         copy={confirming ? removeUserConfirm(user.name) : null}
         busy={remove.isPending}
@@ -188,10 +216,11 @@ export function UsersPage() {
         </div>
       </form>
       <p className={classes.note}>
-        O papel é escolhido no convite. Para trocar, remova a pessoa e convide de novo.
+        O papel é escolhido no convite e pode ser trocado depois, na lista acima.
       </p>
       <p className={classes.note}>
-        Sem papel informado, o usuário nasce como equipe. Ninguém remove a própria conta.
+        Sem papel informado, o usuário nasce como equipe. Ninguém remove a própria conta nem muda
+        o próprio papel.
       </p>
       {failure && (
         <p role="alert" className={classes.error}>

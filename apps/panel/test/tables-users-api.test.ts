@@ -5,7 +5,7 @@ import {
   renameTable,
   rotateTableHash,
 } from "../src/api/tables.ts";
-import { deleteUser, inviteUser, listUsers } from "../src/api/users.ts";
+import { changeUserRole, deleteUser, inviteUser, listUsers } from "../src/api/users.ts";
 import { mockApi } from "./api-mock.ts";
 import { RESTAURANT_ID, signIn } from "./fixtures.ts";
 
@@ -90,5 +90,12 @@ describe("api de mesas e usuários", () => {
     const api = mockApi([{ method: "DELETE", path: `${USERS}/u-2`, status: 204 }]);
     await deleteUser(RESTAURANT_ID, "u-2");
     expect(api.calls[0].method).toBe("DELETE");
+  });
+
+  it("troca o papel com PATCH, mandando só o papel", async () => {
+    const api = mockApi([{ method: "PATCH", path: `${USERS}/u-2`, body: { id: "u-2", role: "owner" } }]);
+    await changeUserRole(RESTAURANT_ID, "u-2", "owner");
+    expect(api.calls[0].method).toBe("PATCH");
+    expect(api.calls[0].body).toEqual({ role: "owner" });
   });
 });

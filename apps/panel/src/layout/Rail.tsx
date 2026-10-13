@@ -24,7 +24,7 @@ const NAV_GROUPS: { title: string; items: { to: string; label: string; ownerOnly
       { to: "/entrega", label: "Entrega" },
       { to: "/horario", label: "Horário" },
       { to: "/mesas", label: "Mesas e QR" },
-      // Só o dono: a API responde 403 nas três rotas de usuários, e link morto
+      // Só o dono: a API responde 403 nas rotas de usuários, e link morto
       // é pior que ausência.
       { to: "/usuarios", label: "Usuários", ownerOnly: true },
       { to: "/dados-da-loja", label: "Dados da loja" },
