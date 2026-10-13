@@ -15,6 +15,7 @@ import { PASSWORD_RESET_TOKEN_TTL_MS } from "../domain/password-reset.ts";
 import { EMAIL_VERIFICATION_TOKEN_TTL_MS } from "../domain/email-verification.ts";
 import {
   ConflictError,
+  ForbiddenError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -753,13 +754,80 @@ export async function createUser(
 }
 
 /**
+ * Trava quem pede e o alvo, e confere que quem pede AINDA é dono.
+ *
+ * ⚠️ "Ninguém remove nem rebaixa a si mesmo" não segura sozinho a invariante
+ * de sempre haver um dono. O hook confere o `ownerOnly` com o papel lido
+ * ANTES da transação; dois donos agindo um sobre o outro ao mesmo tempo
+ * passariam os dois, e a loja ficaria sem dono nenhum — sem quem convide,
+ * promova ou a encerre (medido: duas remoções cruzadas respondiam 204 e 204).
+ * Com as duas linhas travadas, em ordem de id para as duas requisições não se
+ * travarem em ordens opostas, a segunda a entrar encontra quem pede já
+ * rebaixado ou removido e leva o mesmo 403 do hook. Há testes de corrida, e
+ * eles caem sem esta releitura.
+ */
+async function assertStillOwner(
+  auth: AuthContext,
+  targetId: string,
+  client: Queryable,
+): Promise<void> {
+  const locked = await restaurantUsersRepository.findByIdsInRestaurantForUpdate(
+    auth.restaurantId,
+    [auth.userId, targetId],
+    client,
+  );
+  const actor = locked.find((user) => user.id === auth.userId);
+  if (actor?.role !== "owner") {
+    throw new ForbiddenError("Esta ação é restrita ao dono do restaurante");
+  }
+}
+
+/**
+ * Troca o papel de um usuário do restaurante.
+ *
+ * **Ninguém muda o próprio papel** (409), pela mesma razão de ninguém remover
+ * a si mesmo: como só `owner` muda papel, o último dono nunca consegue deixar
+ * de ser dono. A corrida entre dois donos é fechada por `assertStillOwner`.
+ *
+ * Não mexe nas sessões de ninguém: o papel vem do banco a cada requisição, na
+ * query que resolve o token, então a troca vale na requisição seguinte.
+ */
+export async function changeUserRole(
+  auth: AuthContext,
+  userId: string,
+  role: UserRole,
+): Promise<RestaurantUser> {
+  if (!isUuid(userId)) throw userNotFound(userId);
+
+  if (userId === auth.userId) {
+    throw new ConflictError(
+      "Você não pode mudar o próprio papel. Peça a outro dono do restaurante",
+    );
+  }
+
+  return withTransaction(async (client) => {
+    await assertStillOwner(auth, userId, client);
+
+    const updated = await restaurantUsersRepository.updateRole(
+      auth.restaurantId,
+      userId,
+      role,
+      client,
+    );
+    if (updated === null) throw userNotFound(userId);
+    return updated;
+  });
+}
+
+/**
  * Remove um usuário do restaurante.
  *
  * **Ninguém remove a si mesmo** (409). A regra existe para não deixar alguém
  * se trancar para fora, e ela tem uma consequência que vale de invariante: como
  * só `owner` remove usuário, o último dono nunca consegue sair — então o
  * restaurante sempre tem pelo menos um `owner`, e nunca fica sem quem possa
- * convidar alguém ou encerrá-lo.
+ * convidar alguém ou encerrá-lo. A corrida entre dois donos se removendo ao
+ * mesmo tempo é fechada por `assertStillOwner`.
  *
  * Não é preciso revogar as sessões do removido: a resolução do token junta
  * `restaurant_users` filtrando `deleted_at is null`, então elas param de valer
@@ -777,9 +845,14 @@ export async function removeUser(
     );
   }
 
-  const removed = await restaurantUsersRepository.softDelete(
-    auth.restaurantId,
-    userId,
-  );
-  if (!removed) throw userNotFound(userId);
+  await withTransaction(async (client) => {
+    await assertStillOwner(auth, userId, client);
+
+    const removed = await restaurantUsersRepository.softDelete(
+      auth.restaurantId,
+      userId,
+      client,
+    );
+    if (!removed) throw userNotFound(userId);
+  });
 }

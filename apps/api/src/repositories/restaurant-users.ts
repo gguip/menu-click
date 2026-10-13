@@ -221,6 +221,48 @@ export async function updateEmail(
 }
 
 /**
+ * Usuários vivos do restaurante com esses ids, **travando as linhas** até o
+ * fim da transação.
+ *
+ * O `order by id` fixa a ordem de travamento: duas trocas de papel cruzadas
+ * (A muda B enquanto B muda A) pedem as mesmas duas linhas, e sem ordem fixa
+ * cada uma pegaria a sua primeiro e esperaria a da outra — deadlock.
+ */
+export async function findByIdsInRestaurantForUpdate(
+  restaurantId: string,
+  ids: string[],
+  db: Queryable,
+): Promise<RestaurantUser[]> {
+  const { rows } = await db.query<RestaurantUserRow>(
+    `select * from restaurant_users
+      where id = any($1::uuid[]) and restaurant_id = $2 and deleted_at is null
+      order by id
+        for update`,
+    [ids, restaurantId],
+  );
+  return rows.map(toRestaurantUser);
+}
+
+/**
+ * Troca o papel de um usuário vivo, **escopado pelo restaurante** (S23).
+ * `null` quando ele não existe ali ou já foi removido.
+ */
+export async function updateRole(
+  restaurantId: string,
+  id: string,
+  role: UserRole,
+  db: Queryable = pool,
+): Promise<RestaurantUser | null> {
+  const { rows } = await db.query<RestaurantUserRow>(
+    `update restaurant_users set role = $1, updated_at = now()
+      where id = $2 and restaurant_id = $3 and deleted_at is null
+      returning *`,
+    [role, id, restaurantId],
+  );
+  return rows.length === 0 ? null : toRestaurantUser(rows[0]);
+}
+
+/**
  * Usuário vivo com esse id, **com o hash**. Só a troca de senha usa, para
  * conferir a atual.
  *

@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
-import type { CreateRestaurantUserInput } from "../domain/restaurant-user.ts";
+import type {
+  CreateRestaurantUserInput,
+  UserRole,
+} from "../domain/restaurant-user.ts";
 import {
   PASSWORD_MIN_LENGTH,
   USER_ROLES,
@@ -12,7 +15,7 @@ import { errorResponseSchema } from "./schemas.ts";
 /**
  * Quem tem acesso ao painel do restaurante.
  *
- * As três rotas são `ownerOnly`: administrar usuários é uma das duas ações que
+ * As quatro rotas são `ownerOnly`: administrar usuários é uma das duas ações que
  * o papel restringe (a outra é remover o restaurante). Sem isso, um atendente
  * convidaria outro atendente — e o dono deixaria de controlar quem entra.
  *
@@ -35,6 +38,15 @@ const createUserBodySchema = {
     // alguém o poder de apagar o restaurante
     role: { type: "string", enum: [...USER_ROLES] },
   },
+};
+
+// só o papel: nome e e-mail não se editam por aqui (o e-mail é o login, e
+// trocá-lo tem rota e regras próprias)
+const changeRoleBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["role"],
+  properties: { role: { type: "string", enum: [...USER_ROLES] } },
 };
 
 const userResponseSchema = {
@@ -126,6 +138,39 @@ export async function restaurantUserRoutes(app: FastifyInstance) {
     },
     async (request) => {
       return { data: await authService.listUsers(request.params.restaurantId) };
+    },
+  );
+
+  app.patch<{
+    Params: { restaurantId: string; id: string };
+    Body: { role: UserRole };
+  }>(
+    "/restaurants/:restaurantId/users/:id",
+    {
+      config: { ownerOnly: true },
+      schema: {
+        tags: ["Usuários"],
+        operationId: "changeRestaurantUserRole",
+        summary: "Muda o papel de alguém",
+        description:
+          "Restrito ao dono, e **só o papel muda** — nome e e-mail não se editam por aqui. **Ninguém muda o próprio papel** (409): como só o dono muda papel, o restaurante nunca fica sem nenhum `owner`. A troca vale na requisição seguinte da pessoa, sem novo login: o papel é lido do banco junto com a sessão.",
+        params: userParamsSchema,
+        body: changeRoleBodySchema,
+        response: {
+          200: userResponseSchema,
+          400: errorResponseSchema,
+          403: errorResponseSchema,
+          404: errorResponseSchema,
+          409: errorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      return authService.changeUserRole(
+        requireAuth(request),
+        request.params.id,
+        request.body.role,
+      );
     },
   );
 
