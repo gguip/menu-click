@@ -577,6 +577,89 @@ export async function changePassword(
   });
 }
 
+/**
+ * Uma tentativa de trocar o e-mail, dentro do seu savepoint.
+ *
+ * Mesmo motivo do `tryInsertUser`: no Postgres, um comando que falha aborta o
+ * bloco inteiro, e a violação de unicidade daqui é seguida de mais queries (a
+ * liberação de cadastro abandonado e a segunda tentativa).
+ */
+async function tryUpdateEmail(
+  userId: string,
+  email: string,
+  db: Queryable,
+): Promise<RestaurantUser | "taken" | null> {
+  // nome fixo, escrito no código: identificador não aceita $n (S3)
+  await db.query("savepoint email_attempt");
+  const updated = await restaurantUsersRepository.updateEmail(userId, email, db);
+  await db.query(
+    updated === "taken"
+      ? "rollback to savepoint email_attempt"
+      : "release savepoint email_attempt",
+  );
+  return updated;
+}
+
+/**
+ * Corrige o e-mail de quem chama — só enquanto a LOJA não foi verificada.
+ *
+ * É o caminho de volta de quem se cadastrou com o endereço errado (S30). Vale
+ * na hora, sem confirmação prévia no endereço novo, e isso só é seguro aqui:
+ * a loja não verificada está vazia, e a verificação que vem depois é a própria
+ * confirmação — endereço que a pessoa não controla deixa a loja bloqueada como
+ * estava. Em conta verificada nada disso vale, e por isso ela recebe 409.
+ *
+ * Exige a senha atual pelo mesmo motivo do `changePassword`, e com mais razão:
+ * o login é por e-mail, então uma sessão roubada que trocasse o endereço
+ * trancaria o dono para fora.
+ *
+ * Não cria o token novo nem manda e-mail: quem faz isso é a ROTA, depois de
+ * responder, com `sendEmailVerification` — SMTP não segura a requisição.
+ */
+export async function changeEmail(
+  auth: AuthContext,
+  currentPassword: string,
+  newEmail: string,
+): Promise<RestaurantUser> {
+  // antes da senha: não revela nada (a loja é a da sessão) e poupa o bcrypt
+  if (auth.emailVerified) {
+    throw new ConflictError(
+      "A troca de e-mail de uma conta já verificada ainda não está disponível",
+    );
+  }
+
+  const user = await restaurantUsersRepository.findByIdWithHash(auth.userId);
+  if (user === null) throw new UnauthorizedError("Sessão inválida ou expirada");
+
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    throw new UnauthorizedError("Senha atual incorreta");
+  }
+
+  if (newEmail === user.email) {
+    throw new ConflictError("Este já é o e-mail cadastrado");
+  }
+
+  return withTransaction(async (client) => {
+    const updated = await tryUpdateEmail(auth.userId, newEmail, client);
+
+    if (updated === "taken") {
+      throw new ConflictError(`O e-mail "${newEmail}" já está cadastrado`);
+    }
+    if (updated === null) {
+      throw new UnauthorizedError("Sessão inválida ou expirada");
+    }
+
+    // O link antigo foi para o endereço errado: não pode destravar a loja.
+    await emailVerificationRepository.softDeleteLiveForUser(auth.userId, client);
+    // Um link de recuperação pedido antes está na caixa de um estranho, e ele
+    // abre a conta.
+    await passwordResetRepository.softDeleteLiveForUser(auth.userId, client);
+    await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId, client);
+
+    return updated;
+  });
+}
+
 /** Os usuários com acesso ao painel do restaurante. */
 export async function listUsers(
   restaurantId: string,

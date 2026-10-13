@@ -146,6 +146,16 @@ export const EMAIL_VERIFICATION_RATE_LIMIT_MAX = 5;
 export const EMAIL_RESEND_RATE_LIMIT_MAX = 3;
 
 /**
+ * Teto do `/auth/change-email`, por USUÁRIO como o do reenvio, e pelo mesmo
+ * motivo: a rota exige sessão, e por IP duas lojas atrás do mesmo CGNAT
+ * dividiriam o teto. Cada chamada roda um bcrypt (centenas de milissegundos,
+ * de propósito) e, quando dá certo, manda um e-mail de verdade para um
+ * endereço escolhido por quem chama. Três por minuto cobrem "errei de novo o
+ * endereço" e não deixam uma sessão testar senha em volume.
+ */
+export const EMAIL_CHANGE_RATE_LIMIT_MAX = 3;
+
+/**
  * Teto do `/auth/register`, e ele chegou tarde: a rota só virou remetente de
  * e-mail quando o cadastro passou a disparar o link de verificação. Até ali
  * era uma rota anônima barata, e o teto global de 100/min bastava; hoje ela é

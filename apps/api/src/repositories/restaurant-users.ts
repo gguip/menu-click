@@ -175,6 +175,33 @@ export async function updatePasswordHash(
 }
 
 /**
+ * Troca o e-mail de um usuário vivo.
+ *
+ * Três resultados, e os três importam para o serviço: a linha atualizada,
+ * `"taken"` quando o endereço já é de outro usuário vivo (o índice único
+ * parcial recusou — nunca um `select` antes, entre checar e gravar cabe outra
+ * requisição), e `null` quando o usuário não existe ou já foi removido.
+ */
+export async function updateEmail(
+  id: string,
+  email: string,
+  db: Queryable = pool,
+): Promise<RestaurantUser | "taken" | null> {
+  try {
+    const { rows } = await db.query<RestaurantUserRow>(
+      `update restaurant_users set email = $1, updated_at = now()
+        where id = $2 and deleted_at is null
+        returning *`,
+      [email, id],
+    );
+    return rows.length === 0 ? null : toRestaurantUser(rows[0]);
+  } catch (error) {
+    if ((error as { code?: string }).code === UNIQUE_VIOLATION) return "taken";
+    throw error;
+  }
+}
+
+/**
  * Usuário vivo com esse id, **com o hash**. Só a troca de senha usa, para
  * conferir a atual.
  *
