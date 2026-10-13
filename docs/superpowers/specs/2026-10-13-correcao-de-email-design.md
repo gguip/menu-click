@@ -110,8 +110,8 @@ A rota declara `tags`, `summary`, `description` e `operationId`, e o
 3. **Mesmo e-mail → `ConflictError`.** A comparação segue a normalização que o
    cadastro já aplica; esta feature não muda regra de caixa.
 4. **Transação única** (`withTransaction`), detalhada abaixo.
-5. **Depois do commit**, o envio do link de verificação para o endereço novo,
-   fora da transação, como o reenvio faz.
+5. **Depois da resposta**, o token novo e o envio do link, em segundo plano.
+   Ver "Depois da resposta".
 
 ### A transação
 
@@ -129,8 +129,9 @@ Tudo com o `client`, na mesma transação (D3):
    de novo. É a mesma regra do `register`, pela mesma função. Colisão com conta
    viva → `ConflictError`, e o rollback desfaz qualquer liberação.
 3. **Tokens de verificação vivos do usuário são invalidados**
-   (`emailVerificationRepository.softDeleteLiveForUser`) e um novo é criado. O
-   link antigo foi para o endereço errado e não pode destravar a loja.
+   (`emailVerificationRepository.softDeleteLiveForUser`). O link antigo foi
+   para o endereço errado e não pode destravar a loja. O token novo **não**
+   nasce aqui: ver "Depois da resposta".
 4. **Tokens de recuperação de senha vivos do usuário são invalidados**
    (`passwordResetRepository.softDeleteLiveForUser`). Um link de recuperação
    pedido antes da correção está na caixa de entrada de um estranho, e ele abre
@@ -140,6 +141,17 @@ Tudo com o `client`, na mesma transação (D3):
 
 O repositório `restaurant-users.ts` ganha `updateEmail(id, email, db)`, que
 devolve `null` na violação de unicidade, no mesmo formato do `insert`.
+
+### Depois da resposta
+
+A rota responde 204 e só então chama `sendEmailVerification(user)` dentro de
+`track()`, sem `await` — a mesma função e o mesmo caminho do cadastro. Ela cria
+o token e manda o e-mail para o endereço novo. SMTP é rede e não pode segurar a
+requisição nem uma conexão do pool.
+
+Se a criação do token ou o envio falharem, a troca já valeu e o erro vai só
+para o log. A loja fica sem link vivo, e o botão "Não recebi, reenviar" resolve:
+ele agora manda para o endereço novo.
 
 ### Limite
 
