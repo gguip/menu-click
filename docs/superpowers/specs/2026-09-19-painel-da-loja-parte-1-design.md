@@ -411,6 +411,7 @@ entram na parte 3, e a separação das origens é pendência já registrada.
 | só "Aberta · fecha …" e "Pausada agora" no rail | + "Fechada · abre …" e "Fechada · sem horário cadastrado" | o handoff não desenha a loja fora do horário (spec de 2026-09-28) |
 | "Pix · pago" sem dizer quem registra | "Marcar como pago" / "Desfazer pago" no drawer | não há pagamento online: quem marca é a loja (spec de 2026-09-28) |
 | painel bloqueado: "Não é possível trocar o e-mail pelo painel" | formulário "E-mail correto" + "Senha atual" | a API ganhou `POST /auth/change-email` para a loja não verificada (spec de 2026-10-13) |
+| papel fixo, com a nota "Para trocar, remova a pessoa e convide de novo." | "Tornar dono" / "Tornar equipe" em cada linha, com confirmação, e a nota "O papel é escolhido no convite e pode ser trocado depois, na lista acima." | a API ganhou `PATCH .../users/:id`; remover e convidar de novo fazia o convidado perder a senha que já tinha |
 
 ## Pendências de backend que este desenho gera
 
