@@ -115,7 +115,10 @@ A rota declara `tags`, `summary`, `description` e `operationId`, e o
 
 ### A transação
 
-Tudo com o `client`, na mesma transação (D3):
+Tudo com o `client`, na mesma transação (D3). A ordem das travas é usuário,
+tokens, loja, e ela importa: é a ordem do `verifyEmail` (token, restaurante)
+com o usuário na frente, para não haver deadlock com uma verificação
+concorrente.
 
 1. **`update restaurant_users set email = $1, updated_at = now()`** no usuário
    da sessão, filtrando `deleted_at is null`. A colisão é detectada pelo índice
@@ -132,11 +135,15 @@ Tudo com o `client`, na mesma transação (D3):
    (`emailVerificationRepository.softDeleteLiveForUser`). O link antigo foi
    para o endereço errado e não pode destravar a loja. O token novo **não**
    nasce aqui: ver "Depois da resposta".
-4. **Tokens de recuperação de senha vivos do usuário são invalidados**
+4. **A loja é travada e conferida de novo** (`lockIfUnverified`): o
+   `emailVerified` da sessão é de antes do bcrypt, e o link antigo pode ter
+   sido aberto nesse intervalo. Loja verificada aqui → 409, e o rollback
+   desfaz o `update`.
+5. **Tokens de recuperação de senha vivos do usuário são invalidados**
    (`passwordResetRepository.softDeleteLiveForUser`). Um link de recuperação
    pedido antes da correção está na caixa de entrada de um estranho, e ele abre
    a conta.
-5. **As demais sessões do usuário são revogadas, poupando a atual**, como no
+6. **As demais sessões do usuário são revogadas, poupando a atual**, como no
    `change-password` (S31).
 
 O repositório `restaurant-users.ts` ganha `updateEmail(id, email, db)`, que
@@ -144,10 +151,17 @@ devolve `null` na violação de unicidade, no mesmo formato do `insert`.
 
 ### Depois da resposta
 
-A rota responde 204 e só então chama `sendEmailVerification(user)` dentro de
-`track()`, sem `await` — a mesma função e o mesmo caminho do cadastro. Ela cria
-o token e manda o e-mail para o endereço novo. SMTP é rede e não pode segurar a
-requisição nem uma conexão do pool.
+A rota responde 204 e só então chama `resendEmailVerification(auth)` dentro de
+`track()`, sem `await`. Ela trava a linha do usuário, lê o e-mail de agora,
+invalida o token anterior, cria o novo e manda o link. SMTP é rede e não pode
+segurar a requisição nem uma conexão do pool.
+
+É a função do reenvio, e não a do cadastro, de propósito: a do cadastro insere
+sem invalidar e usa o e-mail que recebeu. Com ela, duas trocas seguidas
+(A→B→C) podiam deixar vivo um link mandado para B, e um reenvio em voo podia
+mandar o link para o endereço antigo com a troca já feita. Com a linha do
+usuário travada dos dois lados, ou a emissão lê o endereço novo, ou termina
+antes e a troca invalida o token dela.
 
 Se a criação do token ou o envio falharem, a troca já valeu e o erro vai só
 para o log. A loja fica sem link vivo, e o botão "Não recebi, reenviar" resolve:
