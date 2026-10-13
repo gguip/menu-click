@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { escapeIdentifier } from "pg";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { drainBackgroundWorkUnbounded } from "../src/background.ts";
 import { pool } from "../src/db/pool.ts";
-import { clearOutbox } from "../src/email.ts";
+import { clearOutbox, outbox } from "../src/email.ts";
 import { ConflictError } from "../src/errors.ts";
 import * as authService from "../src/services/auth.ts";
 import {
@@ -340,6 +342,107 @@ describe("POST /auth/change-email", () => {
       [restaurant.id],
     );
     expect(rows[0].total).toBe("1");
+
+    // e zero linha em toda tabela filha. A lista vem do catálogo, como na
+    // varredura de `email-verification.test.ts`: tabela nova entra sozinha
+    const { rows: filhas } = await pool.query<{ tabela: string }>(
+      `select table_name as tabela from information_schema.columns
+        where table_schema = 'public' and column_name = 'restaurant_id'
+          and table_name <> 'restaurant_users'
+        order by table_name`,
+    );
+    expect(filhas.length).toBeGreaterThan(0);
+    for (const { tabela } of filhas) {
+      const { rows: contagem } = await pool.query<{ n: number }>(
+        `select count(*)::int as n from ${escapeIdentifier(tabela)}
+          where restaurant_id = $1`,
+        [restaurant.id],
+      );
+      expect(contagem[0].n, `${tabela} deveria estar vazia`).toBe(0);
+    }
+  });
+
+  it("falha no envio não desfaz a troca, e o reenvio manda para o endereço novo", async () => {
+    const { user, headers } = await registerAndLogin(app);
+    await esperaEmail(user.email);
+    clearOutbox();
+    const novo = uniqueEmail();
+
+    // o driver de console "envia" empurrando no outbox: falhar ali é o
+    // provedor de SMTP fora do ar naquele minuto
+    const envio = vi.spyOn(outbox, "push").mockImplementationOnce(() => {
+      throw new Error("SMTP fora do ar");
+    });
+    try {
+      const troca = await changeEmail(headers, {
+        currentPassword: senha,
+        newEmail: novo,
+      });
+      expect(troca.statusCode).toBe(204);
+      await drainBackgroundWorkUnbounded();
+      expect(envio).toHaveBeenCalledTimes(1);
+    } finally {
+      envio.mockRestore();
+    }
+    expect(outbox).toHaveLength(0);
+
+    const me = await app.inject({ method: "GET", url: "/auth/me", headers });
+    expect(me.json().email).toBe(novo);
+
+    await app.inject({
+      method: "POST",
+      url: "/auth/resend-verification",
+      headers,
+    });
+    const token = extraiToken((await esperaEmail(novo)).text);
+    const verifica = await app.inject({
+      method: "POST",
+      url: "/auth/verify-email",
+      payload: { token },
+    });
+    expect(verifica.statusCode).toBe(200);
+  });
+
+  it("um reenvio em voo durante a troca manda para o endereço novo, não para o antigo", async () => {
+    // O reenvio lê o e-mail e cria o token; a troca muda o e-mail e invalida
+    // os tokens. Sem a trava na linha do usuário, o reenvio lia o endereço
+    // antigo e o link ia para a caixa errada — com a troca já feita.
+    const { restaurant, user } = await registerAndLogin(app);
+    await esperaEmail(user.email);
+    clearOutbox();
+    const novo = uniqueEmail();
+
+    const client = await pool.connect();
+    let reenvio: Promise<void>;
+    try {
+      // a troca em andamento: segura a linha do usuário, como o `update` dela
+      await client.query("begin");
+      await client.query(
+        "select id from restaurant_users where id = $1 for update",
+        [user.id],
+      );
+
+      reenvio = authService.resendEmailVerification({
+        sessionId: randomUUID(),
+        userId: user.id,
+        restaurantId: restaurant.id,
+        role: "owner",
+        emailVerified: false,
+      });
+      // janela para o reenvio ler o e-mail, se ele não esperar pela trava
+      await new Promise((r) => setTimeout(r, 150));
+
+      await client.query(
+        "update restaurant_users set email = $1, updated_at = now() where id = $2",
+        [novo, user.id],
+      );
+      await client.query("commit");
+    } finally {
+      client.release();
+    }
+    await reenvio;
+
+    expect(outbox.map((email) => email.to)).toEqual([novo]);
   });
 
   describe("e-mail preso por cadastro abandonado", () => {

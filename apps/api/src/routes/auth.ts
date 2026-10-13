@@ -638,18 +638,20 @@ export async function authRoutes(app: FastifyInstance) {
     },
     async (request, reply) => {
       const { currentPassword, newEmail } = request.body;
-      const user = await authService.changeEmail(
-        requireAuth(request),
-        currentPassword,
-        newEmail,
-      );
+      const auth = requireAuth(request);
+      await authService.changeEmail(auth, currentPassword, newEmail);
       reply.code(204).send();
 
       // Depois de responder, e sem `await` — mesmo motivo do cadastro: e-mail
       // é rede. Falha vai só para o log (nunca o token, S13); a troca já
       // valeu, e o reenvio manda para o endereço novo.
+      //
+      // ⚠️ É o `resendEmailVerification`, e não o `sendEmailVerification` do
+      // cadastro: ele lê o e-mail DE AGORA com a linha travada e invalida o
+      // token anterior. Com o do cadastro, duas trocas seguidas (A→B→C)
+      // podiam deixar vivo um link mandado para B.
       track(
-        authService.sendEmailVerification(user).catch((error) => {
+        authService.resendEmailVerification(auth).catch((error) => {
           request.log.error(
             { err: error },
             "falha ao enviar e-mail de verificação depois da troca de e-mail",

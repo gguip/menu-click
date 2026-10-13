@@ -261,20 +261,29 @@ export async function sendEmailVerification(user: RestaurantUser): Promise<void>
 export async function resendEmailVerification(auth: AuthContext): Promise<void> {
   if (auth.emailVerified) return;
 
-  const user = await restaurantUsersRepository.findById(auth.userId);
-  // sessão válida apontando para usuário removido não deveria acontecer (a
-  // consulta de sessão já filtra `deleted_at is null`), mas o tipo permite
-  if (user === null) throw new UnauthorizedError("Sessão inválida");
-
   const token = generateToken();
   const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
 
-  await withTransaction(async (client) => {
-    await emailVerificationRepository.softDeleteLiveForUser(user.id, client);
-    await emailVerificationRepository.insert(
-      { restaurantUserId: user.id, tokenHash: hashToken(token), expiresAt },
+  const user = await withTransaction(async (client) => {
+    // ⚠️ O e-mail é lido DENTRO da transação, com a linha travada. A troca de
+    // e-mail (`changeEmail`) trava a mesma linha: lido de fora, um reenvio em
+    // voo pegava o endereço antigo e mandava o link para a caixa errada com a
+    // troca já feita. Travado, ou ele espera e lê o novo, ou termina antes e
+    // a troca invalida o token dele.
+    const locked = await restaurantUsersRepository.findByIdForUpdate(
+      auth.userId,
       client,
     );
+    // sessão válida apontando para usuário removido não deveria acontecer (a
+    // consulta de sessão já filtra `deleted_at is null`), mas o tipo permite
+    if (locked === null) throw new UnauthorizedError("Sessão inválida");
+
+    await emailVerificationRepository.softDeleteLiveForUser(locked.id, client);
+    await emailVerificationRepository.insert(
+      { restaurantUserId: locked.id, tokenHash: hashToken(token), expiresAt },
+      client,
+    );
+    return locked;
   });
 
   // FORA da transação e depois do commit: sendEmail é rede, e segurar uma
@@ -614,13 +623,14 @@ async function tryUpdateEmail(
  * trancaria o dono para fora.
  *
  * Não cria o token novo nem manda e-mail: quem faz isso é a ROTA, depois de
- * responder, com `sendEmailVerification` — SMTP não segura a requisição.
+ * responder, com `resendEmailVerification` — SMTP não segura a requisição, e
+ * aquela função lê o e-mail com a linha do usuário travada.
  */
 export async function changeEmail(
   auth: AuthContext,
   currentPassword: string,
   newEmail: string,
-): Promise<RestaurantUser> {
+): Promise<void> {
   const jaVerificada = () =>
     new ConflictError(
       "A troca de e-mail de uma conta já verificada ainda não está disponível",
@@ -641,23 +651,15 @@ export async function changeEmail(
     throw new ConflictError("Este já é o e-mail cadastrado");
   }
 
-  return withTransaction(async (client) => {
-    // O link antigo foi para o endereço errado: não pode destravar a loja.
+  await withTransaction(async (client) => {
+    // ⚠️ A ORDEM das travas é usuário, tokens, loja — e ela é a defesa.
     //
-    // ⚠️ PRIMEIRO os tokens, DEPOIS a loja — a mesma ordem do `verifyEmail`
-    // (token, restaurante). Invertida, esta transação e uma verificação
-    // concorrente travariam as duas linhas em ordens opostas: deadlock.
-    await emailVerificationRepository.softDeleteLiveForUser(auth.userId, client);
-
-    // 🚨 `auth.emailVerified` foi lido ANTES do bcrypt, que leva centenas de
-    // milissegundos de propósito. Se o link antigo for aberto nesse intervalo,
-    // a sessão ainda diz "não verificada" e a troca gravaria um endereço que
-    // ninguém provou numa loja já liberada — reproduzido na revisão. A trava
-    // decide com o estado de agora, e segura a linha até o commit.
-    if (!(await restaurantsRepository.lockIfUnverified(auth.restaurantId, client))) {
-      throw jaVerificada();
-    }
-
+    // O usuário primeiro (o `update` trava a linha): a emissão do link de
+    // verificação lê o e-mail com a mesma linha travada, então um reenvio em
+    // voo ou espera e lê o endereço novo, ou já terminou e o token dele cai na
+    // invalidação logo abaixo. Tokens antes da loja porque é a ordem do
+    // `verifyEmail` (token, restaurante): invertida, esta transação e uma
+    // verificação concorrente travariam as duas linhas em ordens opostas.
     let updated = await tryUpdateEmail(auth.userId, newEmail, client);
 
     if (updated === "taken") {
@@ -684,12 +686,23 @@ export async function changeEmail(
       throw new UnauthorizedError("Sessão inválida ou expirada");
     }
 
+    // O link antigo foi para o endereço errado: não pode destravar a loja.
+    await emailVerificationRepository.softDeleteLiveForUser(auth.userId, client);
+
+    // 🚨 `auth.emailVerified` foi lido ANTES do bcrypt, que leva centenas de
+    // milissegundos de propósito. Se o link antigo for aberto nesse intervalo,
+    // a sessão ainda diz "não verificada" e a troca gravaria um endereço que
+    // ninguém provou numa loja já liberada — reproduzido na revisão. A trava
+    // decide com o estado de agora, segura a linha até o commit, e o rollback
+    // desfaz o `update` acima.
+    if (!(await restaurantsRepository.lockIfUnverified(auth.restaurantId, client))) {
+      throw jaVerificada();
+    }
+
     // Um link de recuperação pedido antes está na caixa de um estranho, e ele
     // abre a conta.
     await passwordResetRepository.softDeleteLiveForUser(auth.userId, client);
     await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId, client);
-
-    return updated;
   });
 }
 

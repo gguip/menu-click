@@ -175,6 +175,25 @@ export async function updatePasswordHash(
 }
 
 /**
+ * Usuário vivo com esse id, **travando a linha** até o fim da transação.
+ *
+ * Existe para quem lê o e-mail e age sobre ele na mesma transação — a emissão
+ * do link de verificação. A troca de e-mail trava a mesma linha com o `update`
+ * dela, então as duas se enfileiram: ou a emissão lê o endereço novo, ou o
+ * token dela nasce antes e a troca o invalida.
+ */
+export async function findByIdForUpdate(
+  id: string,
+  db: Queryable,
+): Promise<RestaurantUser | null> {
+  const { rows } = await db.query<RestaurantUserRow>(
+    "select * from restaurant_users where id = $1 and deleted_at is null for update",
+    [id],
+  );
+  return rows.length === 0 ? null : toRestaurantUser(rows[0]);
+}
+
+/**
  * Troca o e-mail de um usuário vivo.
  *
  * Três resultados, e os três importam para o serviço: a linha atualizada,
