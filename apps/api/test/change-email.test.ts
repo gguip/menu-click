@@ -1,7 +1,10 @@
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.ts";
 import { clearOutbox } from "../src/email.ts";
+import { ConflictError } from "../src/errors.ts";
+import * as authService from "../src/services/auth.ts";
 import {
   authHeaders,
   buildTestApp,
@@ -187,6 +190,45 @@ describe("POST /auth/change-email", () => {
       headers: restaurant.headers,
     });
     expect(me.json().email).toBe(restaurant.ownerEmail);
+  });
+
+  it("a verificação que cai DURANTE a troca não deixa trocar o e-mail", async () => {
+    // A corrida de verdade: o hook resolve `emailVerified: false`, o bcrypt
+    // segura a requisição por centenas de milissegundos, e nesse intervalo o
+    // link antigo é aberto. Reproduzida na revisão da branch: a loja terminava
+    // verificada com um endereço que ninguém provou. O `AuthContext` velho
+    // (`emailVerified: false` numa loja que já verificou) é exatamente o que
+    // a requisição atrasada tem em mãos — a rota não deixa montá-lo, o
+    // serviço sim.
+    const restaurant = await createRestaurant(app);
+    const me = await app.inject({
+      method: "GET",
+      url: "/auth/me",
+      headers: restaurant.headers,
+    });
+
+    await expect(
+      authService.changeEmail(
+        {
+          sessionId: randomUUID(),
+          userId: me.json().id,
+          restaurantId: restaurant.id,
+          role: "owner",
+          emailVerified: false,
+        },
+        senha,
+        uniqueEmail(),
+      ),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    const depois = await app.inject({
+      method: "GET",
+      url: "/auth/me",
+      headers: restaurant.headers,
+    });
+    // o rollback desfaz tudo: o e-mail fica, e a sessão também
+    expect(depois.statusCode).toBe(200);
+    expect(depois.json().email).toBe(restaurant.ownerEmail);
   });
 
   it("senha atual errada é 401 e nada muda", async () => {

@@ -621,12 +621,14 @@ export async function changeEmail(
   currentPassword: string,
   newEmail: string,
 ): Promise<RestaurantUser> {
-  // antes da senha: não revela nada (a loja é a da sessão) e poupa o bcrypt
-  if (auth.emailVerified) {
-    throw new ConflictError(
+  const jaVerificada = () =>
+    new ConflictError(
       "A troca de e-mail de uma conta já verificada ainda não está disponível",
     );
-  }
+
+  // antes da senha: não revela nada (a loja é a da sessão) e poupa o bcrypt.
+  // É só saída antecipada — quem decide é a trava dentro da transação.
+  if (auth.emailVerified) throw jaVerificada();
 
   const user = await restaurantUsersRepository.findByIdWithHash(auth.userId);
   if (user === null) throw new UnauthorizedError("Sessão inválida ou expirada");
@@ -640,6 +642,22 @@ export async function changeEmail(
   }
 
   return withTransaction(async (client) => {
+    // O link antigo foi para o endereço errado: não pode destravar a loja.
+    //
+    // ⚠️ PRIMEIRO os tokens, DEPOIS a loja — a mesma ordem do `verifyEmail`
+    // (token, restaurante). Invertida, esta transação e uma verificação
+    // concorrente travariam as duas linhas em ordens opostas: deadlock.
+    await emailVerificationRepository.softDeleteLiveForUser(auth.userId, client);
+
+    // 🚨 `auth.emailVerified` foi lido ANTES do bcrypt, que leva centenas de
+    // milissegundos de propósito. Se o link antigo for aberto nesse intervalo,
+    // a sessão ainda diz "não verificada" e a troca gravaria um endereço que
+    // ninguém provou numa loja já liberada — reproduzido na revisão. A trava
+    // decide com o estado de agora, e segura a linha até o commit.
+    if (!(await restaurantsRepository.lockIfUnverified(auth.restaurantId, client))) {
+      throw jaVerificada();
+    }
+
     let updated = await tryUpdateEmail(auth.userId, newEmail, client);
 
     if (updated === "taken") {
@@ -666,8 +684,6 @@ export async function changeEmail(
       throw new UnauthorizedError("Sessão inválida ou expirada");
     }
 
-    // O link antigo foi para o endereço errado: não pode destravar a loja.
-    await emailVerificationRepository.softDeleteLiveForUser(auth.userId, client);
     // Um link de recuperação pedido antes está na caixa de um estranho, e ele
     // abre a conta.
     await passwordResetRepository.softDeleteLiveForUser(auth.userId, client);
