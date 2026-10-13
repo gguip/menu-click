@@ -887,8 +887,9 @@ describe("bloqueio do painel por e-mail não verificado", () => {
         ["PATCH", `/restaurants/${restaurant.id}`],
         // o DELETE também: a verificação é conferida ANTES do `ownerOnly`, e
         // a consequência é que nem o dono desfaz o próprio cadastro enquanto
-        // não verificar — quem se cadastrou errado espera a liberação dos 7
-        // dias, que é o único caminho que solta o slug
+        // não verificar — quem se cadastrou com o e-mail errado o corrige por
+        // `POST /auth/change-email`, e o slug só é solto pela liberação dos 7
+        // dias
         ["DELETE", `/restaurants/${restaurant.id}`],
       ] as const;
 

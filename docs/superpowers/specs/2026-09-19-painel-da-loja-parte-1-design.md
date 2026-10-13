@@ -410,6 +410,7 @@ entram na parte 3, e a separação das origens é pendência já registrada.
 | sem aviso de alteração não salva | "Sair sem salvar?" ao trocar de tela com a barra suja, e o aviso do navegador ao recarregar | sem ele, um clique no rail descartava um horário ou um produto inteiro em silêncio |
 | só "Aberta · fecha …" e "Pausada agora" no rail | + "Fechada · abre …" e "Fechada · sem horário cadastrado" | o handoff não desenha a loja fora do horário (spec de 2026-09-28) |
 | "Pix · pago" sem dizer quem registra | "Marcar como pago" / "Desfazer pago" no drawer | não há pagamento online: quem marca é a loja (spec de 2026-09-28) |
+| painel bloqueado: "Não é possível trocar o e-mail pelo painel" | formulário "E-mail correto" + "Senha atual" | a API ganhou `POST /auth/change-email` para a loja não verificada (spec de 2026-10-13) |
 
 ## Pendências de backend que este desenho gera
 
