@@ -299,4 +299,87 @@ describe("POST /auth/change-email", () => {
     );
     expect(rows[0].total).toBe("1");
   });
+
+  describe("e-mail preso por cadastro abandonado", () => {
+    /** Envelhece o cadastro: a regra de abandono lê `restaurants.created_at`. */
+    async function envelhece(restaurantId: string, dias: number) {
+      await pool.query(
+        "update restaurants set created_at = now() - make_interval(days => $2) where id = $1",
+        [restaurantId, dias],
+      );
+    }
+
+    it("libera o cadastro abandonado e faz a troca", async () => {
+      const abandonado = await registerAndLogin(app);
+      const { headers } = await registerAndLogin(app);
+      // ⚠️ envelhece DEPOIS do segundo cadastro: os dois derivam o mesmo slug
+      // do mesmo nome, e com o primeiro já abandonado seria o `register` a
+      // liberá-lo pela colisão de slug — o teste passaria sem a troca de
+      // e-mail liberar nada (foi assim que ele nasceu verde)
+      await envelhece(abandonado.restaurant.id, 8);
+
+      const response = await changeEmail(headers, {
+        currentPassword: senha,
+        newEmail: abandonado.user.email,
+      });
+      expect(response.statusCode).toBe(204);
+
+      const me = await app.inject({ method: "GET", url: "/auth/me", headers });
+      expect(me.json().email).toBe(abandonado.user.email);
+
+      // quem estava no cadastro abandonado perde a sessão junto
+      const expulso = await app.inject({
+        method: "GET",
+        url: "/auth/me",
+        headers: abandonado.headers,
+      });
+      expect(expulso.statusCode).toBe(401);
+    });
+
+    it("NÃO libera cadastro não verificado recente", async () => {
+      const recente = await registerAndLogin(app);
+      const { headers } = await registerAndLogin(app);
+
+      const response = await changeEmail(headers, {
+        currentPassword: senha,
+        newEmail: recente.user.email,
+      });
+      expect(response.statusCode).toBe(409);
+
+      const intacto = await app.inject({
+        method: "GET",
+        url: "/auth/me",
+        headers: recente.headers,
+      });
+      expect(intacto.statusCode).toBe(200);
+    });
+
+    it("NÃO libera loja verificada, por mais antiga que seja", async () => {
+      const verificada = await createRestaurant(app);
+      const { headers } = await registerAndLogin(app);
+      await envelhece(verificada.id, 400);
+
+      const response = await changeEmail(headers, {
+        currentPassword: senha,
+        newEmail: verificada.ownerEmail,
+      });
+      expect(response.statusCode).toBe(409);
+    });
+
+    it("quem corrige depois do sétimo dia não é liberado pela própria chamada", async () => {
+      const { restaurant, headers } = await registerAndLogin(app);
+      await envelhece(restaurant.id, 8);
+      const novo = uniqueEmail();
+
+      const response = await changeEmail(headers, {
+        currentPassword: senha,
+        newEmail: novo,
+      });
+      expect(response.statusCode).toBe(204);
+
+      const me = await app.inject({ method: "GET", url: "/auth/me", headers });
+      expect(me.statusCode).toBe(200);
+      expect(me.json().email).toBe(novo);
+    });
+  });
 });

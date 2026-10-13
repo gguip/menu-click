@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  EMAIL_CHANGE_RATE_LIMIT_MAX,
   EMAIL_RESEND_RATE_LIMIT_MAX,
   EMAIL_VERIFICATION_RATE_LIMIT_MAX,
   LOGIN_RATE_LIMIT_MAX,
@@ -218,6 +219,63 @@ describe("rate limit", () => {
     });
 
     expect(response.statusCode).toBe(202);
+  });
+
+  it(`a ${EMAIL_CHANGE_RATE_LIMIT_MAX + 1}ª troca de e-mail da mesma sessão é 429, mesmo trocando de IP`, async () => {
+    const { headers } = await registerAndLogin(app);
+    // senha errada de propósito: o 401 conta para o teto e não troca nada
+    const payload = {
+      currentPassword: "senha-errada-999",
+      newEmail: uniqueEmail(),
+    };
+
+    const respostas = [];
+    for (let i = 0; i < EMAIL_CHANGE_RATE_LIMIT_MAX + 1; i++) {
+      respostas.push(
+        await app.inject({
+          method: "POST",
+          url: "/auth/change-email",
+          remoteAddress: ipDedicado(),
+          headers,
+          payload,
+        }),
+      );
+    }
+
+    expect(
+      respostas.slice(0, EMAIL_CHANGE_RATE_LIMIT_MAX).map((r) => r.statusCode),
+    ).toEqual(Array(EMAIL_CHANGE_RATE_LIMIT_MAX).fill(401));
+    expect(respostas.at(-1)?.statusCode).toBe(429);
+  });
+
+  it("a troca de e-mail esgotada de uma loja não tranca a vizinha no mesmo IP", async () => {
+    const compartilhado = ipDedicado();
+    const gastadora = await registerAndLogin(app);
+    const vizinha = await registerAndLogin(app);
+    const payload = {
+      currentPassword: "senha-errada-999",
+      newEmail: uniqueEmail(),
+    };
+
+    for (let i = 0; i < EMAIL_CHANGE_RATE_LIMIT_MAX + 1; i++) {
+      await app.inject({
+        method: "POST",
+        url: "/auth/change-email",
+        remoteAddress: compartilhado,
+        headers: gastadora.headers,
+        payload,
+      });
+    }
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/change-email",
+      remoteAddress: compartilhado,
+      headers: vizinha.headers,
+      payload,
+    });
+
+    expect(response.statusCode).toBe(401);
   });
 
   it(`o ${LOGIN_RATE_LIMIT_MAX + 1}º login do mesmo IP é 429`, async () => {

@@ -640,7 +640,24 @@ export async function changeEmail(
   }
 
   return withTransaction(async (client) => {
-    const updated = await tryUpdateEmail(auth.userId, newEmail, client);
+    let updated = await tryUpdateEmail(auth.userId, newEmail, client);
+
+    if (updated === "taken") {
+      // A mesma regra do `register`, pela mesma função: se quem segura o
+      // endereço é um cadastro abandonado, ele sai de cena e a troca tenta de
+      // novo. Roda na transação de quem chamou — se algo falhar depois, o
+      // rollback desfaz a liberação junto.
+      const holderId = await restaurantUsersRepository.findRestaurantIdByEmail(
+        newEmail,
+        client,
+      );
+      if (
+        holderId !== null &&
+        (await restaurantsService.releaseAbandonedRegistration(holderId, client))
+      ) {
+        updated = await tryUpdateEmail(auth.userId, newEmail, client);
+      }
+    }
 
     if (updated === "taken") {
       throw new ConflictError(`O e-mail "${newEmail}" já está cadastrado`);
