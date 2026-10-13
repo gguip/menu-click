@@ -17,6 +17,14 @@ import classes from "./EmailBlockedPage.module.css";
 const SUPPORT_URL = import.meta.env.VITE_SUPPORT_URL;
 
 /**
+ * O 429 se explica pela contagem no botão, e só enquanto ela corre: o texto
+ * "aguarde" ao lado de um botão já liberado se contradiz.
+ */
+function isRateLimit(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 429;
+}
+
+/**
  * Sem rail e sem header: o painel está bloqueado, e mostrar a navegação
  * desabilitada só frustra. Endereço errado se corrige aqui mesmo, com a senha
  * da conta — a API só aceita a troca enquanto a loja não foi verificada.
@@ -60,8 +68,14 @@ export function EmailBlockedPage() {
       await queryClient.invalidateQueries({ queryKey: meQueryKey });
     },
     onError: (error) => {
-      if (error instanceof ApiError && error.status === 429) {
+      if (!(error instanceof ApiError)) return;
+      if (error.status === 429) {
         correctionCountdown.start(error.retryAfterSeconds ?? 60);
+      }
+      // 409 pode ser a loja já verificada em outra aba: reler o `me` tira a
+      // pessoa desta tela, em vez de deixá-la presa numa recusa
+      if (error.status === 409) {
+        void queryClient.invalidateQueries({ queryKey: meQueryKey });
       }
     },
     onSettled: () => {
@@ -105,7 +119,7 @@ export function EmailBlockedPage() {
           {sent && !locked && (
             <p className={access.success}>Link reenviado. Confira também a caixa de spam.</p>
           )}
-          {resend.isError && !locked && (
+          {resend.isError && !isRateLimit(resend.error) && (
             <p role="alert" className={access.error}>
               {describeError(resend.error)}
             </p>
@@ -152,7 +166,7 @@ export function EmailBlockedPage() {
                 Informe o e-mail correto e a senha atual.
               </p>
             )}
-            {correction.isError && !incomplete && !correctionLocked && (
+            {correction.isError && !incomplete && !isRateLimit(correction.error) && (
               <p role="alert" className={access.error}>
                 {describeError(correction.error)}
               </p>

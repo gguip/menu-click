@@ -192,4 +192,73 @@ describe("EmailBlockedPage", () => {
     await screen.findByText("E-mail corrigido. Enviamos o link de confirmação para o endereço novo.");
     expect(api.calls.filter((c) => c.path === "/auth/change-email").length).toBe(1);
   });
+
+  const tooMany = "Muitas tentativas seguidas. Aguarde um instante e tente de novo.";
+
+  it("quando a contagem da correção acaba, o botão volta e o aviso de limite some", async () => {
+    signIn();
+    mockApi([
+      me,
+      {
+        method: "POST",
+        path: "/auth/change-email",
+        status: 429,
+        body: { message: "Rate limit exceeded" },
+        headers: { "retry-after": "1" },
+      },
+    ]);
+    renderRoutes(routes, "/confirme-seu-email");
+
+    await fillAndSubmit(corrected, "senha-do-dono-123");
+    await screen.findByRole("button", { name: "Tentar de novo em 0:01" });
+
+    const back = await screen.findByRole("button", { name: "Corrigir e-mail" }, { timeout: 3000 });
+    expect((back as HTMLButtonElement).disabled).toBe(false);
+    // "aguarde" ao lado de um botão liberado se contradiz
+    expect(screen.queryByText(tooMany)).toBeNull();
+  });
+
+  it("quando a contagem do reenvio acaba, o aviso de limite some", async () => {
+    signIn();
+    mockApi([
+      me,
+      {
+        method: "POST",
+        path: "/auth/resend-verification",
+        status: 429,
+        body: { message: "Rate limit exceeded" },
+        headers: { "retry-after": "1" },
+      },
+    ]);
+    renderRoutes(routes, "/confirme-seu-email");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Não recebi, reenviar" }));
+    await screen.findByRole("button", { name: "Reenviar em 0:01" });
+
+    await screen.findByRole("button", { name: "Não recebi, reenviar" }, { timeout: 3000 });
+    expect(screen.queryByText(tooMany)).toBeNull();
+  });
+
+  it("409 com a loja já verificada em outra aba leva para os pedidos", async () => {
+    signIn();
+    mockApi([
+      { ...me, once: true },
+      { method: "GET", path: "/auth/me", body: makeMe() },
+      {
+        method: "POST",
+        path: "/auth/change-email",
+        status: 409,
+        body: {
+          statusCode: 409,
+          error: "Conflict",
+          message: "A troca de e-mail de uma conta já verificada ainda não está disponível",
+        },
+      },
+    ]);
+    renderRoutes(routes, "/confirme-seu-email");
+
+    await fillAndSubmit(corrected, "senha-do-dono-123");
+
+    expect((await screen.findByTestId("location")).textContent).toBe("/pedidos");
+  });
 });
