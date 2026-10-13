@@ -63,3 +63,18 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
     expireOn401: false,
   });
 }
+
+/**
+ * Corrige o e-mail de uma loja ainda não verificada. Responde 204.
+ *
+ * Mesma armadilha do `changePassword`: o 401 daqui é "senha atual incorreta",
+ * não sessão expirada — sem `expireOn401: false`, errar a senha deslogaria a
+ * pessoa da única tela que resolve o problema dela.
+ */
+export function changeEmail(currentPassword: string, newEmail: string): Promise<void> {
+  return apiRequest<void>("/auth/change-email", {
+    method: "POST",
+    body: { currentPassword, newEmail },
+    expireOn401: false,
+  });
+}
