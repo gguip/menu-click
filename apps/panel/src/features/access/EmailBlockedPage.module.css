@@ -62,6 +62,11 @@
   font-size: 13.5px;
 }
 
+.form {
+  display: grid;
+  gap: 10px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

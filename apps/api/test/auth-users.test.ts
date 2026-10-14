@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { pool } from "../src/db/pool.ts";
 import {
   authHeaders,
   buildTestApp,
@@ -472,6 +473,270 @@ describe("acesso ao painel", () => {
       });
 
       expect(segunda.statusCode).toBe(404);
+    });
+  });
+
+  /**
+   * O papel passou várias PRs sem ser editável: trocar era remover e convidar
+   * de novo, e o convidado perdia a senha que já tinha.
+   */
+  describe("troca de papel", () => {
+    async function cenario() {
+      const { restaurant, user, password } = await registerRestaurant(app);
+      await verifyRestaurantEmail(app, user.email);
+      const dono = {
+        restaurant,
+        user,
+        headers: authHeaders(await login(app, user.email, password)),
+      };
+      const convidar = async (role: "owner" | "staff") => {
+        const email = `${role}-${Math.random().toString(36).slice(2)}@x.com`;
+        const criado = await app.inject({
+          method: "POST",
+          url: `/restaurants/${restaurant.id}/users`,
+          headers: dono.headers,
+          payload: { name: "Convidado", email, password: "senha-do-convidado", role },
+        });
+        return {
+          user: criado.json(),
+          headers: authHeaders(await login(app, email, "senha-do-convidado")),
+        };
+      };
+      const urlDe = (id: string) => `/restaurants/${restaurant.id}/users/${id}`;
+      return { dono, convidar, urlDe };
+    }
+
+    /** Donos vivos da loja, lidos fora da API. */
+    async function donosVivos(restaurantId: string): Promise<number> {
+      const { rows } = await pool.query<{ donos: number }>(
+        `select count(*)::int as donos from restaurant_users
+          where restaurant_id = $1 and role = 'owner' and deleted_at is null`,
+        [restaurantId],
+      );
+      return rows[0].donos;
+    }
+
+    it("200, e o staff promovido passa a administrar usuários na mesma sessão", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const staff = await convidar("staff");
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: urlDe(staff.user.id),
+        headers: dono.headers,
+        payload: { role: "owner" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ id: staff.user.id, role: "owner" });
+      expect(response.json().passwordHash).toBeUndefined();
+      // a sessão é a de antes da troca: o papel vem do banco a cada requisição
+      const lista = await app.inject({
+        method: "GET",
+        url: `/restaurants/${dono.restaurant.id}/users`,
+        headers: staff.headers,
+      });
+      expect(lista.statusCode).toBe(200);
+    });
+
+    it("o dono rebaixado perde o acesso de dono na mesma sessão", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const socio = await convidar("owner");
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: urlDe(socio.user.id),
+        headers: dono.headers,
+        payload: { role: "staff" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().role).toBe("staff");
+      const lista = await app.inject({
+        method: "GET",
+        url: `/restaurants/${dono.restaurant.id}/users`,
+        headers: socio.headers,
+      });
+      expect(lista.statusCode).toBe(403);
+    });
+
+    /**
+     * A mesma regra da remoção, pelo mesmo motivo: como só dono muda papel, o
+     * último dono nunca consegue deixar de ser dono.
+     */
+    it("409 ao tentar mudar o próprio papel", async () => {
+      const { dono, urlDe } = await cenario();
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: urlDe(dono.user.id),
+        headers: dono.headers,
+        payload: { role: "staff" },
+      });
+
+      expect(response.statusCode).toBe(409);
+      expect(response.json().message).toContain("próprio papel");
+    });
+
+    it("staff NÃO muda o papel de ninguém — 403", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const staff = await convidar("staff");
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: urlDe(dono.user.id),
+        headers: staff.headers,
+        payload: { role: "staff" },
+      });
+
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("404 com id inexistente, com id que não é uuid e com usuário de outro restaurante", async () => {
+      const { dono, urlDe } = await cenario();
+      const outro = await cenario();
+      const alheio = await outro.convidar("staff");
+
+      for (const id of [NONEXISTENT_ID, "nao-e-uuid", alheio.user.id]) {
+        const response = await app.inject({
+          method: "PATCH",
+          url: urlDe(id),
+          headers: dono.headers,
+          payload: { role: "owner" },
+        });
+        expect(response.statusCode).toBe(404);
+      }
+      const lista = await app.inject({
+        method: "GET",
+        url: `/restaurants/${outro.dono.restaurant.id}/users`,
+        headers: outro.dono.headers,
+      });
+      const intacto = lista
+        .json()
+        .data.find((u: { id: string }) => u.id === alheio.user.id);
+      expect(intacto.role).toBe("staff");
+    });
+
+    it("400 sem papel e com papel que não existe", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const staff = await convidar("staff");
+
+      for (const payload of [{}, { role: "admin" }]) {
+        const response = await app.inject({
+          method: "PATCH",
+          url: urlDe(staff.user.id),
+          headers: dono.headers,
+          payload,
+        });
+        expect(response.statusCode).toBe(400);
+      }
+    });
+
+    it("só o papel muda: nome e e-mail no corpo são descartados", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const staff = await convidar("staff");
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: urlDe(staff.user.id),
+        headers: dono.headers,
+        payload: { role: "owner", name: "Outro nome", email: "outro@x.com" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        role: "owner",
+        name: staff.user.name,
+        email: staff.user.email,
+      });
+    });
+
+    it("pedir o papel que a pessoa já tem é 200 e não muda nada", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const staff = await convidar("staff");
+
+      const response = await app.inject({
+        method: "PATCH",
+        url: urlDe(staff.user.id),
+        headers: dono.headers,
+        payload: { role: "staff" },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json().role).toBe("staff");
+    });
+
+    /**
+     * "Ninguém muda o próprio papel" não basta sozinho: dois donos se
+     * rebaixando ao mesmo tempo passariam os dois pela checagem do hook (feita
+     * com o papel lido antes) e a loja ficaria sem dono nenhum — sem quem
+     * convide, promova ou a encerre. O serviço trava as duas linhas e relê o
+     * papel de quem pede.
+     */
+    it("dois donos se rebaixando ao mesmo tempo: só um consegue, e sobra um dono", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const socio = await convidar("owner");
+
+      // pool frio serializa as duas por acidente, e o teste passaria sem a trava
+      await Promise.all(Array.from({ length: 4 }, () => pool.query("select 1")));
+      const respostas = await Promise.all([
+        app.inject({
+          method: "PATCH",
+          url: urlDe(socio.user.id),
+          headers: dono.headers,
+          payload: { role: "staff" },
+        }),
+        app.inject({
+          method: "PATCH",
+          url: urlDe(dono.user.id),
+          headers: socio.headers,
+          payload: { role: "staff" },
+        }),
+      ]);
+
+      expect(respostas.map((r) => r.statusCode).sort()).toEqual([200, 403]);
+      expect(await donosVivos(dono.restaurant.id)).toBe(1);
+    });
+
+    /**
+     * A remoção entra na mesma fila. Sem isso a troca de papel abriria um
+     * buraco novo: A rebaixa B enquanto B remove A, e sobra só um staff.
+     */
+    it("um dono rebaixa o outro enquanto é removido por ele: sobra um dono", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const socio = await convidar("owner");
+
+      await Promise.all(Array.from({ length: 4 }, () => pool.query("select 1")));
+      const [rebaixa, remove] = await Promise.all([
+        app.inject({
+          method: "PATCH",
+          url: urlDe(socio.user.id),
+          headers: dono.headers,
+          payload: { role: "staff" },
+        }),
+        app.inject({
+          method: "DELETE",
+          url: urlDe(dono.user.id),
+          headers: socio.headers,
+        }),
+      ]);
+
+      expect([rebaixa.statusCode, remove.statusCode]).toContain(403);
+      expect(await donosVivos(dono.restaurant.id)).toBe(1);
+    });
+
+    it("dois donos se removendo ao mesmo tempo: só um consegue", async () => {
+      const { dono, convidar, urlDe } = await cenario();
+      const socio = await convidar("owner");
+
+      await Promise.all(Array.from({ length: 4 }, () => pool.query("select 1")));
+      const respostas = await Promise.all([
+        app.inject({ method: "DELETE", url: urlDe(socio.user.id), headers: dono.headers }),
+        app.inject({ method: "DELETE", url: urlDe(dono.user.id), headers: socio.headers }),
+      ]);
+
+      expect(respostas.map((r) => r.statusCode).sort()).toEqual([204, 403]);
+      expect(await donosVivos(dono.restaurant.id)).toBe(1);
     });
   });
 });

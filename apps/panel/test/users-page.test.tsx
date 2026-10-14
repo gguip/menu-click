@@ -111,4 +111,61 @@ describe("tela de usuários", () => {
     await screen.findByText("Só o dono administra os usuários da loja.");
     expect(screen.queryByLabelText("Senha provisória")).toBeNull();
   });
+
+  it("promover confirma, manda o PATCH com o papel novo e refaz a lista", async () => {
+    signIn();
+    const api = withUsers([dona, joao]);
+    renderInPanel(routes, "/usuarios");
+    fireEvent.click(await screen.findByRole("button", { name: "Tornar João Alves dono" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain("pode remover o restaurante");
+    api.add({ method: "PATCH", path: `${USERS}/u-2`, body: { ...joao, role: "owner" } });
+    api.add({ method: "GET", path: USERS, body: { data: [dona, { ...joao, role: "owner" }] } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Tornar dono" }));
+    await waitFor(() =>
+      expect(api.calls.find((call) => call.method === "PATCH")?.body).toEqual({ role: "owner" }),
+    );
+    // a lista refeita já oferece o caminho de volta
+    await screen.findByRole("button", { name: "Tornar João Alves equipe" });
+  });
+
+  it("a própria conta não tem botão de trocar papel", async () => {
+    signIn();
+    withUsers([dona, joao]);
+    renderInPanel(routes, "/usuarios");
+    await screen.findByText("João Alves");
+    expect(screen.queryByRole("button", { name: /^Tornar Cláudia Mendes/ })).toBeNull();
+  });
+
+  it("falha na troca de papel fecha a confirmação e mostra a mensagem da API", async () => {
+    signIn();
+    const api = withUsers([dona, joao]);
+    renderInPanel(routes, "/usuarios");
+    fireEvent.click(await screen.findByRole("button", { name: "Tornar João Alves dono" }));
+    const dialog = await screen.findByRole("dialog");
+    api.add({
+      method: "PATCH",
+      path: `${USERS}/u-2`,
+      status: 403,
+      body: { statusCode: 403, error: "Forbidden", message: "Esta ação é restrita ao dono do restaurante" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Tornar dono" }));
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Esta ação é restrita ao dono do restaurante",
+    );
+  });
+
+  it("as notas do rodapé dizem que o papel se troca na lista", async () => {
+    signIn();
+    withUsers([dona]);
+    renderInPanel(routes, "/usuarios");
+    await screen.findByText(
+      "O papel é escolhido no convite e pode ser trocado depois, na lista acima.",
+    );
+    expect(
+      screen.getByText(
+        "Sem papel informado, o usuário nasce como equipe. Ninguém remove a própria conta nem muda o próprio papel.",
+      ),
+    ).not.toBeNull();
+  });
 });

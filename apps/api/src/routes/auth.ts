@@ -4,6 +4,7 @@ import type { CreateRestaurantInput } from "../domain/restaurant.ts";
 import type { CreateRestaurantUserInput } from "../domain/restaurant-user.ts";
 import { PASSWORD_MIN_LENGTH } from "../domain/restaurant-user.ts";
 import {
+  EMAIL_CHANGE_RATE_LIMIT_MAX,
   EMAIL_RESEND_RATE_LIMIT_MAX,
   EMAIL_VERIFICATION_RATE_LIMIT_MAX,
   LOGIN_RATE_LIMIT_MAX,
@@ -100,6 +101,18 @@ const changePasswordBodySchema = {
     // formato dela recusaria uma senha legítima criada sob outra regra
     currentPassword: { type: "string" },
     newPassword: passwordSchema,
+  },
+};
+
+const changeEmailBodySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["currentPassword", "newEmail"],
+  properties: {
+    // sem `minLength`, como no change-password: é conferida contra o hash
+    currentPassword: { type: "string" },
+    // os mesmos limites do e-mail do cadastro (`userInputSchema`)
+    newEmail: { type: "string", format: "email", maxLength: 254 },
   },
 };
 
@@ -587,6 +600,64 @@ export async function authRoutes(app: FastifyInstance) {
         newPassword,
       );
       return reply.code(204).send();
+    },
+  );
+
+  // Corrigir o próprio e-mail, enquanto a loja não foi verificada. Sem
+  // `restaurantId` nos params, o bloqueio por e-mail não verificado não se
+  // aplica aqui — como no reenvio, esta rota É o que resolve o bloqueio.
+  app.post<{ Body: { currentPassword: string; newEmail: string } }>(
+    "/auth/change-email",
+    {
+      config: {
+        // Teto próprio, e por USUÁRIO — ver EMAIL_CHANGE_RATE_LIMIT_MAX em
+        // limits.ts. A sessão já está resolvida quando o limitador roda (hook
+        // de instância antes do de rota); o `?? ip` é o caminho que não
+        // acontece.
+        rateLimit: {
+          max: EMAIL_CHANGE_RATE_LIMIT_MAX,
+          timeWindow: RATE_LIMIT_WINDOW,
+          keyGenerator: (request) => request.auth?.userId ?? request.ip,
+        },
+      },
+      schema: {
+        tags: ["Autenticação"],
+        operationId: "changeEmail",
+        summary: "Corrige o próprio e-mail antes da verificação",
+        description:
+          "O caminho de volta de quem se cadastrou com o endereço errado (S30). Só funciona enquanto a loja **não** foi verificada: a troca vale na hora, o link de verificação anterior deixa de valer e um novo é enviado ao endereço novo. Exige a senha **atual** mesmo havendo sessão (senha errada é 401), invalida qualquer link de recuperação de senha pendente e revoga as **demais** sessões do usuário. Loja já verificada recebe 409 — a troca com confirmação no endereço novo ainda não existe. E-mail igual ao atual ou já usado por outra conta também é 409. Limite de 3 requisições por minuto **por usuário** (429 ao estourar).",
+        body: changeEmailBodySchema,
+        response: {
+          204: { type: "null" },
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+          409: errorResponseSchema,
+          429: errorResponseSchema,
+        },
+      },
+    },
+    async (request, reply) => {
+      const { currentPassword, newEmail } = request.body;
+      const auth = requireAuth(request);
+      await authService.changeEmail(auth, currentPassword, newEmail);
+      reply.code(204).send();
+
+      // Depois de responder, e sem `await` — mesmo motivo do cadastro: e-mail
+      // é rede. Falha vai só para o log (nunca o token, S13); a troca já
+      // valeu, e o reenvio manda para o endereço novo.
+      //
+      // ⚠️ É o `resendEmailVerification`, e não o `sendEmailVerification` do
+      // cadastro: ele lê o e-mail DE AGORA com a linha travada e invalida o
+      // token anterior. Com o do cadastro, duas trocas seguidas (A→B→C)
+      // podiam deixar vivo um link mandado para B.
+      track(
+        authService.resendEmailVerification(auth).catch((error) => {
+          request.log.error(
+            { err: error },
+            "falha ao enviar e-mail de verificação depois da troca de e-mail",
+          );
+        }),
+      );
     },
   );
 }

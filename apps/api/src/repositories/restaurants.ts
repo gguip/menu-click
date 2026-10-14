@@ -391,6 +391,29 @@ export async function markEmailVerified(
 }
 
 /**
+ * Trava a linha do restaurante **se ele ainda não verificou o e-mail**.
+ * `false` = já verificou (ou não existe), e nada ficou travado.
+ *
+ * Existe para a troca de e-mail da loja não verificada: a checagem que ela faz
+ * pela sessão é de ANTES do bcrypt, e a verificação pode cair nesse intervalo.
+ * O `for update` segura a linha até o fim da transação de quem chama, então um
+ * `markEmailVerified` concorrente espera — e encontra o e-mail já trocado e o
+ * token dele já invalidado.
+ */
+export async function lockIfUnverified(
+  id: string,
+  db: Queryable = pool,
+): Promise<boolean> {
+  const { rows } = await db.query(
+    `select id from restaurants
+      where id = $1 and deleted_at is null and email_verified_at is null
+        for update`,
+    [id],
+  );
+  return rows.length === 1;
+}
+
+/**
  * Soft delete do restaurante. Devolve `false` quando não havia registro vivo
  * com esse id — o `and deleted_at is null` é o que impede sobrescrever a data
  * original numa segunda remoção (D1).

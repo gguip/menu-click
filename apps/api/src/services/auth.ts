@@ -15,6 +15,7 @@ import { PASSWORD_RESET_TOKEN_TTL_MS } from "../domain/password-reset.ts";
 import { EMAIL_VERIFICATION_TOKEN_TTL_MS } from "../domain/email-verification.ts";
 import {
   ConflictError,
+  ForbiddenError,
   NotFoundError,
   UnauthorizedError,
   ValidationError,
@@ -261,20 +262,29 @@ export async function sendEmailVerification(user: RestaurantUser): Promise<void>
 export async function resendEmailVerification(auth: AuthContext): Promise<void> {
   if (auth.emailVerified) return;
 
-  const user = await restaurantUsersRepository.findById(auth.userId);
-  // sessão válida apontando para usuário removido não deveria acontecer (a
-  // consulta de sessão já filtra `deleted_at is null`), mas o tipo permite
-  if (user === null) throw new UnauthorizedError("Sessão inválida");
-
   const token = generateToken();
   const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL_MS);
 
-  await withTransaction(async (client) => {
-    await emailVerificationRepository.softDeleteLiveForUser(user.id, client);
-    await emailVerificationRepository.insert(
-      { restaurantUserId: user.id, tokenHash: hashToken(token), expiresAt },
+  const user = await withTransaction(async (client) => {
+    // ⚠️ O e-mail é lido DENTRO da transação, com a linha travada. A troca de
+    // e-mail (`changeEmail`) trava a mesma linha: lido de fora, um reenvio em
+    // voo pegava o endereço antigo e mandava o link para a caixa errada com a
+    // troca já feita. Travado, ou ele espera e lê o novo, ou termina antes e
+    // a troca invalida o token dele.
+    const locked = await restaurantUsersRepository.findByIdForUpdate(
+      auth.userId,
       client,
     );
+    // sessão válida apontando para usuário removido não deveria acontecer (a
+    // consulta de sessão já filtra `deleted_at is null`), mas o tipo permite
+    if (locked === null) throw new UnauthorizedError("Sessão inválida");
+
+    await emailVerificationRepository.softDeleteLiveForUser(locked.id, client);
+    await emailVerificationRepository.insert(
+      { restaurantUserId: locked.id, tokenHash: hashToken(token), expiresAt },
+      client,
+    );
+    return locked;
   });
 
   // FORA da transação e depois do commit: sendEmail é rede, e segurar uma
@@ -577,6 +587,126 @@ export async function changePassword(
   });
 }
 
+/**
+ * Uma tentativa de trocar o e-mail, dentro do seu savepoint.
+ *
+ * Mesmo motivo do `tryInsertUser`: no Postgres, um comando que falha aborta o
+ * bloco inteiro, e a violação de unicidade daqui é seguida de mais queries (a
+ * liberação de cadastro abandonado e a segunda tentativa).
+ */
+async function tryUpdateEmail(
+  userId: string,
+  email: string,
+  db: Queryable,
+): Promise<RestaurantUser | "taken" | null> {
+  // nome fixo, escrito no código: identificador não aceita $n (S3)
+  await db.query("savepoint email_attempt");
+  const updated = await restaurantUsersRepository.updateEmail(userId, email, db);
+  await db.query(
+    updated === "taken"
+      ? "rollback to savepoint email_attempt"
+      : "release savepoint email_attempt",
+  );
+  return updated;
+}
+
+/**
+ * Corrige o e-mail de quem chama — só enquanto a LOJA não foi verificada.
+ *
+ * É o caminho de volta de quem se cadastrou com o endereço errado (S30). Vale
+ * na hora, sem confirmação prévia no endereço novo, e isso só é seguro aqui:
+ * a loja não verificada está vazia, e a verificação que vem depois é a própria
+ * confirmação — endereço que a pessoa não controla deixa a loja bloqueada como
+ * estava. Em conta verificada nada disso vale, e por isso ela recebe 409.
+ *
+ * Exige a senha atual pelo mesmo motivo do `changePassword`, e com mais razão:
+ * o login é por e-mail, então uma sessão roubada que trocasse o endereço
+ * trancaria o dono para fora.
+ *
+ * Não cria o token novo nem manda e-mail: quem faz isso é a ROTA, depois de
+ * responder, com `resendEmailVerification` — SMTP não segura a requisição, e
+ * aquela função lê o e-mail com a linha do usuário travada.
+ */
+export async function changeEmail(
+  auth: AuthContext,
+  currentPassword: string,
+  newEmail: string,
+): Promise<void> {
+  const jaVerificada = () =>
+    new ConflictError(
+      "A troca de e-mail de uma conta já verificada ainda não está disponível",
+    );
+
+  // antes da senha: não revela nada (a loja é a da sessão) e poupa o bcrypt.
+  // É só saída antecipada — quem decide é a trava dentro da transação.
+  if (auth.emailVerified) throw jaVerificada();
+
+  const user = await restaurantUsersRepository.findByIdWithHash(auth.userId);
+  if (user === null) throw new UnauthorizedError("Sessão inválida ou expirada");
+
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    throw new UnauthorizedError("Senha atual incorreta");
+  }
+
+  if (newEmail === user.email) {
+    throw new ConflictError("Este já é o e-mail cadastrado");
+  }
+
+  await withTransaction(async (client) => {
+    // ⚠️ A ORDEM das travas é usuário, tokens, loja — e ela é a defesa.
+    //
+    // O usuário primeiro (o `update` trava a linha): a emissão do link de
+    // verificação lê o e-mail com a mesma linha travada, então um reenvio em
+    // voo ou espera e lê o endereço novo, ou já terminou e o token dele cai na
+    // invalidação logo abaixo. Tokens antes da loja porque é a ordem do
+    // `verifyEmail` (token, restaurante): invertida, esta transação e uma
+    // verificação concorrente travariam as duas linhas em ordens opostas.
+    let updated = await tryUpdateEmail(auth.userId, newEmail, client);
+
+    if (updated === "taken") {
+      // A mesma regra do `register`, pela mesma função: se quem segura o
+      // endereço é um cadastro abandonado, ele sai de cena e a troca tenta de
+      // novo. Roda na transação de quem chamou — se algo falhar depois, o
+      // rollback desfaz a liberação junto.
+      const holderId = await restaurantUsersRepository.findRestaurantIdByEmail(
+        newEmail,
+        client,
+      );
+      if (
+        holderId !== null &&
+        (await restaurantsService.releaseAbandonedRegistration(holderId, client))
+      ) {
+        updated = await tryUpdateEmail(auth.userId, newEmail, client);
+      }
+    }
+
+    if (updated === "taken") {
+      throw new ConflictError(`O e-mail "${newEmail}" já está cadastrado`);
+    }
+    if (updated === null) {
+      throw new UnauthorizedError("Sessão inválida ou expirada");
+    }
+
+    // O link antigo foi para o endereço errado: não pode destravar a loja.
+    await emailVerificationRepository.softDeleteLiveForUser(auth.userId, client);
+
+    // 🚨 `auth.emailVerified` foi lido ANTES do bcrypt, que leva centenas de
+    // milissegundos de propósito. Se o link antigo for aberto nesse intervalo,
+    // a sessão ainda diz "não verificada" e a troca gravaria um endereço que
+    // ninguém provou numa loja já liberada — reproduzido na revisão. A trava
+    // decide com o estado de agora, segura a linha até o commit, e o rollback
+    // desfaz o `update` acima.
+    if (!(await restaurantsRepository.lockIfUnverified(auth.restaurantId, client))) {
+      throw jaVerificada();
+    }
+
+    // Um link de recuperação pedido antes está na caixa de um estranho, e ele
+    // abre a conta.
+    await passwordResetRepository.softDeleteLiveForUser(auth.userId, client);
+    await sessionsRepository.revokeAllForUser(auth.userId, auth.sessionId, client);
+  });
+}
+
 /** Os usuários com acesso ao painel do restaurante. */
 export async function listUsers(
   restaurantId: string,
@@ -624,13 +754,80 @@ export async function createUser(
 }
 
 /**
+ * Trava quem pede e o alvo, e confere que quem pede AINDA é dono.
+ *
+ * ⚠️ "Ninguém remove nem rebaixa a si mesmo" não segura sozinho a invariante
+ * de sempre haver um dono. O hook confere o `ownerOnly` com o papel lido
+ * ANTES da transação; dois donos agindo um sobre o outro ao mesmo tempo
+ * passariam os dois, e a loja ficaria sem dono nenhum — sem quem convide,
+ * promova ou a encerre (medido: duas remoções cruzadas respondiam 204 e 204).
+ * Com as duas linhas travadas, em ordem de id para as duas requisições não se
+ * travarem em ordens opostas, a segunda a entrar encontra quem pede já
+ * rebaixado ou removido e leva o mesmo 403 do hook. Há testes de corrida, e
+ * eles caem sem esta releitura.
+ */
+async function assertStillOwner(
+  auth: AuthContext,
+  targetId: string,
+  client: Queryable,
+): Promise<void> {
+  const locked = await restaurantUsersRepository.findByIdsInRestaurantForUpdate(
+    auth.restaurantId,
+    [auth.userId, targetId],
+    client,
+  );
+  const actor = locked.find((user) => user.id === auth.userId);
+  if (actor?.role !== "owner") {
+    throw new ForbiddenError("Esta ação é restrita ao dono do restaurante");
+  }
+}
+
+/**
+ * Troca o papel de um usuário do restaurante.
+ *
+ * **Ninguém muda o próprio papel** (409), pela mesma razão de ninguém remover
+ * a si mesmo: como só `owner` muda papel, o último dono nunca consegue deixar
+ * de ser dono. A corrida entre dois donos é fechada por `assertStillOwner`.
+ *
+ * Não mexe nas sessões de ninguém: o papel vem do banco a cada requisição, na
+ * query que resolve o token, então a troca vale na requisição seguinte.
+ */
+export async function changeUserRole(
+  auth: AuthContext,
+  userId: string,
+  role: UserRole,
+): Promise<RestaurantUser> {
+  if (!isUuid(userId)) throw userNotFound(userId);
+
+  if (userId === auth.userId) {
+    throw new ConflictError(
+      "Você não pode mudar o próprio papel. Peça a outro dono do restaurante",
+    );
+  }
+
+  return withTransaction(async (client) => {
+    await assertStillOwner(auth, userId, client);
+
+    const updated = await restaurantUsersRepository.updateRole(
+      auth.restaurantId,
+      userId,
+      role,
+      client,
+    );
+    if (updated === null) throw userNotFound(userId);
+    return updated;
+  });
+}
+
+/**
  * Remove um usuário do restaurante.
  *
  * **Ninguém remove a si mesmo** (409). A regra existe para não deixar alguém
  * se trancar para fora, e ela tem uma consequência que vale de invariante: como
  * só `owner` remove usuário, o último dono nunca consegue sair — então o
  * restaurante sempre tem pelo menos um `owner`, e nunca fica sem quem possa
- * convidar alguém ou encerrá-lo.
+ * convidar alguém ou encerrá-lo. A corrida entre dois donos se removendo ao
+ * mesmo tempo é fechada por `assertStillOwner`.
  *
  * Não é preciso revogar as sessões do removido: a resolução do token junta
  * `restaurant_users` filtrando `deleted_at is null`, então elas param de valer
@@ -648,9 +845,14 @@ export async function removeUser(
     );
   }
 
-  const removed = await restaurantUsersRepository.softDelete(
-    auth.restaurantId,
-    userId,
-  );
-  if (!removed) throw userNotFound(userId);
+  await withTransaction(async (client) => {
+    await assertStillOwner(auth, userId, client);
+
+    const removed = await restaurantUsersRepository.softDelete(
+      auth.restaurantId,
+      userId,
+      client,
+    );
+    if (!removed) throw userNotFound(userId);
+  });
 }

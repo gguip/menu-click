@@ -31,3 +31,15 @@ export function inviteUser(restaurantId: string, body: InviteBody): Promise<Rest
 export function deleteUser(restaurantId: string, id: string): Promise<void> {
   return apiRequest<void>(`/restaurants/${restaurantId}/users/${id}`, { method: "DELETE" });
 }
+
+/** Só o papel: a API não edita nome nem e-mail por esta rota. */
+export function changeUserRole(
+  restaurantId: string,
+  id: string,
+  role: UserRole,
+): Promise<RestaurantUser> {
+  return apiRequest<RestaurantUser>(`/restaurants/${restaurantId}/users/${id}`, {
+    method: "PATCH",
+    body: { role },
+  });
+}

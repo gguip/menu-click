@@ -199,8 +199,8 @@ export type ListedOptionGroup = OptionGroup & { productCount: number };
 export type Table = { id: string; restaurantId: string; label: string; hash: string; qrUrl: string };
 
 /**
- * Usuário do restaurante. O papel não se edita: a API não tem
- * `PATCH .../users/:id`, então trocar é remover e convidar de novo.
+ * Usuário do restaurante. Só o papel se edita (`PATCH .../users/:id`); nome e
+ * e-mail, não.
  */
 export type RestaurantUser = {
   id: string;

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { RestaurantUser } from "../src/api/types.ts";
 import {
+  changeRoleConfirm,
   initials,
   isSelf,
+  otherRole,
   removeUserConfirm,
   roleLabel,
   validateInvite,
@@ -75,5 +77,30 @@ describe("regras dos usuários", () => {
     );
     expect(copy.cta).toBe("Remover acesso");
     expect(copy.tone).toBe("danger");
+  });
+
+  it("a confirmação de promover diz o que o dono pode fazer", () => {
+    const copy = changeRoleConfirm("João", "owner");
+    expect(copy.title).toBe("Tornar João dono?");
+    expect(copy.body).toBe(
+      "Dono administra os usuários e pode remover o restaurante. A mudança vale na próxima ação dela, sem entrar de novo.",
+    );
+    expect(copy.cta).toBe("Tornar dono");
+    expect(copy.tone).toBe("danger");
+  });
+
+  it("a confirmação de rebaixar diz o que a pessoa perde e o que continua", () => {
+    const copy = changeRoleConfirm("João", "staff");
+    expect(copy.title).toBe("Tornar João equipe?");
+    expect(copy.body).toBe(
+      "A conta deixa de administrar os usuários e de poder remover o restaurante. O resto do painel continua igual, e a mudança vale na próxima ação dela.",
+    );
+    expect(copy.cta).toBe("Tornar equipe");
+    expect(copy.tone).toBe("accent");
+  });
+
+  it("o papel oferecido é sempre o outro", () => {
+    expect(otherRole("staff")).toBe("owner");
+    expect(otherRole("owner")).toBe("staff");
   });
 });

@@ -175,6 +175,94 @@ export async function updatePasswordHash(
 }
 
 /**
+ * Usuário vivo com esse id, **travando a linha** até o fim da transação.
+ *
+ * Existe para quem lê o e-mail e age sobre ele na mesma transação — a emissão
+ * do link de verificação. A troca de e-mail trava a mesma linha com o `update`
+ * dela, então as duas se enfileiram: ou a emissão lê o endereço novo, ou o
+ * token dela nasce antes e a troca o invalida.
+ */
+export async function findByIdForUpdate(
+  id: string,
+  db: Queryable,
+): Promise<RestaurantUser | null> {
+  const { rows } = await db.query<RestaurantUserRow>(
+    "select * from restaurant_users where id = $1 and deleted_at is null for update",
+    [id],
+  );
+  return rows.length === 0 ? null : toRestaurantUser(rows[0]);
+}
+
+/**
+ * Troca o e-mail de um usuário vivo.
+ *
+ * Três resultados, e os três importam para o serviço: a linha atualizada,
+ * `"taken"` quando o endereço já é de outro usuário vivo (o índice único
+ * parcial recusou — nunca um `select` antes, entre checar e gravar cabe outra
+ * requisição), e `null` quando o usuário não existe ou já foi removido.
+ */
+export async function updateEmail(
+  id: string,
+  email: string,
+  db: Queryable = pool,
+): Promise<RestaurantUser | "taken" | null> {
+  try {
+    const { rows } = await db.query<RestaurantUserRow>(
+      `update restaurant_users set email = $1, updated_at = now()
+        where id = $2 and deleted_at is null
+        returning *`,
+      [email, id],
+    );
+    return rows.length === 0 ? null : toRestaurantUser(rows[0]);
+  } catch (error) {
+    if ((error as { code?: string }).code === UNIQUE_VIOLATION) return "taken";
+    throw error;
+  }
+}
+
+/**
+ * Usuários vivos do restaurante com esses ids, **travando as linhas** até o
+ * fim da transação.
+ *
+ * O `order by id` fixa a ordem de travamento: duas trocas de papel cruzadas
+ * (A muda B enquanto B muda A) pedem as mesmas duas linhas, e sem ordem fixa
+ * cada uma pegaria a sua primeiro e esperaria a da outra — deadlock.
+ */
+export async function findByIdsInRestaurantForUpdate(
+  restaurantId: string,
+  ids: string[],
+  db: Queryable,
+): Promise<RestaurantUser[]> {
+  const { rows } = await db.query<RestaurantUserRow>(
+    `select * from restaurant_users
+      where id = any($1::uuid[]) and restaurant_id = $2 and deleted_at is null
+      order by id
+        for update`,
+    [ids, restaurantId],
+  );
+  return rows.map(toRestaurantUser);
+}
+
+/**
+ * Troca o papel de um usuário vivo, **escopado pelo restaurante** (S23).
+ * `null` quando ele não existe ali ou já foi removido.
+ */
+export async function updateRole(
+  restaurantId: string,
+  id: string,
+  role: UserRole,
+  db: Queryable = pool,
+): Promise<RestaurantUser | null> {
+  const { rows } = await db.query<RestaurantUserRow>(
+    `update restaurant_users set role = $1, updated_at = now()
+      where id = $2 and restaurant_id = $3 and deleted_at is null
+      returning *`,
+    [role, id, restaurantId],
+  );
+  return rows.length === 0 ? null : toRestaurantUser(rows[0]);
+}
+
+/**
  * Usuário vivo com esse id, **com o hash**. Só a troca de senha usa, para
  * conferir a atual.
  *

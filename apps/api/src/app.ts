@@ -272,6 +272,9 @@ export async function buildApp() {
     // e método fora daqui o navegador bloqueia antes de sair (há teste)
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["content-type", "authorization"],
+    // header de RESPOSTA que o script da outra origem pode ler: sem isto o
+    // navegador esconde o `Retry-After` do 429 e o painel conta sempre 60 s
+    exposedHeaders: ["retry-after"],
     // sem `credentials`: a API usa header, não cookie
   });
 

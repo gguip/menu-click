@@ -62,3 +62,29 @@ export function removeUserConfirm(name: string): ConfirmCopy {
     tone: "danger",
   };
 }
+
+/** A troca de papel só tem um destino: o outro. */
+export function otherRole(role: UserRole): UserRole {
+  return role === "owner" ? "staff" : "owner";
+}
+
+/**
+ * Promover é o gesto de consequência: dá a alguém o poder de remover o
+ * restaurante, por isso o tom de perigo. Rebaixar só tira.
+ */
+export function changeRoleConfirm(name: string, role: UserRole): ConfirmCopy {
+  if (role === "owner") {
+    return {
+      title: `Tornar ${name} dono?`,
+      body: "Dono administra os usuários e pode remover o restaurante. A mudança vale na próxima ação dela, sem entrar de novo.",
+      cta: "Tornar dono",
+      tone: "danger",
+    };
+  }
+  return {
+    title: `Tornar ${name} equipe?`,
+    body: "A conta deixa de administrar os usuários e de poder remover o restaurante. O resto do painel continua igual, e a mudança vale na próxima ação dela.",
+    cta: "Tornar equipe",
+    tone: "accent",
+  };
+}
